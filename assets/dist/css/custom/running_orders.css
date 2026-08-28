@@ -1,0 +1,164 @@
+/* Running Order screen: wide card grid so orders are visible at a glance
+   instead of the narrow scrolling list in the POS sidebar. */
+
+.ro_card_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.ro_card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+}
+
+.ro_card_head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eeeeee;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.ro_order_no {
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.ro_timer {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: #7367f0;
+}
+
+.ro_card_body {
+    flex: 1;
+}
+
+.ro_row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 3px 0;
+    font-size: 13px;
+}
+
+.ro_label {
+    color: #8f8f8f;
+}
+
+.ro_value {
+    font-weight: 600;
+    text-align: right;
+    word-break: break-word;
+}
+
+.ro_card_actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.ro_btn {
+    font-size: 12px;
+    padding: 6px 4px;
+    border-radius: 6px;
+    background-color: #f2f2f7;
+    color: #333333;
+    text-align: center;
+}
+
+.ro_btn:hover {
+    background-color: #e4e4ef;
+    color: #111111;
+}
+
+.ro_btn_details {
+    background-color: #7367f0;
+    color: #ffffff;
+}
+
+.ro_btn_details:hover {
+    background-color: #5e52d6;
+    color: #ffffff;
+}
+
+.ro_btn_danger {
+    background-color: #f5d8d8;
+    color: #a12020;
+}
+
+.ro_btn_danger:hover {
+    background-color: #edc2c2;
+    color: #7d1616;
+}
+
+.ro_empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: #8f8f8f;
+    padding: 30px 0;
+}
+
+.ro_offline_banner {
+    background-color: #fff4e5;
+    border: 1px solid #ffc107;
+    color: #8a5300;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-weight: 600;
+}
+
+.ro_close_btn {
+    background-color: #dc3545;
+    color: #ffffff;
+    font-weight: 600;
+    margin-left: 10px;
+    padding: 6px 14px;
+    border-radius: 6px;
+}
+
+.ro_close_btn:hover,
+.ro_close_btn:focus {
+    background-color: #b52b39;
+    color: #ffffff;
+}
+
+.ro_count_badge {
+    display: inline-block;
+    background-color: #7367f0;
+    color: #ffffff;
+    border-radius: 20px;
+    padding: 2px 12px;
+    font-weight: 700;
+}
+
+.ro_details_head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.ro_details_table {
+    width: 100%;
+}
+
+.ro_modifiers {
+    font-size: 12px;
+    color: #8f8f8f;
+}
+
+@media (max-width: 575px) {
+    .ro_card_actions {
+        grid-template-columns: 1fr;
+    }
+}

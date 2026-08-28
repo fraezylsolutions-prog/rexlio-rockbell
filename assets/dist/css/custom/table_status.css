@@ -1,0 +1,205 @@
+/* Table status screen: occupancy at a glance, grouped by area. */
+
+.ts_area_block {
+    margin-bottom: 26px;
+}
+
+.ts_area_title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 700;
+    border-bottom: 1px solid #e6e6ef;
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+}
+
+.ts_area_meta {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8f8f8f;
+}
+
+.ts_card_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 14px;
+}
+
+.ts_card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    padding: 13px;
+    display: flex;
+    flex-direction: column;
+    border-top: 4px solid #cfcfda;
+}
+
+.ts_card.ts_occupied {
+    border-top-color: #dc3545;
+}
+
+.ts_card.ts_free {
+    border-top-color: #28a745;
+}
+
+.ts_card_head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.ts_table_name {
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.ts_badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 20px;
+    text-transform: uppercase;
+}
+
+.ts_occupied .ts_badge {
+    background-color: #f8d7da;
+    color: #a12020;
+}
+
+.ts_free .ts_badge {
+    background-color: #d9f2e0;
+    color: #1c6b33;
+}
+
+.ts_card_body {
+    flex: 1;
+}
+
+.ts_row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 13px;
+}
+
+.ts_label {
+    color: #8f8f8f;
+}
+
+.ts_value {
+    font-weight: 600;
+}
+
+.ts_order {
+    border-top: 1px dashed #e6e6ef;
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+.ts_order_head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ts_order_no {
+    font-weight: 700;
+    font-size: 13px;
+}
+
+.ts_timer {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 13px;
+    color: #7367f0;
+}
+
+.ts_order_meta {
+    font-size: 12px;
+    color: #8f8f8f;
+    margin-top: 2px;
+}
+
+.ts_card_actions {
+    margin-top: 12px;
+}
+
+.ts_btn {
+    display: block;
+    width: 100%;
+    font-size: 12px;
+    padding: 6px 4px;
+    border-radius: 6px;
+    background-color: #f2f2f7;
+    color: #333333;
+    text-align: center;
+}
+
+.ts_btn:hover {
+    background-color: #e4e4ef;
+    color: #111111;
+}
+
+.ts_btn_open {
+    background-color: #7367f0;
+    color: #ffffff;
+}
+
+.ts_btn_open:hover {
+    background-color: #5e52d6;
+    color: #ffffff;
+}
+
+.ts_summary {
+    display: inline-block;
+    border-radius: 20px;
+    padding: 3px 13px;
+    font-weight: 700;
+    font-size: 13px;
+    margin-left: 8px;
+}
+
+.ts_summary_occupied {
+    background-color: #f8d7da;
+    color: #a12020;
+}
+
+.ts_summary_free {
+    background-color: #d9f2e0;
+    color: #1c6b33;
+}
+
+.ts_close_btn {
+    background-color: #dc3545;
+    color: #ffffff;
+    font-weight: 600;
+    margin-left: 10px;
+    padding: 6px 14px;
+    border-radius: 6px;
+}
+
+.ts_close_btn:hover,
+.ts_close_btn:focus {
+    background-color: #b52b39;
+    color: #ffffff;
+}
+
+.ts_offline_banner {
+    background-color: #fff4e5;
+    border: 1px solid #ffc107;
+    color: #8a5300;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-weight: 600;
+}
+
+.ts_empty {
+    text-align: center;
+    color: #8f8f8f;
+    padding: 30px 0;
+}

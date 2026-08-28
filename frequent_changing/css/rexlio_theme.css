@@ -1,0 +1,988 @@
+/* ==========================================================================
+   Rexlio theme layer  —  light / dark
+
+   WHY THIS IS AN OVERRIDE FILE, NOT AN EDIT
+   The stylesheets this sits on top of carry ~1,482 hardcoded colour literals
+   (886 in AdminLTE alone) and zero custom properties. Rewriting them in place
+   would be a thousand-edit change across files every screen depends on. This
+   loads LAST instead and re-points the surfaces that matter at a token set, so
+   the whole theme can be removed by deleting one <link> if it ever misbehaves.
+
+   THEME RESOLUTION (three states, not two)
+     :root                                   -> complete LIGHT palette
+     @media (prefers-color-scheme: dark)     -> dark tokens for the visitor who
+       :root:not([data-theme="light"])          has made no explicit choice,
+                                                guarded so an explicit light
+                                                choice still beats a dark OS
+     :root[data-theme="dark"]                -> dark tokens when the toggle asks
+   Components must read TOKENS only. A colour declared solely inside a media or
+   [data-theme] block never applies in the un-stamped state, which is exactly
+   how you end up with one theme's text on the other theme's background.
+   ========================================================================== */
+
+:root{
+    /* ground + surface */
+    --rx-bg:#F4F3FA;
+    --rx-surface:#FFFFFF;
+    --rx-raise:#FFFFFF;
+    --rx-rail:#FFFFFF;
+    --rx-header:#FFFFFF;
+
+    /* ink */
+    --rx-ink:#1B1633;
+    --rx-ink-soft:#4A4568;
+    --rx-muted:#716E8C;
+    --rx-on-accent:#FFFFFF;
+
+    /* lines + accent */
+    --rx-line:#E7E3F4;
+    --rx-line-soft:#F0EDF9;
+    --rx-accent:#6C4BF4;
+    --rx-accent-2:#8B5CF6;
+    --rx-accent-soft:#EFEBFF;
+    --rx-accent-ink:#FFFFFF;
+
+    /* semantic — deliberately separate from the accent hue */
+    --rx-good:#10B981;
+    --rx-warn:#F59E0B;
+    --rx-bad:#EF4444;
+    --rx-info:#06B6D4;
+    --rx-plum:#8B5CF6;
+
+    /* depth */
+    --rx-shadow:0 1px 2px rgba(27,22,51,.05), 0 6px 18px rgba(27,22,51,.07);
+    --rx-shadow-sm:0 1px 2px rgba(27,22,51,.06);
+    --rx-radius:13px;
+    --rx-radius-sm:9px;
+
+    /* chart ink */
+    --rx-grid:#EDEAF7;
+    --rx-track:#EFEBFF;
+}
+
+@media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+        --rx-bg:#070C1F;
+        --rx-surface:#0E1730;
+        --rx-raise:#132043;
+        --rx-rail:#0B1128;
+        --rx-header:#0B1128;
+
+        --rx-ink:#EAF0FF;
+        --rx-ink-soft:#C6D4F0;
+        --rx-muted:#8AA0C9;
+        --rx-on-accent:#FFFFFF;
+
+        --rx-line:#1C2C4E;
+        --rx-line-soft:#152443;
+        --rx-accent:#4C8DFF;
+        --rx-accent-2:#7C4DFF;
+        --rx-accent-soft:#132043;
+        --rx-accent-ink:#FFFFFF;
+
+        --rx-good:#34D399;
+        --rx-warn:#FBBF24;
+        --rx-bad:#F87171;
+        --rx-info:#22D3EE;
+        --rx-plum:#A78BFA;
+
+        --rx-shadow:0 1px 2px rgba(0,0,0,.6), 0 8px 26px rgba(0,0,0,.5);
+        --rx-shadow-sm:0 1px 2px rgba(0,0,0,.5);
+
+        --rx-grid:#152443;
+        --rx-track:#132043;
+    }
+}
+
+:root[data-theme="dark"]{
+    --rx-bg:#070C1F;
+    --rx-surface:#0E1730;
+    --rx-raise:#132043;
+    --rx-rail:#0B1128;
+    --rx-header:#0B1128;
+
+    --rx-ink:#EAF0FF;
+    --rx-ink-soft:#C6D4F0;
+    --rx-muted:#8AA0C9;
+    --rx-on-accent:#FFFFFF;
+
+    --rx-line:#1C2C4E;
+    --rx-line-soft:#152443;
+    --rx-accent:#4C8DFF;
+    --rx-accent-2:#7C4DFF;
+    --rx-accent-soft:#132043;
+    --rx-accent-ink:#FFFFFF;
+
+    --rx-good:#34D399;
+    --rx-warn:#FBBF24;
+    --rx-bad:#F87171;
+    --rx-info:#22D3EE;
+    --rx-plum:#A78BFA;
+
+    --rx-shadow:0 1px 2px rgba(0,0,0,.6), 0 8px 26px rgba(0,0,0,.5);
+    --rx-shadow-sm:0 1px 2px rgba(0,0,0,.5);
+
+    --rx-grid:#152443;
+    --rx-track:#132043;
+}
+
+/* ==========================================================================
+   1. Ground
+   ========================================================================== */
+body,
+.wrapper,
+.content-wrapper,
+.main-content-wrapper{
+    background:var(--rx-bg) !important;
+    color:var(--rx-ink);
+}
+.content-wrapper{min-height:100vh}
+
+/* ==========================================================================
+   2. Sidebar
+   ========================================================================== */
+.main-sidebar,
+.main-sidebar2,
+.left-side{
+    background:var(--rx-rail) !important;
+    border-right:1px solid var(--rx-line);
+}
+.main-sidebar .sidebar-menu > li > a,
+.main-sidebar2 .sidebar-menu > li > a,
+.sidebar-menu .treeview-menu > li > a{
+    color:var(--rx-muted) !important;
+    border-radius:var(--rx-radius-sm);
+    margin:2px 8px;
+    transition:background .15s ease, color .15s ease;
+}
+.main-sidebar .sidebar-menu > li > a:hover,
+.sidebar-menu .treeview-menu > li > a:hover{
+    background:var(--rx-accent-soft) !important;
+    color:var(--rx-accent) !important;
+}
+.sidebar-menu > li.active > a,
+.sidebar-menu li.treeview > .treeview-menu .treeMenuActive a,
+.main-sidebar .sidebar-menu li.treeview > .treeview-menu .treeMenuActive a{
+    background:var(--rx-accent) !important;
+    color:var(--rx-accent-ink) !important;
+    box-shadow:var(--rx-shadow-sm);
+}
+.sidebar-menu .header,
+.main-sidebar .sidebar-menu .header{
+    color:var(--rx-muted) !important;
+    background:transparent !important;
+    font-size:10px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    font-weight:600;
+}
+.sidebar-menu .treeview-menu{background:transparent !important}
+
+/* ==========================================================================
+   3. Header
+   ========================================================================== */
+.main-header .navbar,
+.main-header .logo,
+.main-header{
+    background:var(--rx-header) !important;
+    border-bottom:1px solid var(--rx-line);
+    box-shadow:none;
+}
+.main-header .navbar .nav > li > a,
+.main-header .navbar a{color:var(--rx-ink-soft)}
+
+/* ==========================================================================
+   4. Cards / boxes  (dashboard + every list screen)
+   ========================================================================== */
+.box,
+.table-box,
+.card,
+.box-wrapper > .table-box{
+    background:var(--rx-surface) !important;
+    border:1px solid var(--rx-line) !important;
+    border-radius:var(--rx-radius) !important;
+    box-shadow:var(--rx-shadow) !important;
+    color:var(--rx-ink);
+}
+.box-header,
+.box-body,
+.box-footer{background:transparent !important; color:var(--rx-ink)}
+.box-title,
+.box-header .box-title{
+    color:var(--rx-ink) !important;
+    font-weight:600;
+    letter-spacing:-.01em;
+}
+.box.box-info,
+.box.box-primary,
+.box.box-success,
+.box.box-warning,
+.box.box-danger{border-top-color:var(--rx-line) !important}
+
+/* the coloured stat tiles */
+.card-icon{
+    width:44px; height:44px;
+    border-radius:12px;
+    display:grid; place-items:center;
+    color:#fff !important;
+    box-shadow:var(--rx-shadow-sm);
+}
+.card-icon.primary_icon{background:linear-gradient(135deg,var(--rx-accent),var(--rx-accent-2)) !important}
+.card-icon.success_icon{background:linear-gradient(135deg,var(--rx-good),#6EE7B7) !important}
+.card-icon.warning_icon{background:linear-gradient(135deg,var(--rx-warn),#FCD34D) !important}
+.card-icon.info_icon   {background:linear-gradient(135deg,var(--rx-info),#67E8F9) !important}
+.card-icon.purple_icon {background:linear-gradient(135deg,var(--rx-plum),#C4B5FD) !important}
+.card-icon.red_icon    {background:linear-gradient(135deg,var(--rx-bad),#FCA5A5) !important}
+.card-icon i,.card-icon svg{color:#fff !important; stroke:#fff}
+
+/* numbers line up */
+.txt_28,.box-body.txt_28,.grid_view .txt_28{
+    font-variant-numeric:tabular-nums;
+    font-weight:700;
+    letter-spacing:-.02em;
+    color:var(--rx-ink) !important;
+}
+
+/* ==========================================================================
+   5. Tables
+   ========================================================================== */
+.table,.table thead th,.table tbody td,table.dataTable{
+    color:var(--rx-ink) !important;
+    border-color:var(--rx-line) !important;
+}
+.table thead th,table.dataTable thead th{
+    background:var(--rx-accent-soft) !important;
+    color:var(--rx-ink) !important;
+    font-weight:600;
+    border-bottom:1px solid var(--rx-line) !important;
+}
+.table tbody tr:hover > td{background:var(--rx-accent-soft) !important}
+.table-striped tbody tr:nth-of-type(odd) > *{background:var(--rx-line-soft) !important}
+
+/* ==========================================================================
+   6. Forms
+   ========================================================================== */
+.form-control,
+select.form-control,
+textarea.form-control,
+.select2-container--default .select2-selection--single{
+    background:var(--rx-surface) !important;
+    border:1px solid var(--rx-line) !important;
+    color:var(--rx-ink) !important;
+    border-radius:var(--rx-radius-sm) !important;
+}
+.form-control::placeholder{color:var(--rx-muted) !important}
+.form-control:focus{
+    border-color:var(--rx-accent) !important;
+    box-shadow:0 0 0 3px var(--rx-accent-soft) !important;
+}
+label,.form-group label{color:var(--rx-ink-soft)}
+.select2-dropdown,.select2-results__option{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+}
+.select2-container--default .select2-results__option--highlighted[aria-selected]{
+    background:var(--rx-accent) !important; color:#fff !important;
+}
+
+/* ==========================================================================
+   7. Buttons
+   ========================================================================== */
+.btn.bg-blue-btn,.new-btn,.btn-primary{
+    background:var(--rx-accent) !important;
+    border-color:transparent !important;
+    color:var(--rx-accent-ink) !important;
+    border-radius:var(--rx-radius-sm) !important;
+    font-weight:600;
+    box-shadow:var(--rx-shadow-sm);
+    transition:filter .15s ease, transform .08s ease;
+}
+.btn.bg-blue-btn:hover,.new-btn:hover,.btn-primary:hover{filter:brightness(1.08)}
+.btn.bg-blue-btn:active,.new-btn:active{transform:translateY(1px)}
+.btn:focus-visible,a:focus-visible,button:focus-visible{
+    outline:2px solid var(--rx-accent) !important;
+    outline-offset:2px;
+}
+
+/* ==========================================================================
+   8. Sale screen
+   ========================================================================== */
+.order_holder,
+.order_table_holder,
+.footer__details,
+.pos-left,.pos-right{color:var(--rx-ink)}
+
+/* category rail — colour is assigned server-side as data-cix so each category
+   keeps the SAME colour every time the screen loads, rather than shifting when
+   the list is filtered or reordered. */
+a.category_button{
+    display:flex !important;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
+    border-radius:var(--rx-radius-sm) !important;
+    font-weight:600 !important;
+    color:#fff !important;
+    border:0 !important;
+    box-shadow:var(--rx-shadow-sm);
+    transition:filter .15s ease, transform .08s ease;
+}
+a.category_button:hover{filter:brightness(1.1)}
+a.category_button:active{transform:translateY(1px)}
+a.category_button[data-cix="0"]{background:#E11D48 !important}
+a.category_button[data-cix="1"]{background:#7C3AED !important}
+a.category_button[data-cix="2"]{background:#0891B2 !important}
+a.category_button[data-cix="3"]{background:#DB2777 !important}
+a.category_button[data-cix="4"]{background:#EA580C !important}
+a.category_button[data-cix="5"]{background:#059669 !important}
+a.category_button[data-cix="6"]{background:#4F46E5 !important}
+a.category_button[data-cix="7"]{background:#B45309 !important}
+a.category_button.active,a.category_button.all_category{
+    background:var(--rx-accent) !important;
+    outline:2px solid var(--rx-ink);
+    outline-offset:1px;
+}
+
+/* product tiles */
+.single_item{
+    background:var(--rx-surface) !important;
+    border:1px solid var(--rx-line) !important;
+    border-radius:var(--rx-radius) !important;
+    box-shadow:var(--rx-shadow);
+    overflow:hidden;
+    transition:transform .1s ease, box-shadow .15s ease;
+}
+.single_item:hover{transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.14)}
+.single_item .item_name{color:var(--rx-ink) !important; font-weight:600}
+.single_item .item_price{
+    color:var(--rx-accent) !important;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+}
+
+/* ==========================================================================
+   9. Theme toggle control
+   Sits as an <li> in the header's menu-list, beside the language selector, so
+   it inherits that row's alignment instead of trying to match it by hand.
+   Icon only: the header is already crowded and the two glyphs are unambiguous,
+   with the accessible name carried by aria-label rather than visible text.
+   ========================================================================== */
+li.rx-theme-li{
+    display:flex;
+    align-items:center;
+    list-style:none;
+    margin:0 4px;
+}
+.rx-theme-toggle{
+    display:inline-flex;
+    align-items:center;
+    gap:2px;
+    padding:2px;
+    background:var(--rx-accent-soft);
+    border:1px solid var(--rx-line);
+    border-radius:999px;
+    line-height:0;
+}
+.rx-theme-toggle button{
+    font:600 13px/1 inherit;
+    color:var(--rx-muted);
+    background:none;
+    border:0;
+    width:28px;
+    height:28px;
+    padding:0;
+    border-radius:50%;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    transition:background .16s ease, color .16s ease;
+}
+.rx-theme-toggle button[aria-pressed="true"]{
+    background:var(--rx-accent);
+    color:var(--rx-accent-ink);
+    box-shadow:var(--rx-shadow-sm);
+}
+.rx-theme-toggle button:hover{color:var(--rx-ink)}
+.rx-theme-toggle button[aria-pressed="true"]:hover{color:var(--rx-accent-ink)}
+
+/* ==========================================================================
+   10. Odds and ends that otherwise stay light in dark mode
+   ========================================================================== */
+.modal-content,.dropdown-menu,.c-dropdown-menu,.lang-dropdown-menu,.popover,.tooltip-inner{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+    border:1px solid var(--rx-line) !important;
+}
+.modal-header,.modal-footer{border-color:var(--rx-line) !important}
+.nav-tabs .nav-link.active{
+    background:var(--rx-surface) !important;
+    color:var(--rx-accent) !important;
+    border-color:var(--rx-line) var(--rx-line) var(--rx-surface) !important;
+}
+hr{border-color:var(--rx-line) !important}
+.callout{
+    background:var(--rx-accent-soft) !important;
+    border-left:4px solid var(--rx-accent) !important;
+    color:var(--rx-ink) !important;
+    border-radius:var(--rx-radius-sm);
+}
+.alert-success{background:var(--rx-good) !important; color:#fff !important; border:0 !important}
+.alert-danger {background:var(--rx-bad)  !important; color:#fff !important; border:0 !important}
+
+@media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important}
+}
+
+/* ==========================================================================
+   11. Elements that keep a hardcoded colour in dark mode
+   Found by a computed-contrast sweep over the real dashboard, not by eye.
+   Each of these is set either by AdminLTE or by the inline <style> block in
+   userHome.php that injects the company's configured brand colour - both of
+   which out-specify the token rules above, so they are named explicitly here.
+   Measured contrast before this block: 1.06 on the page title, 1.01 on the
+   Week/Month buttons, 1.32 on the logo and sidebar toggle.
+   ========================================================================== */
+/* these three sit OUTSIDE .main-header in the markup, so the prefixed
+   selectors I first wrote never matched them */
+.sidebar-toggle,
+.logo-wrapper,
+.logo-mini,
+.logo-lg,
+.sidebar-toggle i,
+.logo-wrapper i{
+    color:var(--rx-ink) !important;
+}
+h3.top-left-header,
+.top-left-header,
+.top-left-header span,
+.sale_report_header,
+.content-header h3,
+.content-header h1{
+    color:var(--rx-ink) !important;
+}
+.select2-container--default .select2-selection__rendered,
+.select2-selection__placeholder{
+    color:var(--rx-ink) !important;
+}
+/* segmented Week / Month control: accent text on a 10%-accent fill is
+   invisible once both sides move with the theme */
+.get_date_by_custom_btn,
+button.get_date_by_custom_btn.custom_td{
+    color:var(--rx-ink) !important;
+    background:var(--rx-accent-soft) !important;
+    border:1px solid var(--rx-line) !important;
+    border-radius:var(--rx-radius-sm) !important;
+    font-weight:600;
+}
+.get_date_by_custom_btn.active,
+button.get_date_by_custom_btn.custom_td.active{
+    background:var(--rx-accent) !important;
+    color:var(--rx-accent-ink) !important;
+    border-color:transparent !important;
+}
+
+/* ==========================================================================
+   12. Select2
+   Select2 builds its own DOM with its own hardcoded colours (#444 text on a
+   white selection box), and it is used on nearly every screen with a filter -
+   Order Lookup, the report screens, the bulk tools. Measured at 1.14 contrast
+   in dark mode, i.e. dark grey text on dark navy. Covered explicitly here
+   because the generic .form-control rules never reach these nodes.
+   ========================================================================== */
+.select2-container--default .select2-selection--single,
+.select2-container--default .select2-selection--multiple,
+.select2-container .select2-selection{
+    background:var(--rx-surface) !important;
+    border:1px solid var(--rx-line) !important;
+    border-radius:var(--rx-radius-sm) !important;
+    color:var(--rx-ink) !important;
+}
+.select2-container--default .select2-selection--single .select2-selection__rendered,
+.select2-container--default .select2-selection--multiple .select2-selection__rendered,
+.select2-selection__rendered,
+.select2-selection__choice,
+.select2-container .select2-selection__rendered{
+    color:var(--rx-ink) !important;
+}
+.select2-container--default .select2-selection--single .select2-selection__placeholder,
+.select2-selection__placeholder{color:var(--rx-muted) !important}
+.select2-container--default .select2-selection--single .select2-selection__arrow b{
+    border-color:var(--rx-muted) transparent transparent transparent !important;
+}
+.select2-container--default.select2-container--open .select2-selection--single .select2-selection__arrow b{
+    border-color:transparent transparent var(--rx-muted) transparent !important;
+}
+.select2-dropdown,.select2-container--default .select2-dropdown{
+    background:var(--rx-surface) !important;
+    border:1px solid var(--rx-line) !important;
+    color:var(--rx-ink) !important;
+}
+.select2-container--default .select2-results__option{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+}
+.select2-container--default .select2-results__option[aria-selected="true"]{
+    background:var(--rx-accent-soft) !important;
+    color:var(--rx-ink) !important;
+}
+.select2-container--default .select2-search--dropdown .select2-search__field{
+    background:var(--rx-surface) !important;
+    border:1px solid var(--rx-line) !important;
+    color:var(--rx-ink) !important;
+}
+.select2-container--default .select2-selection--multiple .select2-selection__choice{
+    background:var(--rx-accent-soft) !important;
+    border:1px solid var(--rx-line) !important;
+}
+
+/* native selects and file inputs pick up the browser's own light chrome */
+select,select.form-control,input[type="file"],input[type="date"],input[type="text"],
+input[type="number"],input[type="email"],input[type="password"],textarea{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+    border:1px solid var(--rx-line) !important;
+}
+select option{background:var(--rx-surface); color:var(--rx-ink)}
+input[type="file"]::file-selector-button{
+    background:var(--rx-accent-soft) !important;
+    color:var(--rx-ink) !important;
+    border:1px solid var(--rx-line) !important;
+    border-radius:var(--rx-radius-sm);
+}
+
+/* ==========================================================================
+   13. DataTables chrome
+   Present on every list and report screen. Two measured failures in dark mode:
+   the empty-table cell kept a hardcoded white background (light text on white,
+   1.14), and the "Showing x to y of z" line uses a translucent near-black that
+   lands at 1.3 on the dark ground. Both are DataTables' own styles.
+   ========================================================================== */
+table.dataTable td.dataTables_empty,
+td.dataTables_empty{
+    background:var(--rx-surface) !important;
+    color:var(--rx-muted) !important;
+}
+.dataTables_info,.dataTables_length,.dataTables_filter,
+.dataTables_length label,.dataTables_filter label,
+.dataTables_wrapper .dataTables_info,
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter{
+    color:var(--rx-muted) !important;
+}
+.dataTables_filter input,.dataTables_length select{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+    border:1px solid var(--rx-line) !important;
+    border-radius:var(--rx-radius-sm) !important;
+}
+.dataTables_paginate .paginate_button{
+    color:var(--rx-ink) !important;
+    background:var(--rx-surface) !important;
+    border:1px solid var(--rx-line) !important;
+    border-radius:var(--rx-radius-sm) !important;
+}
+.dataTables_paginate .paginate_button.current,
+.dataTables_paginate .paginate_button:hover{
+    background:var(--rx-accent) !important;
+    color:var(--rx-accent-ink) !important;
+    border-color:transparent !important;
+}
+.dataTables_paginate .paginate_button.disabled{opacity:.45}
+table.dataTable tbody tr,table.dataTable tbody td{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+}
+table.dataTable tbody tr:hover td{background:var(--rx-accent-soft) !important}
+.dt-buttons .dt-button{
+    background:var(--rx-accent-soft) !important;
+    color:var(--rx-ink) !important;
+    border:1px solid var(--rx-line) !important;
+    border-radius:var(--rx-radius-sm) !important;
+}
+
+/* ==========================================================================
+   14. Headings and callouts inside content boxes
+   The bulk-tool screens use bare <h4> step headings and a .callout for the
+   explanatory note. Neither inherited a themed colour: the headings measured
+   1.18 in dark, and the callout body 2.15 in BOTH themes - marginal even in
+   light, which is why it is set here rather than only patched for dark.
+   ========================================================================== */
+.table-box h1,.table-box h2,.table-box h3,.table-box h4,.table-box h5,
+.box-body h1,.box-body h2,.box-body h3,.box-body h4,.box-body h5,
+.box-wrapper h4{
+    color:var(--rx-ink) !important;
+}
+.callout,.callout p,.callout-info,.callout-info p{
+    color:var(--rx-ink) !important;
+}
+.help-block,.help-block small,small.text-muted,.text-muted{
+    color:var(--rx-muted) !important;
+}
+
+/* AdminLTE's .callout-info paints a fixed cyan (#00C0EF) that out-specifies the
+   .callout rule above, leaving light ink on cyan at 1.88. The variant classes
+   are named explicitly so the surface moves with the theme; the semantic
+   distinction is kept as a left border rather than a full-bleed fill. */
+.callout.callout-info,.callout.callout-success,
+.callout.callout-warning,.callout.callout-danger{
+    background:var(--rx-accent-soft) !important;
+    color:var(--rx-ink) !important;
+}
+.callout.callout-info{border-left:4px solid var(--rx-info) !important}
+.callout.callout-success{border-left:4px solid var(--rx-good) !important}
+.callout.callout-warning{border-left:4px solid var(--rx-warn) !important}
+.callout.callout-danger{border-left:4px solid var(--rx-bad) !important}
+
+/* ==========================================================================
+   15. POS shell surfaces
+   --------------------------------------------------------------------------
+   The first pass themed the CONTENT of the sale screen (tiles, category rail,
+   cart text) but not the PANELS those sit in. style2.css paints .main_left,
+   .main_middle, .main_right, .main_center, .holder and .top_header_part a
+   hardcoded #fff, so in dark mode the screen came back mostly white with dark
+   islands floating in it - the "so many white" the mockup does not have.
+
+   Everything here is painted from tokens rather than fixed colours, so the
+   light theme is unchanged: --rx-surface IS #FFFFFF in light, which is exactly
+   what these rules already were. Only the dark palette actually moves.
+
+   Separators use inset box-shadow, never border, so nothing gains a pixel of
+   box size and no layout shifts.
+   ========================================================================== */
+
+.top_header_part,
+.main_left,.main_middle,.main_right,.main_center,
+.main_left .holder,
+ul.list-of-item{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+}
+.top_header_part{box-shadow:inset 0 -1px 0 var(--rx-line)}
+.main_left{box-shadow:inset -1px 0 0 var(--rx-line)}
+.main_right{box-shadow:inset 1px 0 0 var(--rx-line)}
+
+/* the scrollable running-order list carries its own translucent near-white */
+#order_details_holder,
+.scroll-wrapper.order_details,
+.order_details{background:transparent !important;color:var(--rx-ink) !important}
+
+/* panel headings inherited the light-theme ink, so "Running Orders" came out
+   near-black on navy */
+.main_left h3,.main_left h4,.main_middle h3,.main_right h3{color:var(--rx-ink) !important}
+
+/* left-hand operation buttons: #ECF0F1 with black text in both themes */
+.operation_button,
+.invoice_btn_class,.kot_btn_class{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+    box-shadow:inset 0 0 0 1px var(--rx-line);
+    border-radius:var(--rx-radius-sm) !important;
+}
+.operation_button:hover,
+.invoice_btn_class:hover,.kot_btn_class:hover{background:var(--rx-accent-soft) !important}
+
+#search_running_orders,
+#search_future_custom_modal,
+#search_self_order_custom_modal{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+    box-shadow:inset 0 0 0 1px var(--rx-line);
+}
+
+/* order-type tabs. The mockup shows the active one filled with the accent and
+   the rest quiet, instead of two near-identical greys. */
+.main_top .selected__btn_c{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+    box-shadow:inset 0 0 0 1px var(--rx-line);
+    border-radius:6px !important;
+    font-weight:600;
+}
+.main_top .selected__btn_c[data-selected="selected"]{
+    background:var(--rx-accent) !important;
+    color:var(--rx-on-accent,#fff) !important;
+    box-shadow:none;
+}
+
+/* Total Payable strip - a bare <h1> with a hardcoded grey ground */
+.main_center h1,.main_middle h1{
+    background:transparent !important;
+    color:var(--rx-ink) !important;
+}
+
+/* cart table */
+.main_center table,.main_center thead,.main_center tbody,
+.main_center th,.main_center td{
+    background:transparent !important;
+    color:var(--rx-ink) !important;
+    border-color:var(--rx-line) !important;
+}
+.main_center th{color:var(--rx-muted) !important; font-weight:600}
+
+/* ==========================================================================
+   16. Category rail shape
+   --------------------------------------------------------------------------
+   9px on a 29px-tall button reads as a lozenge; the mockup uses a slight
+   rounding on a much taller button. Radius only - the height is left alone
+   deliberately, because the rail is a fixed 300px scroll box and taller
+   buttons would mean fewer categories visible per screen, trading a real
+   click into a scroll for a cosmetic gain.
+   ========================================================================== */
+a.category_button{border-radius:4px !important}
+a.button_category_show_all1,a.category_button.all_category{
+    border-radius:4px !important;
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+    box-shadow:inset 0 0 0 1px var(--rx-line);
+    font-weight:600 !important;
+}
+
+/* The cart header and its rows are DIVs, not a real table, so the table rules
+   above never reached them - the column labels stayed pure black and landed at
+   1.18 against the navy. Set on the containers only, so any child that carries
+   its own deliberate colour (the price accent, status pills) keeps it. */
+.single_header_column{color:var(--rx-muted) !important; font-weight:600}
+.single_order_column{color:var(--rx-ink) !important}
+
+/* ==========================================================================
+   17. Dashboard KPI cards
+   --------------------------------------------------------------------------
+   The two rows of stat cards (Revenue / Net Profit / Transactions / Customers
+   / Average Receipt, and the date row above them) are .btn.btn-dblue1 anchors
+   painted a flat #fff with black text, so in dark mode they read as eleven
+   white slabs on the navy ground - the single biggest light area left on the
+   dashboard. Tokens again, so light is unchanged (--rx-surface IS #fff there).
+
+   The selected card also gets an accent ring. Previously .active differed from
+   the rest by nothing visible at all, in EITHER theme, so which metric the
+   chart below was plotting could not be told from the cards.
+   ========================================================================== */
+.btn-dblue1{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+    box-shadow:inset 0 0 0 1px var(--rx-line);
+    border-radius:var(--rx-radius) !important;
+}
+.btn-dblue1:hover{background:var(--rx-accent-soft) !important}
+.btn-dblue1.active{
+    background:var(--rx-accent-soft) !important;
+    color:var(--rx-ink) !important;
+    box-shadow:inset 0 0 0 2px var(--rx-accent);
+}
+.btn-dblue1 *{color:inherit !important}
+
+/* ==========================================================================
+   18. Dashboard KPI cards - raised treatment
+   --------------------------------------------------------------------------
+   The mockup gives each stat card depth and a colour identity: a tinted icon
+   chip, a coloured edge, and a lift off the ground. The markup already carries
+   the identity - every card holds a .card-icon with a variant class
+   (primary_icon / warning_icon / success_icon / red_icon / info_icon /
+   purple_icon), so nothing needs to be added server-side to colour them.
+
+   The coloured edge is an INSET box-shadow, not a border-left, so no card
+   gains 4px of box and no row re-wraps. The per-card edge uses :has(); where
+   that is unsupported the card still gets the neutral accent edge from the
+   base rule, so it degrades to "less colourful", never to "broken".
+   ========================================================================== */
+.btn-dblue1{
+    background-image:linear-gradient(160deg,rgba(255,255,255,.06),rgba(0,0,0,.10)) !important;
+    box-shadow:
+        inset 4px 0 0 var(--rx-accent),
+        inset 0 1px 0 rgba(255,255,255,.07),
+        inset 0 0 0 1px var(--rx-line),
+        0 6px 16px rgba(0,0,0,.22) !important;
+    transition:transform .12s ease, box-shadow .12s ease;
+}
+.btn-dblue1:hover{
+    transform:translateY(-2px);
+    box-shadow:
+        inset 4px 0 0 var(--rx-accent),
+        inset 0 1px 0 rgba(255,255,255,.10),
+        inset 0 0 0 1px var(--rx-line),
+        0 12px 26px rgba(0,0,0,.30) !important;
+}
+.btn-dblue1.active{
+    box-shadow:
+        inset 4px 0 0 var(--rx-accent),
+        inset 0 0 0 2px var(--rx-accent),
+        0 10px 24px rgba(0,0,0,.30) !important;
+}
+
+/* card identity colours, driven by the icon variant already in the markup */
+.btn-dblue1:has(.primary_icon){--rx-card:#4C8DFF}
+.btn-dblue1:has(.warning_icon){--rx-card:#F5A524}
+.btn-dblue1:has(.success_icon){--rx-card:#21C177}
+.btn-dblue1:has(.red_icon)    {--rx-card:#F5455C}
+.btn-dblue1:has(.info_icon)   {--rx-card:#38BDF8}
+.btn-dblue1:has(.purple_icon) {--rx-card:#A855F7}
+.btn-dblue1:has(.card-icon){
+    box-shadow:
+        inset 4px 0 0 var(--rx-card),
+        inset 0 1px 0 rgba(255,255,255,.07),
+        inset 0 0 0 1px var(--rx-line),
+        0 6px 16px rgba(0,0,0,.22) !important;
+}
+.btn-dblue1:has(.card-icon):hover{
+    box-shadow:
+        inset 4px 0 0 var(--rx-card),
+        inset 0 1px 0 rgba(255,255,255,.10),
+        inset 0 0 0 1px var(--rx-line),
+        0 12px 26px rgba(0,0,0,.30) !important;
+}
+.btn-dblue1.active:has(.card-icon){
+    box-shadow:
+        inset 4px 0 0 var(--rx-card),
+        inset 0 0 0 2px var(--rx-card),
+        0 10px 24px rgba(0,0,0,.30) !important;
+}
+
+/* the icon chip: tinted plate + matching glow, as in the mockup */
+.card-icon{
+    width:40px !important; height:40px !important;
+    border-radius:10px !important;
+    align-items:center; justify-content:center;
+}
+.card-icon svg{width:21px;height:21px;stroke:currentColor}
+
+/* Tints written out per variant rather than derived with color-mix(). The
+   derived version resolved its colour correctly for the glyph but the
+   background shorthand kept computing to transparent, so the chip lost its
+   plate. Explicit rgba is unambiguous and has no support question. */
+.card-icon.primary_icon{--rx-card:#4C8DFF; background:rgba(76,141,255,.16) !important; color:#4C8DFF !important;
+    box-shadow:0 0 0 1px rgba(76,141,255,.34), 0 4px 14px rgba(76,141,255,.26)}
+.card-icon.warning_icon{--rx-card:#F5A524; background:rgba(245,165,36,.16) !important; color:#F5A524 !important;
+    box-shadow:0 0 0 1px rgba(245,165,36,.34), 0 4px 14px rgba(245,165,36,.26)}
+.card-icon.success_icon{--rx-card:#21C177; background:rgba(33,193,119,.16) !important; color:#21C177 !important;
+    box-shadow:0 0 0 1px rgba(33,193,119,.34), 0 4px 14px rgba(33,193,119,.26)}
+.card-icon.red_icon    {--rx-card:#F5455C; background:rgba(245,69,92,.16) !important; color:#F5455C !important;
+    box-shadow:0 0 0 1px rgba(245,69,92,.34), 0 4px 14px rgba(245,69,92,.26)}
+.card-icon.info_icon   {--rx-card:#38BDF8; background:rgba(56,189,248,.16) !important; color:#38BDF8 !important;
+    box-shadow:0 0 0 1px rgba(56,189,248,.34), 0 4px 14px rgba(56,189,248,.26)}
+.card-icon.purple_icon {--rx-card:#A855F7; background:rgba(168,85,247,.16) !important; color:#A855F7 !important;
+    box-shadow:0 0 0 1px rgba(168,85,247,.34), 0 4px 14px rgba(168,85,247,.26)}
+
+/* KPI typography - label quiet, figure large and bold, as in the mockup */
+.btn-dblue1 p{font-size:15px !important; color:var(--rx-muted) !important; margin-bottom:4px}
+.btn-dblue1 h5{font-size:24px !important; font-weight:700 !important; color:var(--rx-ink) !important}
+
+/* ==========================================================================
+   19. Payment Methods bars
+   --------------------------------------------------------------------------
+   Bootstrap's .progress ships a near-white track and a flat blue fill, so in
+   dark mode the whole block read as a stack of white slabs - the area circled
+   in the review screenshot.
+   ========================================================================== */
+.progress{
+    background:var(--rx-track,var(--rx-line-soft)) !important;
+    border-radius:8px !important;
+    height:26px !important;
+    box-shadow:inset 0 0 0 1px var(--rx-line);
+    overflow:hidden;
+}
+.progress-bar{
+    background:linear-gradient(90deg,var(--rx-accent),var(--rx-accent-2)) !important;
+    color:#fff !important;
+    font-weight:600 !important;
+    font-size:13px !important;
+    line-height:26px !important;
+    border-radius:8px 0 0 8px;
+}
+
+/* ==========================================================================
+   20. Sale screen typography, footer clearance, running-order cards
+   --------------------------------------------------------------------------
+   Product names shipped at 14px in weight 100 - hairline text on a busy grid,
+   which is what made the screen feel small and washed out. Prices and the cart
+   column headers were 12px. Sizes are nudged, not inflated: the grid is dense
+   and a large jump would cost tiles per screen, which is a real trade against
+   speed of service.
+   ========================================================================== */
+.single_item .item_name{font-size:15px !important; font-weight:600 !important; line-height:1.25}
+.single_item .item_price{font-size:14px !important; font-weight:700 !important}
+.single_header_column{font-size:13px !important; font-weight:700 !important;
+    letter-spacing:.02em; text-transform:uppercase}
+.single_order_column{font-size:14px !important}
+.main_top .selected__btn_c{font-size:15px !important}
+.main_left h3{font-size:19px !important; font-weight:700 !important}
+.bottom__info .payable h1,.main_middle h1{font-size:26px !important; font-weight:700 !important}
+.operation_button{font-size:14px !important; font-weight:600 !important}
+a.category_button{font-size:15px !important}
+
+/* The action row sat flush against the bottom of the column, so on a maximised
+   window it collided with the OS task bar. #bottom_absolute is in normal flow
+   inside a fixed-height column, so bottom padding lifts the buttons rather
+   than pushing the column taller. */
+/* Padding BELOW the buttons cannot lift them - the column already runs past
+   the bottom of the screen, so extra padding just extends the overflow (my
+   first attempt at this made it 16px worse). The action row sits after the
+   cart list, so the only thing that raises it is capping the list. Capped
+   with overflow-y:auto, never a bare max-height, so a long order scrolls
+   instead of losing its last lines.
+   261px = the header/tabs above (149) + the action block (102) + ~26px of
+   clearance, so the buttons keep that gap at any window height. */
+.main_center{
+    max-height:calc(100vh - 261px) !important;
+    overflow-y:auto !important;
+}
+#bottom_absolute{padding-bottom:0 !important}
+
+/* Running-order list: the mockup shows these as raised cards on the dark
+   panel, not bare rows on a light strip. */
+.running_order_custom{
+    background:var(--rx-raise,var(--rx-surface)) !important;
+    color:var(--rx-ink) !important;
+    border-radius:8px !important;
+    margin-bottom:8px !important;
+    box-shadow:inset 0 0 0 1px var(--rx-line);
+    transition:box-shadow .12s ease, transform .08s ease;
+}
+.running_order_custom:hover{
+    transform:translateY(-1px);
+    box-shadow:inset 0 0 0 1px var(--rx-accent);
+}
+.running_order_custom[data-selected="selected"]{
+    box-shadow:inset 0 0 0 2px var(--rx-accent) !important;
+}
+.running_order_custom p,
+.running_order_customer_name,.oder_list_class,
+.running_order_order_number,.running_order_order_number_,
+.running_order_table_name,.running_order_waiter_name{
+    color:var(--rx-ink) !important; font-size:13.5px !important;
+}
+.running_order_customer_name{font-weight:600 !important}
+.running_order_right_arrow{color:var(--rx-muted) !important}
+
+/* ==========================================================================
+   21. Side navigation size
+   --------------------------------------------------------------------------
+   Nudged up one step only. The nav is long and a larger jump would push
+   Purchase/Expense and Transfer/Damage below the fold on a 720p till.
+   ========================================================================== */
+.sidebar-menu > li > a,
+aside .pos__menu__list > li > a{font-size:15.5px !important}
+.child-menu{font-size:14.5px !important}
+.sidebar-menu .header{font-size:13px !important; font-weight:700 !important;
+    letter-spacing:.04em; color:var(--rx-muted) !important}
+
+/* Side-nav section labels ("Common Usages", "Item/Stock"). Kept at their size
+   but given weight and a quiet colour, so they read as group headings rather
+   than as more nav items. */
+.sidebar-menu .menu-header,.menu-header.small{
+    font-size:14px !important; font-weight:700 !important;
+    letter-spacing:.03em; color:var(--rx-muted) !important;
+}
+
+/* The narrow-width header bar stayed white in dark mode. Only visible on
+   tablet/phone widths, which is why it did not show up in the desktop sweep. */
+.top_header_for_mobile{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+    box-shadow:inset 0 -1px 0 var(--rx-line);
+}
+.tablet_btn.type_temp_div{
+    background:var(--rx-surface) !important;
+    color:var(--rx-ink) !important;
+    box-shadow:inset 0 0 0 1px var(--rx-line);
+}

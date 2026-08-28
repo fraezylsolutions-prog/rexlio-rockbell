@@ -1,0 +1,56 @@
+# =============================================================================
+# Rexlio POS - deployment repository
+#
+# Rule of thumb: if it differs between the local WampServer box and the live
+# host, or if it is created BY the app at runtime, it does not belong here.
+# =============================================================================
+
+# --- Environment-specific configuration --------------------------------------
+# database.php holds hardcoded credentials and differs per environment.
+# Deploying it would point live at the local database. Each server keeps its
+# own copy, placed once by hand; database.php.example is the template.
+# NOTE: config.php is deliberately NOT ignored - base_url is derived from
+# $_SERVER['HTTP_HOST'] (config.php:27), so that file is portable as-is.
+/application/config/database.php
+
+# --- Local test harness - MUST NEVER REACH LIVE ------------------------------
+# pw.php is a front controller pinned to ENVIRONMENT='testing' and used with a
+# seeded session; application/config/testing/ points at the scratch database.
+# On a public host this would be an authentication bypass.
+/pw.php
+/application/config/testing/
+/_rx_*.html
+/_pos_*.html
+/_dash_*.html
+
+# --- Runtime-generated ------------------------------------------------------
+/application/logs/*
+!/application/logs/index.html
+!/application/logs/.htaccess
+/application/cache/*
+!/application/cache/index.html
+!/application/cache/.htaccess
+/_temp/
+
+# --- User-uploaded content (belongs to each server, not to the code) ---------
+# Food photos, category images and imported spreadsheets are created by users
+# on whichever server they are using. Versioning them causes binary churn and
+# would let a deploy overwrite live uploads.
+/images/
+/uploads/
+/asset/excel/*
+!/asset/excel/index.html
+!/asset/excel/index.php
+
+# --- Not part of the deployed application -----------------------------------
+/iRestora PLUS v7.5 Nulled/
+/doc/old/
+/doc/*.zip
+/rexlio_backups/
+
+# --- Office lock files, OS cruft ---------------------------------------------
+~$*
+Thumbs.db
+[Dd]esktop.ini
+.DS_Store
+*.sql.gz

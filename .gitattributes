@@ -1,0 +1,20 @@
+# This codebase has deliberately MIXED line endings - application/views/sale/
+# POS/main_screen.php is LF-only while application/views/userHome.php is CRLF,
+# and edits have been made carefully to preserve each file as it was.
+#
+# "* -text" disables all end-of-line conversion, so every file is stored and
+# checked out byte-for-byte. Without it, git would normalise on commit and
+# convert again on checkout, which on the Linux live host would rewrite the
+# endings of the CRLF files, produce enormous whitespace-only diffs, and make
+# it impossible to tell a real change from a line-ending change.
+* -text
+
+# Keep the tracker readable as a binary blob rather than attempted merges.
+*.xlsx binary
+*.zip  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.jfif binary
+*.gif  binary
+*.ico  binary

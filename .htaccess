@@ -1,0 +1,10 @@
+RewriteEngine On 
+RewriteCond %{REQUEST_FILENAME} !-f 
+RewriteCond %{REQUEST_FILENAME} !-d 
+RewriteRule ^(.*)$ index.php?/$1 [L]
+
+# Apache ships no mapping for .jfif, so these uploads were served with no
+# Content-Type at all. Browsers sniff images inside <img> so tiles still
+# rendered, but anything that trusts the header (downloads, some proxies,
+# an <img> served cross-origin) would not. .jfif is plain JPEG data.
+AddType image/jpeg .jfif

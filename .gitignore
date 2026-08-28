@@ -12,6 +12,10 @@
 # NOTE: config.php is deliberately NOT ignored - base_url is derived from
 # $_SERVER['HTTP_HOST'] (config.php:27), so that file is portable as-is.
 /application/config/database.php
+# ...and any per-environment override. CI3 picks config/<ENVIRONMENT>/database.php
+# over the base file and includes only ONE of them (system/database/DB.php:57-63),
+# so a committed production/database.php would silently take precedence on live.
+/application/config/*/database.php
 
 # --- Local test harness - MUST NEVER REACH LIVE ------------------------------
 # pw.php is a front controller pinned to ENVIRONMENT='testing' and used with a

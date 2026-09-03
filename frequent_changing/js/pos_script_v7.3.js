@@ -9718,6 +9718,7 @@
   
                 let customer_data = selected_action.parent().parent().find('.split_customer_id').select2('data'); //Added By Jobayer
   
+                let customer_name = customer_data[0].text; //Added By Jobayer
                 let waiter_name = irWaiterName(); //safe for hidden-input waiter field
                 let token_number = $("#token_number").val();
                 let hidden_given_amount = $("#hidden_given_amount").val();

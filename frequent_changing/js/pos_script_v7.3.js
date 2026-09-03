@@ -8534,24 +8534,31 @@
                   if (selected_order_type_object.attr("data-id") == "delivery_button") {
                       order_type = 3;
                       if (customer_id == "") {
+                          /* NULL-SAFE: #select_waiter is a SELECT for most roles but a
+                             fixed hidden INPUT for waiters (self-attribution), so it has no
+                             select2 instance and .data("select2") is undefined. Calling
+                             .open()/.close() on it threw a TypeError INSIDE this click handler,
+                             killing it before any request was made: Place Order did nothing at
+                             all, with no message to the user. These calls only nudge a dropdown
+                             open, so skipping them when there is no dropdown is correct. */
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.open();
-                          op2.close();
+                          if (op1) { op1.open(); }
+                          if (op2) { op2.close(); }
                           return false;
                       }
                       if (customer_id == "1") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.open();
-                          op2.close();
+                          if (op1) { op1.open(); }
+                          if (op2) { op2.close(); }
                           return false;
                       }
                       if (customer_address == "") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.open();
-                          op2.close();
+                          if (op1) { op1.open(); }
+                          if (op2) { op2.close(); }
                           let you_need_to_add_address_with_your_selected_customer = $("#you_need_to_add_address_with_your_selected_customer").val();
                           toastr['error']((you_need_to_add_address_with_your_selected_customer), '');
                           return false;
@@ -8563,15 +8570,15 @@
                       if (waiter_id == "" && waiter_app_status!="Yes" && is_self_order!="Yes" && is_online_order!="Yes") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.close();
-                          op2.open();
+                          if (op1) { op1.close(); }
+                          if (op2) { op2.open(); }
                           return false;
                       }
                       if (customer_id == "") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.open();
-                          op2.close();
+                          if (op1) { op1.open(); }
+                          if (op2) { op2.close(); }
                           return false;
                       }
                   } else if (
@@ -8582,15 +8589,15 @@
                       if (waiter_id == ""  && is_self_order!="Yes"  && is_online_order!="Yes" && waiter_app_status!="Yes") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.close();
-                          op2.open();
+                          if (op1) { op1.close(); }
+                          if (op2) { op2.open(); }
                           return false;
                       }
                       if (customer_id == "") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.open();
-                          op2.close();
+                          if (op1) { op1.open(); }
+                          if (op2) { op2.close(); }
                           return false;
                       }
                   }
@@ -9061,23 +9068,23 @@
                       if (customer_id == "") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.open();
-                          op2.close();
+                          if (op1) { op1.open(); }
+                          if (op2) { op2.close(); }
                           return false;
                       }
                       if (customer_id == "1") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.open();
-                          op2.close();
+                          if (op1) { op1.open(); }
+                          if (op2) { op2.close(); }
                           return false;
                       }
   
                       if (customer_address == "") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.open();
-                          op2.close();
+                          if (op1) { op1.open(); }
+                          if (op2) { op2.close(); }
                           let you_need_to_add_address_with_your_selected_customer = $("#you_need_to_add_address_with_your_selected_customer").val();
                           toastr['error']((you_need_to_add_address_with_your_selected_customer), '');
                           return false;
@@ -9089,15 +9096,15 @@
                       if (waiter_id == "" && waiter_app_status!="Yes" && is_self_order!="Yes" && is_online_order!="Yes") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.close();
-                          op2.open();
+                          if (op1) { op1.close(); }
+                          if (op2) { op2.open(); }
                           return false;
                       }
                       if (customer_id == "") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.open();
-                          op2.close();
+                          if (op1) { op1.open(); }
+                          if (op2) { op2.close(); }
                           return false;
                       }
                   } else if (
@@ -9108,15 +9115,15 @@
                       if (waiter_id == "") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.close();
-                          op2.open();
+                          if (op1) { op1.close(); }
+                          if (op2) { op2.open(); }
                           return false;
                       }
                       if (customer_id == "") {
                           let op1 = $("#walk_in_customer").data("select2");
                           let op2 = $("#select_waiter").data("select2");
-                          op1.open();
-                          op2.close();
+                          if (op1) { op1.open(); }
+                          if (op2) { op2.close(); }
                           return false;
                       }
                   }
@@ -10019,7 +10026,7 @@
         if(tax_is_gst=="Yes"){
             if (!same_or_diff_state) {
                 let op1 = $(".same_or_diff_state_modal").data("select2");
-                op1.open();
+                if (op1) { op1.open(); }
               error++;
             }
         }

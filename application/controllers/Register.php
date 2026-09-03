@@ -27,6 +27,7 @@ class Register extends Cl_Controller {
         $this->load->model('Common_model');
         $this->load->model('Master_model');
         $this->load->model('Register_model');
+        $this->load->model('Sale_model'); //needed for computeForceCloseTotals()'s parameterized totals
         $this->load->library('form_validation');
         
         $this->Common_model->setDefaultTimezone();
@@ -51,6 +52,22 @@ class Register extends Cl_Controller {
             if(!checkAccess("376", "open")){
                 $this->session->set_flashdata('exception_er', lang('not_permitted_open_register'));
                 redirect('Authentication/userProfile');
+            }
+        }
+
+        //Admin Register Management: list every open register and force-close one
+        //on someone else's behalf (forgotten shift-end, staff departure mid-shift).
+        //Configurable permission, same pattern as 'open' above - NOT hardcoded to a
+        //role name. Granted to Admin/Manager by default (see the migration), but an
+        //Admin/Manager designation alone grants nothing without this row.
+        if($segment_2 == "manageRegisters" || $segment_2 == "forceCloseRegisterCalc" || $segment_2 == "forceCloseRegister"){
+            if(!checkAccess("376", "manage_registers")){
+                if($segment_2 == "manageRegisters"){
+                    $this->session->set_flashdata('exception_er', lang('not_permitted_manage_registers'));
+                    redirect('Authentication/userProfile');
+                }
+                echo json_encode(array('status' => 'error', 'message' => lang('not_permitted_manage_registers')));
+                exit;
             }
         }
 
@@ -308,4 +325,237 @@ class Register extends Cl_Controller {
                 
     }
 
+
+     /**
+     * Admin Register Management: list every OPEN register across every outlet
+     * this user may see (getAccessibleOutletIds - same company-and-assignment
+     * scoping already used by the R6 register-details popup), oldest first.
+     * @access public
+     * @return void
+     * @param no
+     */
+    public function manageRegisters(){
+        $data = array();
+        $data['open_registers'] = $this->Register_model->getAllOpenRegisters(getAccessibleOutletIds());
+        $data['main_content'] = $this->load->view('register/manageRegisters', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
+
+     /**
+     * Shared math for both the force-close preview and the force-close write, so
+     * the number an admin is shown is GUARANTEED to be the number that gets
+     * written - never two code paths that could quietly drift apart.
+     *
+     * Deliberately a NEW parameterized calculation rather than a call into
+     * Sale::closeRegister() - that method reads counter_id/outlet_id from the
+     * SESSION, so calling it for someone else's register would compute against
+     * the ADMIN's own counter/outlet instead of the target's. Same formula,
+     * same per-payment-method shape (payment_methods_sale/others_currency), just
+     * fed the target register's own counter/outlet/opening time explicitly.
+     *
+     * Window is opening time -> NOW, same as a normal close - no backdating.
+     * @access private
+     * @return array
+     * @param object $register
+     */
+    private function computeForceCloseTotals($register){
+        $counter_id = $register->counter_id;
+        $outlet_id = $register->outlet_id;
+        $opening_date_time = $register->opening_balance_date_time;
+        $opening_details_decode = json_decode($register->opening_details);
+
+        $total_closing = 0;
+        $total_sale_all = 0;
+        $total_purchase_all = 0;
+        $total_refund_all = 0;
+        $total_due_receive_all = 0;
+        $total_due_payment_all = 0;
+        $total_expense_all = 0;
+        $payment_details = array();
+        $others_currency = array();
+        $breakdown = array();
+
+        if(is_array($opening_details_decode)){
+            foreach ($opening_details_decode as $value){
+                $payments = explode("||",$value);
+
+                $total_sale = $this->Sale_model->getAllSaleByPaymentForRegister($opening_date_time,$payments[0],$counter_id,$outlet_id);
+                $total_purchase = $this->Sale_model->getAllPurchaseByPaymentForRegister($opening_date_time,$payments[0],$counter_id,$outlet_id);
+                $total_due_receive = $this->Sale_model->getAllDueReceiveByPaymentForRegister($opening_date_time,$payments[0],$counter_id,$outlet_id);
+                $total_due_payment = $this->Sale_model->getAllDuePaymentByPaymentForRegister($opening_date_time,$payments[0],$counter_id,$outlet_id);
+                $total_expense = $this->Sale_model->getAllExpenseByPaymentForRegister($opening_date_time,$payments[0],$counter_id,$outlet_id);
+                $refund_amount = $this->Sale_model->getAllRefundByPaymentForRegister($opening_date_time,$payments[0],$counter_id,$outlet_id);
+
+                $total_sale_all += $total_sale;
+                $total_purchase_all += $total_purchase;
+                $total_refund_all += $refund_amount;
+                $total_due_receive_all += $total_due_receive;
+                $total_due_payment_all += $total_due_payment;
+                $total_expense_all += $total_expense;
+                $inline_closing = ($payments[2] - $total_purchase + $total_sale + $total_due_receive - $total_due_payment - $total_expense - $refund_amount);
+                $total_closing += $inline_closing;
+
+                $preview_amount = isset($payment_details[$payments[1]]) && $payment_details[$payments[1]]?$payment_details[$payments[1]]:0;
+                $payment_details[$payments[1]] = $preview_amount + $inline_closing;
+
+                $breakdown[] = array(
+                    'payment_name' => $payments[1],
+                    'opening' => (float) $payments[2],
+                    'sale' => (float) $total_sale,
+                    'purchase' => (float) $total_purchase,
+                    'due_receive' => (float) $total_due_receive,
+                    'due_payment' => (float) $total_due_payment,
+                    'expense' => (float) $total_expense,
+                    'refund' => (float) $refund_amount,
+                    'closing' => (float) $inline_closing,
+                );
+
+                if($payments[0]==1){
+                    $total_sale_mul_c_rows = $this->Sale_model->getAllSaleByPaymentMultiCurrencyRowsForRegister($opening_date_time,$payments[0],$counter_id,$outlet_id);
+                    if($total_sale_mul_c_rows){
+                        foreach ($total_sale_mul_c_rows as $value1){
+                            $tmp_arr = array();
+                            $tmp_arr['payment_name'] = $value1->multi_currency;
+                            $tmp_arr['amount'] = getAmtPCustom($value1->total_amount);
+                            $others_currency[] = $tmp_arr;
+                        }
+                    }
+                }
+            }
+        }
+
+        return array(
+            'system_closing_balance' => $total_closing,
+            'sale_paid_amount' => $total_sale_all,
+            'total_purchase' => $total_purchase_all,
+            'refund_amount' => $total_refund_all,
+            'customer_due_receive' => $total_due_receive_all,
+            'total_due_payment' => $total_due_payment_all,
+            'total_expense' => $total_expense_all,
+            'payment_methods_sale' => $payment_details,
+            'others_currency' => $others_currency,
+            'breakdown' => $breakdown,
+        );
+    }
+
+     /**
+     * Force-close preview. Read-only - computes and RETURNS the system figure,
+     * writes nothing. The admin sees this number, then must type the actually
+     * counted cash amount before anything is saved (confirmed: never a blind
+     * one-click accept - a force-close is exactly the abandoned-register case
+     * where a discrepancy is most likely and most important to catch).
+     * @access public
+     * @return void (json)
+     * @param no
+     */
+    public function forceCloseRegisterCalc(){
+        $register_id = (int) $this->input->post('register_id');
+        $register = $this->Register_model->getRegisterById($register_id);
+        if(!$register || (int)$register->register_status !== 1){
+            echo json_encode(array('status' => 'error', 'message' => lang('register_already_closed')));
+            return;
+        }
+        if(!in_array((int)$register->outlet_id, getAccessibleOutletIds(), TRUE)){
+            echo json_encode(array('status' => 'error', 'message' => lang('not_permitted_manage_registers')));
+            return;
+        }
+        $totals = $this->computeForceCloseTotals($register);
+        echo json_encode(array(
+            'status' => 'ok',
+            'register_id' => (int) $register->id,
+            'user_name' => $register->user_name,
+            'outlet_name' => $register->outlet_name,
+            'counter_name' => $register->counter_name,
+            'opening_balance' => (float) $register->opening_balance,
+            'opening_balance_date_time' => $register->opening_balance_date_time,
+            'system_closing_balance' => (float) $totals['system_closing_balance'],
+            'breakdown' => $totals['breakdown'],
+        ));
+    }
+
+     /**
+     * Force-close write. Recomputes server-side rather than trusting any total
+     * the client might send back - the browser is never the source of truth for
+     * money. closing_balance is set to the admin's COUNTED figure (matching what
+     * a normal close means: cash actually in the drawer); the system-computed
+     * figure is kept separately in system_closing_balance so a discrepancy is
+     * visible and queryable rather than silently overwritten either way.
+     *
+     * WHERE ... register_status=1 is a race guard: if the register's own holder
+     * closes it normally in the moment between the preview and this submit, this
+     * updates zero rows instead of double-closing or clobbering their numbers.
+     * @access public
+     * @return void (json)
+     * @param no
+     */
+    public function forceCloseRegister(){
+        $register_id = (int) $this->input->post('register_id');
+        $counted_amount = $this->input->post('counted_amount');
+        $reason = trim((string) $this->input->post($this->security->xss_clean('reason')));
+
+        if($counted_amount === NULL || $counted_amount === '' || !is_numeric($counted_amount)){
+            echo json_encode(array('status' => 'error', 'message' => lang('force_close_counted_amount_required')));
+            return;
+        }
+        if($reason === ''){
+            echo json_encode(array('status' => 'error', 'message' => lang('force_close_reason_required')));
+            return;
+        }
+
+        $register = $this->Register_model->getRegisterById($register_id);
+        if(!$register || (int)$register->register_status !== 1){
+            echo json_encode(array('status' => 'error', 'message' => lang('register_already_closed')));
+            return;
+        }
+        if(!in_array((int)$register->outlet_id, getAccessibleOutletIds(), TRUE)){
+            echo json_encode(array('status' => 'error', 'message' => lang('not_permitted_manage_registers')));
+            return;
+        }
+
+        $totals = $this->computeForceCloseTotals($register);
+        $counted_amount = (float) $counted_amount;
+        $discrepancy = $counted_amount - $totals['system_closing_balance'];
+
+        $changes = array(
+            'closing_balance' => $counted_amount,
+            'system_closing_balance' => $totals['system_closing_balance'],
+            'closing_balance_date_time' => date('Y-m-d H:i:s'),
+            'customer_due_receive' => $totals['customer_due_receive'],
+            'total_purchase' => $totals['total_purchase'],
+            'refund_amount' => $totals['refund_amount'],
+            'total_due_payment' => $totals['total_due_payment'],
+            'total_expense' => $totals['total_expense'],
+            'sale_paid_amount' => $totals['sale_paid_amount'],
+            'others_currency' => json_encode($totals['others_currency']),
+            'payment_methods_sale' => json_encode($totals['payment_methods_sale']),
+            'register_status' => 2,
+            'force_closed_by' => $this->session->userdata('user_id'),
+            'force_close_reason' => $reason,
+        );
+
+        $this->db->where('id', $register_id);
+        $this->db->where('register_status', 1);
+        $this->db->update('tbl_register', $changes);
+
+        if($this->db->affected_rows() === 0){
+            echo json_encode(array('status' => 'error', 'message' => lang('register_already_closed')));
+            return;
+        }
+
+        $details = '<b>Reason: '.escape_output($reason).'</b><br>'
+            .'Register Owner: '.escape_output($register->user_name).', Outlet: '.escape_output($register->outlet_name)
+            .', Counter: '.escape_output($register->counter_name).'<br>'
+            .'Opened: '.escape_output($register->opening_balance_date_time).'<br>'
+            .'System-Computed Closing: '.getAmtP($totals['system_closing_balance'])
+            .', Counted: '.getAmtP($counted_amount)
+            .', Discrepancy: '.getAmtP($discrepancy);
+        putAuditLog($this->session->userdata('user_id'), $details, 'Force Closed Register', date('Y-m-d H:i:s'));
+
+        echo json_encode(array(
+            'status' => 'ok',
+            'system_closing_balance' => (float) $totals['system_closing_balance'],
+            'counted_amount' => $counted_amount,
+            'discrepancy' => $discrepancy,
+        ));
+    }
 }

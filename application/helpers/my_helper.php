@@ -4680,6 +4680,20 @@ if (!function_exists('getAccessibleOutletIds')) {
                ->order_by('id', 'ASC');
         //Admin sees every outlet in the company, matching getAllOutlestByAssign()
         if ($CI->session->userdata('role') != "Admin") {
+            //BUG FIX: this query builder object still carries the pending
+            //select('id')->from('tbl_outlets')->where(...)->order_by(...) chain
+            //built above and never executed (no get() call yet) - CI3's query
+            //builder ACCUMULATES across select()/from()/where() calls until a
+            //terminal method (get()/insert()/etc.) runs; it does not reset
+            //between unrelated chains on its own. Without this reset, the
+            //tbl_users lookup below merges with that pending tbl_outlets chain
+            //into one cross-join, and MySQL rejects it with "Column 'id' in
+            //field list is ambiguous" (both tables have their own id column).
+            //Reproduced: any NON-ADMIN caller of getAccessibleOutletIds() hit
+            //this every time - Admin short-circuits above and never reaches
+            //here, which is why the Admin-only-tested R6 register popup never
+            //surfaced it.
+            $CI->db->reset_query();
             $user_id = (int) $CI->session->userdata('user_id');
             if (!$user_id) {
                 return array();

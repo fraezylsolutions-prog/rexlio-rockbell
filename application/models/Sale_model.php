@@ -1504,6 +1504,109 @@ class Sale_model extends CI_Model {
       $data =  $this->db->get()->row();
       return (isset($data->total_amount) && $data->total_amount?$data->total_amount:0);
     }
+    /* Parameterized twins of the six totals methods above, for Admin Register
+       Management (force-close). The originals all read counter_id/outlet_id
+       from SESSION, which is correct for a user closing their OWN register but
+       wrong for an admin computing totals for someone ELSE's register - that
+       would silently compute against the ADMIN's own counter/outlet instead of
+       the target register's. These take both explicitly and are otherwise
+       byte-identical to the originals, so a force-close and a normal close
+       calculate the same way. New methods, not edits, so the live per-user
+       close flow (Sale::closeRegister) is completely untouched. */
+    public function getAllSaleByPaymentForRegister($date,$payment_id,$counter_id,$outlet_id)
+    {
+      $this->db->select("sum(amount) as total_amount");
+      $this->db->from('tbl_sale_payments');
+      $this->db->where("counter_id", $counter_id);
+      $this->db->where("outlet_id", $outlet_id);
+      $this->db->where("payment_id", $payment_id);
+      $this->db->where("date_time	>=", $date);
+      $this->db->where("date_time	<=", date('Y-m-d H:i:s'));
+      $this->db->where("currency_type", null);
+      $this->db->where('del_status', 'Live');
+      $data =  $this->db->get()->row();
+      return (isset($data->total_amount) && $data->total_amount?$data->total_amount:0);
+    }
+    public function getAllPurchaseByPaymentForRegister($date,$payment_id,$counter_id,$outlet_id)
+    {
+      $this->db->select("sum(paid) as total_amount");
+      $this->db->from('tbl_purchase');
+      $this->db->where("counter_id", $counter_id);
+      $this->db->where("outlet_id", $outlet_id);
+      $this->db->where("payment_id", $payment_id);
+      $this->db->where("added_date_time>=", $date);
+      $this->db->where("added_date_time<=", date('Y-m-d H:i:s'));
+      $this->db->where('del_status', 'Live');
+      $data =  $this->db->get()->row();
+      return (isset($data->total_amount) && $data->total_amount?$data->total_amount:0);
+    }
+    public function getAllDueReceiveByPaymentForRegister($date,$payment_id,$counter_id,$outlet_id)
+    {
+      $this->db->select("sum(amount) as total_amount");
+      $this->db->from('tbl_customer_due_receives');
+      $this->db->where("counter_id", $counter_id);
+      $this->db->where("outlet_id", $outlet_id);
+      $this->db->where("payment_id", $payment_id);
+      $this->db->where("date>=", $date);
+      $this->db->where("date<=", date('Y-m-d H:i:s'));
+      $this->db->where('del_status', 'Live');
+      $data =  $this->db->get()->row();
+      return (isset($data->total_amount) && $data->total_amount?$data->total_amount:0);
+    }
+    public function getAllDuePaymentByPaymentForRegister($date,$payment_id,$counter_id,$outlet_id)
+    {
+      $this->db->select("sum(amount) as total_amount");
+      $this->db->from('tbl_supplier_payments');
+      $this->db->where("counter_id", $counter_id);
+      $this->db->where("outlet_id", $outlet_id);
+      $this->db->where("payment_id", $payment_id);
+      $this->db->where("added_date_time	>=", $date);
+      $this->db->where("added_date_time	<=", date('Y-m-d H:i:s'));
+      $this->db->where('del_status', 'Live');
+      $data =  $this->db->get()->row();
+      return (isset($data->total_amount) && $data->total_amount?$data->total_amount:0);
+    }
+    public function getAllExpenseByPaymentForRegister($date,$payment_id,$counter_id,$outlet_id)
+    {
+      $this->db->select("sum(amount) as total_amount");
+      $this->db->from('tbl_expenses');
+      $this->db->where("counter_id", $counter_id);
+      $this->db->where("outlet_id", $outlet_id);
+      $this->db->where("payment_id", $payment_id);
+      $this->db->where("added_date_time	>=", $date);
+      $this->db->where("added_date_time	<=", date('Y-m-d H:i:s'));
+      $this->db->where('del_status', 'Live');
+      $data =  $this->db->get()->row();
+      return (isset($data->total_amount) && $data->total_amount?$data->total_amount:0);
+    }
+    public function getAllRefundByPaymentForRegister($date,$payment_id,$counter_id,$outlet_id)
+    {
+      $this->db->select("sum(total_refund) as total_amount");
+      $this->db->from('tbl_sales');
+      $this->db->where("counter_id", $counter_id);
+      $this->db->where("outlet_id", $outlet_id);
+      $this->db->where("refund_date_time	>=", $date);
+      $this->db->where("refund_date_time	<=", date('Y-m-d H:i:s'));
+      $this->db->where("refund_payment_id", $payment_id);
+      $this->db->where("del_status", "Live");
+      $data =  $this->db->get()->row();
+      return (isset($data->total_amount) && $data->total_amount?$data->total_amount:0);
+    }
+    public function getAllSaleByPaymentMultiCurrencyRowsForRegister($date,$payment_id,$counter_id,$outlet_id)
+    {
+      $this->db->select("sum(amount) as total_amount,multi_currency");
+      $this->db->from('tbl_sale_payments');
+      $this->db->where("counter_id", $counter_id);
+      $this->db->where("outlet_id", $outlet_id);
+      $this->db->where("payment_id", $payment_id);
+      $this->db->where("date_time	>=", $date);
+      $this->db->where("date_time	<=", date('Y-m-d H:i:s'));
+      $this->db->where("currency_type", 1);
+      $this->db->where('del_status', 'Live');
+      $this->db->group_by('multi_currency');
+      $data =  $this->db->get()->result();
+      return $data;
+    }
     public function getAllSaleByPaymentMultiCurrencyRows($date,$payment_id)
     {
       $counter_id = $this->session->userdata('counter_id');

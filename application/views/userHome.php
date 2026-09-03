@@ -950,6 +950,11 @@
                                         <?php echo lang('register_report'); ?>
                                     </a>
                                 </li>
+                                <li data-access="manage_registers-376" class="menu_assign_class" data-menu__cid="irp_15">
+                                    <a class="child-menu" href="<?php echo base_url()?>Register/manageRegisters">
+                                        <?php echo lang('manage_registers'); ?>
+                                    </a>
+                                </li>
                                 <li data-access="view-314" class="menu_assign_class" data-menu__cid="irp_15"><a class="child-menu" href="<?php echo base_url()?>Report/zReport"><?php echo lang('z_report'); ?></a></li>
                                 <li data-access="view-314" class="menu_assign_class" data-menu__cid="irp_15"><a class="child-menu" href="<?php echo base_url()?>Report/kitchenPerformanceReport"><?php echo lang('kitchenPerformanceReport'); ?></a></li>
                                 <li data-access="view-332" class="menu_assign_class" data-menu__cid="irp_15"><a class="child-menu" href="<?php echo base_url()?>Report/productAnalysisReport"> <?php echo lang('productAnalysisReport'); ?></a></li>

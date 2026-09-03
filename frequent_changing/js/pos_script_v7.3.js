@@ -473,6 +473,28 @@
           toastr['error']($("#ir_stock_blocked_msg").val() + " " + name + " (" + available + ")", '');
       }
 
+      /* Waiter display name, safe for BOTH renderings of the field.
+         #select_waiter is a <select class="select2"> for most roles but a fixed
+         hidden INPUT for waiters (self-attribution). Calling .select2('data') on
+         that input makes select2 log "called on an element that is not using
+         Select2" and then throw, which killed the click handler before any order
+         request was built - Place Order did nothing at all.
+
+         The previous test here was waiter_app_status!="Yes", which is a DIFFERENT
+         flag from the one the view branches on ($is_waiter_user). A waiter whose
+         outlet has waiter_app_status "No" therefore got the hidden input AND took
+         the select2 path. Test the element itself instead of guessing from a flag.
+         The view always emits #select_waiter_name beside the hidden input, so that
+         is the correct source when there is no select2 instance. */
+      function irWaiterName(){
+          var $w = $("#select_waiter");
+          if ($w.is("select") && $w.data("select2")) {
+              var d = $w.select2('data');
+              if (d && d[0] && d[0].text !== undefined) { return d[0].text; }
+          }
+          return $("#select_waiter_name").val() || "";
+      }
+
       /* VIP|Club price tier button.
          Sets the PRICE TIER only. It deliberately does not set order_type, which
          stays dine in, so table selection remains available exactly as it is for
@@ -8475,14 +8497,7 @@
               let waiter_data = '';
               let customer_name = '';
               let waiter_name = '';
-              if(waiter_app_status!="Yes"){
-                  waiter_data = $("#select_waiter").select2('data'); //Added By Jobayer
-                  if(waiter_data[0].text!=undefined){
-                      waiter_name = waiter_data[0].text; //Added By Jobayer
-                  }
-              }else{
-                  waiter_name = $("#select_waiter_name").val();;
-              }
+              waiter_name = irWaiterName(); //safe for hidden-input waiter field
   
   
               if(is_self_order!="Yes"){
@@ -9020,13 +9035,8 @@
               let customer_id = $("#walk_in_customer").val();
               let waiter_id = $("#select_waiter").val();
               let customer_data = $("#walk_in_customer").select2('data'); //Added By Jobayer
-              let waiter_data = $("#select_waiter").select2('data'); //Added By Jobayer
-  
               let customer_name = customer_data[0].text; //Added By Jobayer
-              let waiter_name = ''; //Added By Jobayer
-              if(waiter_data[0].text!=undefined){
-                  waiter_name = waiter_data[0].text; //Added By Jobayer
-              }
+              let waiter_name = irWaiterName(); //safe for hidden-input waiter field
               let customer_address = $("#walk_in_customer").find(':selected').attr('data-customer_address');
               let customer_gst_number = $("#walk_in_customer").find(':selected').attr('data-customer_gst_number');
   
@@ -9708,12 +9718,7 @@
   
                 let customer_data = selected_action.parent().parent().find('.split_customer_id').select2('data'); //Added By Jobayer
   
-                let waiter_data = $("#select_waiter").select2('data'); //Added By Jobayer
-                let customer_name = customer_data[0].text; //Added By Jobayer
-                let waiter_name = ''; //Added By Jobayer
-                if(waiter_data[0].text!=undefined){
-                    waiter_name = waiter_data[0].text; //Added By Jobayer
-                }
+                let waiter_name = irWaiterName(); //safe for hidden-input waiter field
                 let token_number = $("#token_number").val();
                 let hidden_given_amount = $("#hidden_given_amount").val();
                 let hidden_change_amount = $("#hidden_change_amount").val();

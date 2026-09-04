@@ -51,6 +51,10 @@
 /doc/old/
 /doc/*.zip
 /rexlio_backups/
+# Safety dumps taken immediately before a migration is applied to live. These
+# contain real business data (register balances, user/role rows), so they stay
+# on the machine that made them and never enter the repository.
+/db/backups/
 
 # --- Office lock files, OS cruft ---------------------------------------------
 ~$*

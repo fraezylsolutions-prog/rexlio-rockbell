@@ -326,6 +326,20 @@
 
                         <div class="navbar-custom-menu">
                             <ul class="menu-list">
+                                <?php /* Manage Registers. Gated by a direct role check rather than a
+                                     data-access/menu_assign_class pair, matching the "todays_summary"
+                                     button above: those are filtered client-side against the session's
+                                     function_access list, which is built from tbl_access at login, so
+                                     they stay hidden until the permission row exists in the database.
+                                     The controller still gates the route itself via checkAccess(). */
+                                if ($this->session->userdata('role') == "Admin"): ?>
+                                <li class="dropdown user user-menu rx-manage-reg-li">
+                                    <a href="<?php echo base_url()?>Register/manageRegisters" class="new-btn" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="<?php echo lang('manage_registers'); ?>"
+                                       style="width:34px;min-width:34px;height:34px;padding:0;display:inline-flex;align-items:center;justify-content:center;">
+                                        <i data-feather="unlock"></i>
+                                    </a>
+                                </li>
+                                <?php endif; ?>
                                 <?php /* Light/dark switch. Carried as an <li> INSIDE menu-list so it
                                      shares the row with the language selector - as a sibling of the
                                      list it sat on its own line and would not align. Icon only, to
@@ -934,6 +948,12 @@
 
 
 
+                        <li data-access="manage_registers-376" class="menu_assign_class">
+                            <a class="child-menu" href="<?php echo base_url()?>Register/manageRegisters">
+                                <i data-feather="unlock"></i> <span><?php echo lang('manage_registers'); ?></span>
+                            </a>
+                        </li>
+
                         <li class="menu-header small border_bottom_none setting_report1">
                             <span class="menu-header-text"><?php echo lang('Report_Settings');?></span>
                             <i data-feather="more-vertical"></i>
@@ -948,11 +968,6 @@
                                 <li data-access="view-159" class="menu_assign_class" data-menu__cid="irp_15">
                                     <a class="child-menu" href="<?php echo base_url()?>Report/registerReport">
                                         <?php echo lang('register_report'); ?>
-                                    </a>
-                                </li>
-                                <li data-access="manage_registers-376" class="menu_assign_class" data-menu__cid="irp_15">
-                                    <a class="child-menu" href="<?php echo base_url()?>Register/manageRegisters">
-                                        <?php echo lang('manage_registers'); ?>
                                     </a>
                                 </li>
                                 <li data-access="view-314" class="menu_assign_class" data-menu__cid="irp_15"><a class="child-menu" href="<?php echo base_url()?>Report/zReport"><?php echo lang('z_report'); ?></a></li>

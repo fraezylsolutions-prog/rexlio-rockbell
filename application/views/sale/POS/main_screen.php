@@ -700,7 +700,13 @@ foreach ($notifications as $single_notification){
             if(t!=='dark'&&t!=='light'){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
             document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
     </script>
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.6.9">
+    <?php /* Montserrat 800 for the category rail (theme section 22). The app's
+         base @import (assets/POS/css/style.css:2) loads 300-700 only, so a
+         request for 800 would otherwise be met with a synthesised fake-bold
+         rather than the real cut. Same family and host as the existing import,
+         so this adds a weight - not another typeface. */ ?>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.7.1">
 </head>
 
 <body>

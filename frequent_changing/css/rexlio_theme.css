@@ -724,10 +724,14 @@ ul.list-of-item{
    16. Category rail shape
    --------------------------------------------------------------------------
    9px on a 29px-tall button reads as a lozenge; the mockup uses a slight
-   rounding on a much taller button. Radius only - the height is left alone
-   deliberately, because the rail is a fixed 300px scroll box and taller
-   buttons would mean fewer categories visible per screen, trading a real
-   click into a scroll for a cosmetic gain.
+   rounding on a much taller button.
+
+   NOTE: this section originally kept the height alone, to avoid trading a
+   click into a scroll for a cosmetic gain. Section 22 below now overrides
+   both the radius and the height, with the client's explicit sign-off on
+   that trade. The rules here are left in place because section 22 sets the
+   same properties later in the cascade and therefore wins; only the reasoning
+   above is superseded.
    ========================================================================== */
 a.category_button{border-radius:4px !important}
 a.button_category_show_all1,a.category_button.all_category{
@@ -985,4 +989,98 @@ aside .pos__menu__list > li > a{font-size:15.5px !important}
     background:var(--rx-surface) !important;
     color:var(--rx-ink) !important;
     box-shadow:inset 0 0 0 1px var(--rx-line);
+}
+
+/* ==========================================================================
+   22. Category rail - depth and scale
+   --------------------------------------------------------------------------
+   Client-approved treatment, replacing the flat 30px rail. Two things changed
+   against the reference design: raised depth, and height. Width is untouched -
+   .list-of-item is a fixed 130px (style2.css:384) and the brief was explicitly
+   taller, not longer.
+
+   This supersedes the height decision in section 16 above, deliberately and
+   with the client's sign-off: taller buttons mean fewer categories visible
+   before scrolling, and that trade was accepted for the visual weight and for
+   the touch target.
+
+   TOUCH TARGET: min-height is 56px, so every button clears the 44px minimum
+   normally recommended for a finger on a till screen. The old 30px rail did
+   not. This is a floor, not a fixed height - see wrapping below.
+
+   WRAPPING: labels wrap freely and are never truncated. The rail is only 130px
+   wide, so at this size several real category names ("Quick Sides and Extras",
+   "Rockbell Native Platter") need a second line, and the longest may take a
+   third. Deliberately NO line-clamp and NO ellipsis: the client's instruction
+   was that wrapping is preferable to cutting a name off, so the button grows
+   to fit its label rather than the label being cut to fit the button. Most
+   buttons therefore sit at the 56px floor and a few are taller.
+
+   FONT: 800 is loaded explicitly in main_screen.php. The app's base Montserrat
+   @import (style.css:2) stops at 700, so asking for 800 without that link
+   would silently render a synthesised fake-bold instead of the real cut.
+   ========================================================================== */
+a.category_button{
+    /* geometry: height comes from the label plus padding, floored at 56px */
+    min-height:56px;
+    padding:9px 8px !important;
+    align-items:center;
+    justify-content:flex-start;
+    text-align:left;
+
+    /* labels wrap instead of being cut - overrides style2.css:399-401 */
+    white-space:normal !important;
+    overflow:visible !important;
+    text-overflow:clip !important;
+    line-height:1.2 !important;
+    overflow-wrap:break-word;
+
+    font-size:17px !important;
+    font-weight:800 !important;
+    border-radius:7px !important;
+    text-shadow:0 1px 1px rgba(0,0,0,.28);
+
+    /* depth in three parts: a solid bottom edge reading as the button's
+       thickness, an outer shadow lifting it off the rail, and a lit top face.
+       The sheen is background-IMAGE so it layers over the per-category
+       background-color from the data-cix rules without restating 8 colours. */
+    background-image:linear-gradient(180deg,
+        rgba(255,255,255,.17) 0%,
+        rgba(255,255,255,.03) 45%,
+        rgba(0,0,0,.12) 100%) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.30),
+        inset 0 -4px 0 rgba(0,0,0,.34),
+        0 5px 10px rgba(0,0,0,.30) !important;
+    transition:transform .06s ease, box-shadow .06s ease, filter .15s ease;
+}
+
+/* Pressing collapses the bottom edge by its own thickness, so the button reads
+   as pushed into the rail rather than sliding down the screen. */
+a.category_button:active{
+    transform:translateY(3px);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.18),
+        inset 0 -1px 0 rgba(0,0,0,.34),
+        0 2px 4px rgba(0,0,0,.24) !important;
+}
+
+/* The "All" pill is surface-coloured rather than a category colour, so it takes
+   the same scale and lift but a neutral edge - a dark one reads as a smudge
+   under a near-white face. */
+a.button_category_show_all1,
+a.category_button.all_category{
+    min-height:56px;
+    padding:9px 8px !important;
+    font-size:17px !important;
+    font-weight:800 !important;
+    border-radius:7px !important;
+    background-image:none !important;
+    text-shadow:none;
+    white-space:normal !important;
+    line-height:1.2 !important;
+    box-shadow:
+        inset 0 0 0 1px var(--rx-line),
+        inset 0 -3px 0 rgba(0,0,0,.13),
+        0 3px 5px rgba(0,0,0,.16) !important;
 }

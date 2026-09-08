@@ -33,6 +33,18 @@
                 echo lang('waiter').": ".lang('all');
             endif;
             ?></h4>
+        <?php /* Named on the sheet only when a time range is actually set, so an
+                 unfiltered report does not gain a line that says nothing. Once
+                 printed, a report covering 18:00-23:00 is otherwise
+                 indistinguishable from the whole day's. */ ?>
+        <?php if ((isset($start_time) && $start_time) || (isset($end_time) && $end_time)): ?>
+            <h4 class="txt-color-grey ir_txtCenter_mt0"><?php
+                echo lang('time').": "
+                   . escape_output(isset($start_time) && $start_time ? $start_time : '00:00')
+                   . " - "
+                   . escape_output(isset($end_time) && $end_time ? $end_time : '23:59');
+                ?></h4>
+        <?php endif; ?>
 
     </div>
 
@@ -52,6 +64,26 @@
                     <input tabindex="2" type="text" id="endMonth" name="endDate" readonly
                            class="form-control customDatepicker" placeholder="<?php echo lang('end_date'); ?>"
                            value="<?php echo set_value('endDate'); ?>">
+                </div>
+            </div>
+            <?php /* Time-of-day range, filtered on order_time. CLOCK time, deliberately
+                     independent of the date range above, which filters sale_date (the
+                     BUSINESS day) - a late-night sale books to the next business day, so
+                     the two can legitimately disagree by one. Same pattern and column as
+                     the Sales by Category report, so both screens mean the same thing by
+                     "time". Leaving both blank filters on time not at all. */ ?>
+            <div class="col-sm-12 mb-3 col-md-4 col-lg-2">
+                <div class="form-group">
+                    <input tabindex="2" type="time" name="startTime" class="form-control"
+                           title="<?php echo lang('start_time'); ?>"
+                           value="<?php echo escape_output(isset($start_time) ? $start_time : ''); ?>">
+                </div>
+            </div>
+            <div class="col-sm-12 mb-3 col-md-4 col-lg-2">
+                <div class="form-group">
+                    <input tabindex="2" type="time" name="endTime" class="form-control"
+                           title="<?php echo lang('end_time'); ?>"
+                           value="<?php echo escape_output(isset($end_time) ? $end_time : ''); ?>">
                 </div>
             </div>
             <div class="col-sm-12 mb-3 col-md-4 col-lg-2">

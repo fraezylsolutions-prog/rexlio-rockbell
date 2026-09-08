@@ -1762,11 +1762,13 @@ FROM tbl_food_menus_ingredients i  LEFT JOIN (select * from tbl_ingredients wher
      *                            caller not yet updated keeps its old behaviour
      * @param string $payment_id   payment method; matches sales that INCLUDE it
      */
-    public function detailedSaleReport($startMonth = '', $endMonth = '', $user_id = '',$outlet_id='',$waiter_id='',$sale_no='',$due_status='',$outlet_ids=array(),$payment_id='') {
+    public function detailedSaleReport($startMonth = '', $endMonth = '', $user_id = '',$outlet_id='',$waiter_id='',$sale_no='',$due_status='',$outlet_ids=array(),$payment_id='',$start_time='',$end_time='') {
         //R3: the original guard returned NOTHING unless a date or user was given, so
         //searching by invoice number alone would have silently produced an empty
-        //report rather than a result. The new filters have to open the gate too.
-        if ($startMonth || $endMonth || $user_id || $sale_no !== '' || $due_status !== '' || $payment_id !== ''):
+        //report rather than a result. The new filters have to open the gate too -
+        //including the time range, or "everything sold after 18:00" would come back
+        //empty rather than answering the question.
+        if ($startMonth || $endMonth || $user_id || $sale_no !== '' || $due_status !== '' || $payment_id !== '' || $start_time !== '' || $end_time !== ''):
             $this->db->select('tbl_sales.*,tbl_users.full_name,tbl_payment_methods.name');
             $this->db->from('tbl_sales');
             $this->db->join('tbl_users', 'tbl_users.id = tbl_sales.user_id', 'left');
@@ -1788,6 +1790,17 @@ FROM tbl_food_menus_ingredients i  LEFT JOIN (select * from tbl_ingredients wher
             }
             if ($waiter_id != '') {
                 $this->db->where('tbl_sales.waiter_id', $waiter_id);
+            }
+            //Time-of-day range on order_time, matching the Sales by Category report.
+            //This is CLOCK time and is deliberately independent of the date range
+            //above, which filters sale_date (the BUSINESS day) - a late-night sale
+            //books to the next business day, so the two can legitimately disagree.
+            //order_time is a real TIME column, so these compare as times, not strings.
+            if ($start_time !== '' && $start_time !== NULL) {
+                $this->db->where('tbl_sales.order_time >=', $start_time);
+            }
+            if ($end_time !== '' && $end_time !== NULL) {
+                $this->db->where('tbl_sales.order_time <=', $end_time);
             }
             //R3: invoice/order number. Partial match, so a staff member can type the
             //tail of a number off a printed receipt without the random prefix.

@@ -1123,6 +1123,8 @@ class Report extends Cl_Controller {
             $due_status = in_array($due_status, array('due','paid'), TRUE) ? $due_status : '';
             $payment_id = $this->input->post($this->security->xss_clean('payment_id'));
             $payment_id = ($payment_id !== '' && $payment_id !== NULL && (int) $payment_id > 0) ? (int) $payment_id : '';
+            $start_time =htmlspecialcharscustom($this->input->post($this->security->xss_clean('startTime')));
+            $end_time =htmlspecialcharscustom($this->input->post($this->security->xss_clean('endTime')));
             $data['payment_id'] = $payment_id;
             $data['user_id'] = $user_id;
             $data['waiter_id'] = $waiter_id;
@@ -1130,8 +1132,10 @@ class Report extends Cl_Controller {
             $data['due_status'] = $due_status;
             $data['start_date'] = $start_date;
             $data['end_date'] = $end_date;
+            $data['start_time'] = $start_time;
+            $data['end_time'] = $end_time;
             $data['detailedSaleReport'] = $this->Report_model->detailedSaleReport(
-                $start_date, $end_date, $user_id, '', $waiter_id, $sale_no, $due_status, $scope['ids'], $payment_id);
+                $start_date, $end_date, $user_id, '', $waiter_id, $sale_no, $due_status, $scope['ids'], $payment_id, $start_time, $end_time);
         }
         $data['paymentMethods'] = $this->Common_model->getAllByCompanyId($company_id, "tbl_payment_methods");
         $data['users'] = $this->Common_model->getAllByCompanyIdForDropdown($company_id, 'tbl_users');

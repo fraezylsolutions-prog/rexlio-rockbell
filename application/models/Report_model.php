@@ -1535,7 +1535,9 @@ FROM tbl_food_menus_ingredients i  LEFT JOIN (select * from tbl_ingredients wher
      * @param string $end_time    clock time HH:MM, inclusive
      * @param array  $outlet_ids  outlet scope; empty falls back to $outlet_id
      */
-    public function foodMenuSaleByCategories($startMonth = '', $endMonth = '',$outlet_id='',$cat_id='',$user_id='',$start_time='',$end_time='',$outlet_ids=array()) {
+    //$waiter_id is appended last, and optional, so the existing positional call
+    //is unaffected and an unselected waiter leaves the query exactly as it was.
+    public function foodMenuSaleByCategories($startMonth = '', $endMonth = '',$outlet_id='',$cat_id='',$user_id='',$start_time='',$end_time='',$outlet_ids=array(),$waiter_id='') {
         $this->db->select('sum(qty) as totalQty,food_menu_id,menu_name,code,sale_date,tbl_food_menu_categories.category_name,tbl_food_menus.sale_price as menu_unit_price');
         $this->db->from('tbl_sales_details');
         $this->db->join('tbl_sales', 'tbl_sales.id = tbl_sales_details.sales_id', 'left');
@@ -1558,6 +1560,14 @@ FROM tbl_food_menus_ingredients i  LEFT JOIN (select * from tbl_ingredients wher
         //R4: seller
         if ($user_id !== '' && $user_id !== NULL) {
             $this->db->where('tbl_sales.user_id', $user_id);
+        }
+        //waiter who took the order, as distinct from the user who rang it up.
+        //Same column and same guard shape the Detailed Sale Report already uses,
+        //so the two reports agree on what "waiter" means. Independent of the
+        //seller filter above - both can be set, and neither is applied when
+        //left blank, which keeps the unfiltered query identical to before.
+        if ($waiter_id !== '' && $waiter_id !== NULL) {
+            $this->db->where('tbl_sales.waiter_id', $waiter_id);
         }
         //R4: time-of-day range on order_time. CLOCK time, deliberately independent
         //of the date range above, which filters sale_date (the BUSINESS day).

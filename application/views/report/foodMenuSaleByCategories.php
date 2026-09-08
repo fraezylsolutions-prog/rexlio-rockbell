@@ -24,6 +24,12 @@
                     ?>
                     <h4><?= isset($start_date) && $start_date && isset($end_date) && $end_date ? lang('date').": " . date($this->session->userdata('date_format'), strtotime($start_date)) . " - " . date($this->session->userdata('date_format'), strtotime($end_date)) : '' ?><?= isset($start_date) && $start_date && !$end_date ? lang('date').": " . date($this->session->userdata('date_format'), strtotime($start_date)) : '' ?><?= isset($end_date) && $end_date && !$start_date ? lang('date').": " . date($this->session->userdata('date_format'), strtotime($end_date)) : '' ?>
                     </h4>
+                    <?php /* Named on the printed sheet, because a category report filtered to
+                             one waiter is indistinguishable from the whole-venue report once
+                             it is on paper. Only shown when the filter is actually set. */ ?>
+                    <?php if (isset($waiter_id) && $waiter_id): ?>
+                        <h4><?php echo lang('waiter'); ?>: <?php echo escape_output(userName($waiter_id)); ?></h4>
+                    <?php endif; ?>
     </div>
 
         <div class="box-wrapper">
@@ -82,6 +88,24 @@
                                     <option value=""><?php echo lang('all'); ?> <?php echo lang('user'); ?></option>
                                     <?php foreach ($users as $u): ?>
                                         <option <?php echo (isset($user_id) && (string) $user_id === (string) $u->id) ? 'selected' : ''; ?> value="<?php echo escape_output($u->id) ?>"><?php echo escape_output($u->full_name) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <?php /* Waiter filter. Separate from the seller filter above: the
+                                 seller is whoever rang the sale up, the waiter is whoever took
+                                 it, and on this install they are usually different people. The
+                                 list is narrowed to designation "Waiter", matching how the
+                                 Detailed Sale Report builds the same dropdown, so both reports
+                                 offer the same names. */ ?>
+                        <div class="col-sm-12 col-md-4 col-lg-2 mb-3">
+                            <div class="form-group">
+                                <select tabindex="2" class="form-control select2 ir_w_100" name="waiter_id">
+                                    <option value=""><?php echo lang('all'); ?> <?php echo lang('waiter'); ?></option>
+                                    <?php foreach ($users as $u): ?>
+                                        <?php if ($u->designation == "Waiter"): ?>
+                                            <option <?php echo (isset($waiter_id) && (string) $waiter_id === (string) $u->id) ? 'selected' : ''; ?> value="<?php echo escape_output($u->id) ?>"><?php echo escape_output($u->full_name) ?></option>
+                                        <?php endif; ?>
                                     <?php endforeach; ?>
                                 </select>
                             </div>

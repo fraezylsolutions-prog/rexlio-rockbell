@@ -972,16 +972,18 @@ class Report extends Cl_Controller {
             $end_date =htmlspecialcharscustom($this->input->post($this->security->xss_clean('endDate')));
             $cat_id =htmlspecialcharscustom($this->input->post($this->security->xss_clean('cat_id')));
             $user_id =htmlspecialcharscustom($this->input->post($this->security->xss_clean('user_id')));
+            $waiter_id =htmlspecialcharscustom($this->input->post($this->security->xss_clean('waiter_id')));
             $start_time =htmlspecialcharscustom($this->input->post($this->security->xss_clean('startTime')));
             $end_time =htmlspecialcharscustom($this->input->post($this->security->xss_clean('endTime')));
             $data['start_date'] = $start_date;
             $data['end_date'] = $end_date;
             $data['cat_id'] = $cat_id;
             $data['user_id'] = $user_id;
+            $data['waiter_id'] = $waiter_id;
             $data['start_time'] = $start_time;
             $data['end_time'] = $end_time;
             $data['foodMenuSales'] = $this->Report_model->foodMenuSaleByCategories(
-                $start_date, $end_date, '', $cat_id, $user_id, $start_time, $end_time, $scope['ids']);
+                $start_date, $end_date, '', $cat_id, $user_id, $start_time, $end_time, $scope['ids'], $waiter_id);
         }
         $data['foodMenuCategories'] = $this->Common_model->getAllByCompanyIdForDropdown($company_id, "tbl_food_menu_categories");
         $data['main_content'] = $this->load->view('report/foodMenuSaleByCategories', $data, TRUE);

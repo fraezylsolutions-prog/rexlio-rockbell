@@ -42,3 +42,13 @@ SELECT ra.id, r.role_name, ra.access_parent_id, ra.access_child_id
 FROM tbl_role_access ra JOIN tbl_roles r ON r.id = ra.role_id
 JOIN tbl_access a ON a.id = ra.access_child_id
 WHERE a.function_name = 'manage_registers';
+
+-- PASS/FAIL, per db/migrations/_TEMPLATE.sql. If this prints FAIL, STOP and do
+-- not deploy the code: the force-close screen writes to the three new columns
+-- and its menu entry is gated on the permission row.
+SELECT CASE WHEN
+    (SELECT COUNT(*) FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tbl_register'
+        AND COLUMN_NAME IN ('system_closing_balance','force_closed_by','force_close_reason')) = 3
+    AND (SELECT COUNT(*) FROM tbl_access WHERE function_name='manage_registers' AND parent_id=376) = 1
+  THEN 'PASS' ELSE 'FAIL' END AS result;

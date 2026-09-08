@@ -42,3 +42,12 @@ FROM tbl_role_access ra
 JOIN tbl_roles r ON r.id = ra.role_id
 JOIN tbl_access a ON a.id = ra.access_child_id
 WHERE a.function_name = 'view_all_running_orders';
+
+-- PASS/FAIL, per db/migrations/_TEMPLATE.sql. If this prints FAIL, STOP and do
+-- not deploy the code: without the permission row the new canViewAllUsers()
+-- returns FALSE for every non-Admin role and the running order list stays empty.
+SELECT CASE WHEN
+    (SELECT COUNT(*) FROM tbl_access WHERE function_name='view_all_running_orders' AND parent_id=372) = 1
+    AND (SELECT COUNT(*) FROM tbl_role_access ra JOIN tbl_access a ON a.id=ra.access_child_id
+         WHERE a.function_name='view_all_running_orders') >= 1
+  THEN 'PASS' ELSE 'FAIL' END AS result;

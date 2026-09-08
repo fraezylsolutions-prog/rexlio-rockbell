@@ -2044,3 +2044,5 @@ $lang['days_open']='Days Open';
 $lang['discrepancy']='Discrepancy';
 $lang['opened_at']='Opened At';
 $lang['no_data_found']='No data found';
+
+$lang["view_all_running_orders"]="View All Users Running Orders";

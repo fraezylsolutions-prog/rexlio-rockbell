@@ -71,34 +71,19 @@ class Monitor extends Cl_Controller {
      * @return bool
      */
     private function canViewAllUsers() {
-        $role = $this->session->userdata('role');
-        if(isset($role) && $role=="Admin"){
-            return TRUE;
-        }
-        $user_id = $this->session->userdata('user_id');
-        $privileged_roles = $this->privilegedRoleNames();
-        $row = $this->db->select('tbl_roles.role_name')
-                        ->from('tbl_users')
-                        ->join('tbl_roles', 'tbl_roles.id = tbl_users.role_id', 'left')
-                        ->where('tbl_users.id', $user_id)
-                        ->get()->row();
-        if(isset($row->role_name) && $row->role_name){
-            foreach($privileged_roles as $privileged_role){
-                if(strcasecmp(trim($row->role_name), $privileged_role)==0){
-                    return TRUE;
-                }
-            }
-        }
-        return FALSE;
-    }
-
-    /**
-     * role names allowed to switch user on the running order screen
-     * @access private
-     * @return array
-     */
-    private function privilegedRoleNames() {
-        return array('Leader', 'Sales Supervisor');
+        //Decided by PERMISSION, never by role name. checkAccess() already
+        //short-circuits TRUE for Admin, so Admin keeps the behaviour it had.
+        //
+        //This replaced a hardcoded list of role names ('Leader', 'Sales
+        //Supervisor') that matched no role in this install, so in practice only
+        //Admin ever saw the full list - every other role, however privileged and
+        //whatever it had been granted on the role screen, silently saw only the
+        //orders it had personally created. A cashier therefore never saw a
+        //waiter's order, which is the whole point of the screen.
+        //
+        //Degrades safely: if the access row is missing, checkAccess() returns
+        //FALSE for non-Admin and the scoping is exactly what it was before.
+        return checkAccess("372", "view_all_running_orders") ? TRUE : FALSE;
     }
 
     /**

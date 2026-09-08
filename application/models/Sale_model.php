@@ -492,9 +492,13 @@ class Sale_model extends CI_Model {
             if(isset($is_waiter) && $is_waiter=="Yes"){
                 $this->db->where("tbl_kitchen_sales.waiter_id", $user_id);
             }else{
-                if(isset($role) && $role!="Admin"){
-                    $this->db->where("tbl_kitchen_sales.user_id", $user_id);
-                }
+                //No role-name test here. can_view_all is the single decision,
+                //and the controller makes it from the view_all_running_orders
+                //permission (which is TRUE for Admin via checkAccess). The old
+                //$role!="Admin" test was dead weight - an Admin never reaches
+                //this branch - and it meant the scoping rule was expressed in
+                //two places, one of them by role name.
+                $this->db->where("tbl_kitchen_sales.user_id", $user_id);
             }
         }
         if(isset($filters['view_user_id']) && $filters['view_user_id'] !== '' && $filters['view_user_id'] !== NULL){

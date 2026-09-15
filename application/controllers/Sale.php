@@ -4399,20 +4399,66 @@ We hope to see you again!";
         putAuditLog($user_id, 'New table '.$name.' (id '.$table_id.') created from the POS', 'New Table', date('Y-m-d H:i:s'));
         echo json_encode(array('ok' => 1, 'id' => $table_id, 'name' => $name, 'area_id' => $area_id, 'seq' => $seq));
     }
+
     /**
-     * The tables panel data (table-first flow). Own live running orders with the
-     * table(s) they sit on and the order value, plus own auto-created tables that
-     * have no order yet. A caller holding view_all_running_orders gets every
-     * user's orders in the session outlet instead. One query for the orders, one
-     * for the empty tables; nothing else. Also releases own empty auto tables
-     * older than four hours ("+ New Table" tapped and walked away from).
+     * The tables panel data (table-first flow) - the ONE data source of the
+     * unified tables screen (Stage 5a; replaces Monitor::tablesAjax).
+     *
+     * Scope: the session outlet. Widened to every outlet the caller may access
+     * (getAccessibleOutletIds) when the caller holds view_all_running_orders OR
+     * is assigned to more than one outlet (a multi-outlet waiter sees all their
+     * locations); a posted outlet_id narrows it, and only to one of those.
+     * Users: own orders (user or waiter); every user's with view_all_running_orders.
+     * Filters view_user_id / sale_date are honoured for a view-all caller only,
+     * the same validation Monitor::collectTableFilters() applied.
+     *
+     * Every order carries can_act - own, or act_on_any_running_order, AND in the
+     * session outlet (another outlet is a different register and stock; the POS
+     * would refuse the adoption). The server-side adoption check stays the
+     * backstop; this flag only decides what the panel offers.
+     *
+     * Also returns free_tables (every live table in scope with no order, admin
+     * created ones included, via Sale_model::getTableStatus), counts, and on
+     * request (with_lists=1, first open) the outlet and user lists for the
+     * filters. Still releases own empty auto tables older than four hours.
+     * empty_tables is kept unchanged for the current panel render.
      * @access public
      * @return void
      */
     public function myTablesAjax(){
         $user_id = (int) $this->session->userdata('user_id');
         $outlet_id = (int) $this->session->userdata('outlet_id');
+        $company_id = (int) $this->session->userdata('company_id');
         $see_all = checkAccess("372", "view_all_running_orders") ? TRUE : FALSE;
+        $act_any = checkAccess("372", "act_on_any_running_order") ? TRUE : FALSE;
+
+        //scope
+        $accessible = getAccessibleOutletIds();
+        if(!in_array($outlet_id, $accessible, TRUE)){
+            //the session outlet is always in scope (Admin gets every outlet from the helper)
+            $accessible[] = $outlet_id;
+        }
+        $outlet_allowed = ($see_all || count($accessible) > 1);
+        $posted_outlet = (int) $this->input->post('outlet_id');
+        $scope = array($outlet_id);
+        $filter_outlet = '';
+        if($outlet_allowed){
+            if($posted_outlet && in_array($posted_outlet, $accessible, TRUE)){
+                $scope = array($posted_outlet);
+                $filter_outlet = $posted_outlet;
+            }else{
+                $scope = $accessible;
+            }
+        }
+        $view_user_id = 0;
+        $sale_date = '';
+        if($see_all){
+            $view_user_id = (int) $this->input->post('view_user_id');
+            $posted_date = trim((string) $this->input->post('sale_date'));
+            $sale_date = preg_match('/^\d{4}-\d{2}-\d{2}$/', $posted_date) ? $posted_date : '';
+        }
+        $placeholders = implode(',', array_fill(0, count($scope), '?'));
+
         //orders
         $sql = "SELECT ks.id AS sale_id, ks.sale_no, ks.total_payable, ks.date_time, ks.user_id, ks.waiter_id,
                        IFNULL(ks.version, 1) AS version, ks.random_code,
@@ -4422,25 +4468,47 @@ We hope to see you again!";
                           WHERE ot.sale_id = ks.id AND ot.del_status = 'Live' AND t.del_status = 'Live') AS table_ids,
                        (SELECT GROUP_CONCAT(DISTINCT t.name ORDER BY t.id SEPARATOR ', ') FROM tbl_orders_table ot JOIN tbl_tables t ON t.id = ot.table_id
                           WHERE ot.sale_id = ks.id AND ot.del_status = 'Live' AND t.del_status = 'Live') AS table_names,
-                       ks.table_id AS first_table_id
+                       ks.table_id AS first_table_id,
+                       ks.outlet_id, o.outlet_name, ks.sale_date,
+                       w.full_name AS waiter_name, c.name AS customer_name,
+                       (SELECT IFNULL(MAX(ot2.persons), 0) FROM tbl_orders_table ot2 WHERE ot2.sale_id = ks.id AND ot2.del_status = 'Live') AS persons
                   FROM tbl_kitchen_sales ks
-                 WHERE ks.outlet_id = ? AND ks.del_status = 'Live'
+                  LEFT JOIN tbl_outlets o ON o.id = ks.outlet_id
+                  LEFT JOIN tbl_users w ON w.id = ks.waiter_id
+                  LEFT JOIN tbl_customers c ON c.id = ks.customer_id
+                 WHERE ks.outlet_id IN ($placeholders) AND ks.del_status = 'Live'
                    AND (ks.order_status = '1' OR ks.order_status = '2')
                    AND (ks.future_sale_status = '1' OR ks.future_sale_status = '3')";
-        $bind = array($outlet_id);
+        $bind = $scope;
         if(!$see_all){
             $sql .= " AND (ks.user_id = ? OR ks.waiter_id = ?)";
             $bind[] = $user_id; $bind[] = $user_id;
         }
+        if($view_user_id){
+            $sql .= " AND (ks.user_id = ? OR ks.waiter_id = ?)";
+            $bind[] = $view_user_id; $bind[] = $view_user_id;
+        }
+        if($sale_date !== ''){
+            $sql .= " AND ks.sale_date = ?";
+            $bind[] = $sale_date;
+        }
         $sql .= " ORDER BY ks.id DESC";
         $orders = $this->db->query($sql, $bind)->result();
+        $orders_without_table = 0;
+        foreach($orders as $order){
+            $order->is_own = ((int) $order->user_id === $user_id || (int) $order->waiter_id === $user_id) ? 1 : 0;
+            $order->same_outlet = ((int) $order->outlet_id === $outlet_id) ? 1 : 0;
+            $order->can_act = ($order->same_outlet && ($order->is_own || $act_any)) ? 1 : 0;
+            if(!$order->table_ids){ $orders_without_table++; }
+        }
+
         //sweep: own empty auto tables older than 4 h ("+ New Table" tapped, then abandoned)
         $this->db->query("UPDATE tbl_tables t SET t.del_status = 'Deleted'
                            WHERE t.auto_created = 1 AND t.del_status = 'Live' AND t.user_id = ? AND t.outlet_id = ?
                              AND t.created_at IS NOT NULL AND t.created_at < DATE_SUB(NOW(), INTERVAL 4 HOUR)
                              AND t.id NOT IN (SELECT ot.table_id FROM tbl_orders_table ot JOIN tbl_kitchen_sales ks ON ks.id = ot.sale_id AND ks.del_status = 'Live' WHERE ot.del_status = 'Live')
                              AND t.id NOT IN (SELECT ks2.table_id FROM tbl_kitchen_sales ks2 WHERE ks2.del_status = 'Live' AND ks2.table_id IS NOT NULL)", array($user_id, $outlet_id));
-        //empty auto tables (own; or everyone's for a see-all caller)
+        //empty auto tables (own; or everyone's for a see-all caller) - unchanged, the current render uses it
         $sql2 = "SELECT t.id, t.name, t.user_id FROM tbl_tables t
                   WHERE t.auto_created = 1 AND t.del_status = 'Live' AND t.outlet_id = ?
                     AND t.id NOT IN (SELECT ot.table_id FROM tbl_orders_table ot JOIN tbl_kitchen_sales ks ON ks.id = ot.sale_id AND ks.del_status = 'Live' WHERE ot.del_status = 'Live')";
@@ -4448,7 +4516,59 @@ We hope to see you again!";
         if(!$see_all){ $sql2 .= " AND t.user_id = ?"; $bind2[] = $user_id; }
         $sql2 .= " ORDER BY t.id DESC";
         $empty = $this->db->query($sql2, $bind2)->result();
-        echo json_encode(array('ok' => 1, 'see_all' => $see_all ? 1 : 0, 'orders' => $orders, 'empty_tables' => $empty, 'server_time' => date('Y-m-d H:i:s')));
+
+        //every live table in scope, occupied or free, through the query the Table
+        //Status screen used (multi-outlet, value, user/date filters drop free tables)
+        $tables = $this->Sale_model->getTableStatus($scope, array('view_user_id' => $view_user_id ? $view_user_id : '', 'sale_date' => $sale_date));
+        $free_tables = array();
+        $occupied = 0;
+        foreach($tables as $table){
+            if($table->is_occupied){
+                $occupied++;
+                continue;
+            }
+            //a waiter sees only their own auto tables among the free ones; the
+            //house tables and other waiters' auto tables are not theirs to use
+            if(!$see_all && (int) $table->auto_created === 1 && (int) $table->user_id !== $user_id){
+                continue;
+            }
+            $free_tables[] = array(
+                'id' => (int) $table->id, 'name' => $table->name, 'outlet_id' => (int) $table->outlet_id,
+                'outlet_name' => $table->outlet_name, 'area_name' => $table->area_name,
+                'sit_capacity' => $table->sit_capacity, 'auto_created' => (int) $table->auto_created,
+                'user_id' => (int) $table->user_id, 'same_outlet' => ((int) $table->outlet_id === $outlet_id) ? 1 : 0,
+            );
+        }
+
+        $out = array(
+            'ok' => 1, 'see_all' => $see_all ? 1 : 0, 'act_any' => $act_any ? 1 : 0,
+            'session_outlet_id' => $outlet_id,
+            'filters' => array(
+                'outlet_allowed' => $outlet_allowed ? 1 : 0, 'user_allowed' => $see_all ? 1 : 0, 'date_allowed' => $see_all ? 1 : 0,
+                'outlet_id' => $filter_outlet, 'view_user_id' => $view_user_id ? $view_user_id : '', 'sale_date' => $sale_date,
+            ),
+            'scope' => array_values($scope),
+            'orders' => $orders, 'empty_tables' => $empty, 'free_tables' => $free_tables,
+            //tables = occupied + free AS SHOWN (a waiter is not shown other waiters' empty auto tables)
+            'counts' => array('tables' => $occupied + count($free_tables), 'occupied' => $occupied, 'free' => count($free_tables),
+                              'orders' => count($orders), 'orders_without_table' => $orders_without_table),
+            'server_time' => date('Y-m-d H:i:s'),
+        );
+        //the filter lists, asked for once when the panel opens
+        if((int) $this->input->post('with_lists') === 1){
+            $out['outlets'] = array();
+            if($outlet_allowed && $accessible){
+                $rows = $this->db->select('id, outlet_name')->from('tbl_outlets')->where_in('id', $accessible)
+                                 ->where('del_status', 'Live')->order_by('outlet_name', 'ASC')->get()->result();
+                foreach($rows as $r){ $out['outlets'][] = array('id' => (int) $r->id, 'name' => $r->outlet_name); }
+            }
+            $out['users'] = array();
+            if($see_all){
+                $rows = $this->Common_model->getAllByCompanyIdForDropdown($company_id, 'tbl_users');
+                foreach($rows as $r){ $out['users'][] = array('id' => (int) $r->id, 'name' => $r->full_name); }
+            }
+        }
+        echo json_encode($out);
     }
 
     /**

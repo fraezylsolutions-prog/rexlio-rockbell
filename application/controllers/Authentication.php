@@ -429,6 +429,16 @@ class Authentication extends Cl_Controller {
                                         endif;
                                         $this->session->set_userdata($outlet_session);
                                         if ($user_information->designation == 'Waiter') {
+                                            //Stage 5a (table-first flow): a waiter assigned to more than
+                                            //one outlet was pinned to the primary outlet above and never
+                                            //asked - the assigned list was ignored. Send them through the
+                                            //same chooser every other multi-outlet user gets;
+                                            //Outlet::setOutletSession then lands them on the POS. A
+                                            //single-outlet waiter still goes straight there.
+                                            $assigned_outlets = array_filter(array_map('intval', explode(',', (string) $user_information->outlets)));
+                                            if (count($assigned_outlets) > 1) {
+                                                redirect("Outlet/outlets");
+                                            }
                                             redirect("Sale/POS");
                                         }
                                     endif;
@@ -3176,6 +3186,16 @@ class Authentication extends Cl_Controller {
                                         endif;
                                         $this->session->set_userdata($outlet_session);
                                         if ($user_information->designation == 'Waiter') {
+                                            //Stage 5a (table-first flow): a waiter assigned to more than
+                                            //one outlet was pinned to the primary outlet above and never
+                                            //asked - the assigned list was ignored. Send them through the
+                                            //same chooser every other multi-outlet user gets;
+                                            //Outlet::setOutletSession then lands them on the POS. A
+                                            //single-outlet waiter still goes straight there.
+                                            $assigned_outlets = array_filter(array_map('intval', explode(',', (string) $user_information->outlets)));
+                                            if (count($assigned_outlets) > 1) {
+                                                redirect("Outlet/outlets");
+                                            }
                                             redirect("Sale/POS");
                                         }
                                     endif;

@@ -688,7 +688,7 @@ foreach ($notifications as $single_notification){
          rather than the real cut. Same family and host as the existing import,
          so this adds a weight - not another typeface. */ ?>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap">
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.7.1">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.8.7">
 </head>
 
 <body>
@@ -916,6 +916,11 @@ foreach ($notifications as $single_notification){
                     <li class="<?php echo escape_output($is_self_order_class) ?>">
                         <a href="#" id="pull_others_device_orders" data-tippy-content="<?php echo lang('pull_others_device_orders'); ?>" class="header_menu_icon bg__green"><i class="fas fa-exchange-alt"></i></a>
                     </li>
+                    <?php if (isWaiterUser()): ?>
+                    <li>
+                        <a href="#" id="ir_tables_open" data-tippy-content="<?php echo lang('my_tables'); ?>" class="header_menu_icon bg__green"><i class="fas fa-th-large"></i></a>
+                    </li>
+                    <?php endif; ?>
                     <li class="<?php echo escape_output($is_self_order_class) ?>">
                         <a href="#" id="online_status" class="bg__green"><span class="online_status_counter display_none">(0)</span><span class="online_status_text"><?php echo lang('online'); ?></span></a>
                     </li>
@@ -1428,6 +1433,24 @@ foreach ($notifications as $single_notification){
                 </div>
             </div>
             <div class="main_right <?php echo escape_output($is_self_order_class) ? 'online_order':'' ?>">
+                <?php /* Table-first flow (Stage 2): the "My tables" panel. Shown over the item
+                         area on load for waiters (see #ir_tables_panel_on_load), reopenable
+                         from the header. Cards are rendered by irTablesPanel in
+                         pos_script_v7.3.js from this till's IndexedDB plus Sale/myTablesAjax.
+                         Approved visual: preview_my_tables.html. */ ?>
+                <div id="ir_tables_panel" hidden>
+                    <div class="ir-tp-head">
+                        <div>
+                            <p class="ir-tp-title"><?php echo lang('my_tables'); ?></p>
+                            <p class="ir-tp-sub" id="ir_tp_sub"></p>
+                        </div>
+                        <div class="ir-tp-actions">
+                            <button type="button" class="ir-tp-new" id="ir_tp_new"><i class="fas fa-plus"></i> <?php echo lang('new_table'); ?></button>
+                            <button type="button" class="ir-tp-close" id="ir_tp_close" title="<?php echo lang('close'); ?>"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                    <div class="ir-tp-grid" id="ir_tp_grid"></div>
+                </div>
                 <form autocomplete="off" class="search-category-form" id="search_form">
                     <?php  if(isFoodCourt() && $this->session->userdata('role') != 'Admin'):?>
                     <div class="search-category-item">
@@ -4676,7 +4699,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=4.7"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=4.9"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">

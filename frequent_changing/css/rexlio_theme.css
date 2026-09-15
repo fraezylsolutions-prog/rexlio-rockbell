@@ -1444,3 +1444,41 @@ a.category_button.all_category{
 
 
 /* =============================================================================
+   25. "My tables" panel - table-first waiter flow (Stage 2)
+   Sits over the item area (.main_right) of the sale screen. Visual approved
+   from preview_my_tables.html. Uses the theme tokens, so it follows light/dark.
+   ============================================================================= */
+.main_right{position:relative}
+#ir_tables_panel{position:absolute; inset:0; z-index:50; background:var(--rx-bg); display:flex; flex-direction:column; border-radius:var(--rx-radius); overflow:hidden}
+#ir_tables_panel[hidden]{display:none !important}
+#ir_tables_panel .ir-tp-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; background:var(--rx-surface); border-bottom:1px solid var(--rx-line)}
+#ir_tables_panel .ir-tp-title{font:800 20px/1.2 Montserrat,system-ui,sans-serif; color:var(--rx-ink); margin:0}
+#ir_tables_panel .ir-tp-sub{font-size:13px; color:var(--rx-muted); margin:2px 0 0}
+#ir_tables_panel .ir-tp-actions{display:flex; align-items:center; gap:10px}
+#ir_tables_panel .ir-tp-new{display:inline-flex; align-items:center; gap:10px; background:var(--rx-good); color:#fff; border:0; border-radius:var(--rx-radius-sm); padding:14px 22px; font:800 17px/1 Montserrat,system-ui,sans-serif; box-shadow:var(--rx-shadow); cursor:pointer; letter-spacing:.2px}
+#ir_tables_panel .ir-tp-new[disabled]{opacity:.55; cursor:not-allowed}
+#ir_tables_panel .ir-tp-new i{font-size:18px}
+#ir_tables_panel .ir-tp-close{background:transparent; border:1px solid var(--rx-line); color:var(--rx-muted); border-radius:var(--rx-radius-sm); width:44px; height:44px; font-size:18px; cursor:pointer}
+#ir_tables_panel .ir-tp-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:16px; padding:20px; overflow:auto; align-content:start; flex:1}
+.ir-tcard{background:var(--rx-surface); border:1px solid var(--rx-line); border-radius:var(--rx-radius); padding:16px 16px 14px; min-height:118px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:var(--rx-shadow-sm); cursor:pointer; position:relative; user-select:none}
+.ir-tcard:hover, .ir-tcard:focus{border-color:var(--rx-accent); outline:none}
+.ir-tcard .ir-tc-name{font:800 19px/1.15 Montserrat,system-ui,sans-serif; color:var(--rx-ink); letter-spacing:.2px; padding-right:74px; word-break:break-word}
+.ir-tcard .ir-tc-meta{display:flex; justify-content:space-between; align-items:baseline; margin-top:10px; gap:8px}
+.ir-tcard .ir-tc-value{font:800 22px/1 Montserrat,system-ui,sans-serif; color:var(--rx-accent)}
+.ir-tcard .ir-tc-time{font-size:12.5px; color:var(--rx-muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+.ir-tcard .ir-tc-badge{position:absolute; top:12px; right:12px; font-size:11px; font-weight:700; padding:3px 8px; border-radius:999px; background:var(--rx-accent-soft); color:var(--rx-accent); white-space:nowrap}
+.ir-tcard.ir-tc-kitchen .ir-tc-badge{background:rgba(245,158,11,.18); color:var(--rx-warn)}
+.ir-tcard.ir-tc-served .ir-tc-badge{background:rgba(16,185,129,.18); color:var(--rx-good)}
+.ir-tcard.ir-tc-offline .ir-tc-badge{background:rgba(239,68,68,.16); color:var(--rx-bad)}
+.ir-tcard.ir-tc-empty .ir-tc-value{color:var(--rx-muted)}
+.ir-tp-empty{grid-column:1/-1; padding:40px; text-align:center; color:var(--rx-muted); font-size:15px}
+#ir_tables_open.ir-tp-has-table{position:relative}
+@media (max-width:767.98px){
+    #ir_tables_panel .ir-tp-head{padding:10px 12px}
+    #ir_tables_panel .ir-tp-title{font-size:17px}
+    #ir_tables_panel .ir-tp-new{padding:12px 16px; font-size:15px}
+    #ir_tables_panel .ir-tp-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; padding:12px}
+    .ir-tcard{min-height:96px; padding:12px}
+    .ir-tcard .ir-tc-name{font-size:16px}
+    .ir-tcard .ir-tc-value{font-size:18px}
+}

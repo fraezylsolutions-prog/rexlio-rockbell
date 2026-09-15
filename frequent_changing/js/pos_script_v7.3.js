@@ -2280,6 +2280,187 @@
               }
           };
       }
+      /* ---- "My tables" panel - table-first waiter flow (Stage 2) ------------------
+         Rendered over the item area from two sources: this till's IndexedDB (the
+         orders it holds, always, even offline) and Sale/myTablesAjax (the server's
+         view: orders placed on other tills, kitchen progress, empty auto tables).
+         Merged by sale_no; the local copy wins for value and tables because it can
+         be newer than the server (modified offline). Tapping an order that is not
+         on this till adopts it first (Step 2, irAdoptOrder). "+ New Table" creates
+         an auto-named table on the server and selects it the way the table modal
+         would: #table_id, #hidden_table_name, #hidden_table_capacity. Nothing here
+         changes how an order is built or placed. */
+      var ir_tp_timer = null;
+      var ir_tp_busy = false;
+      function irTpMsg(id, fallback){ let v = $("#" + id).val(); return v ? v : fallback; }
+      function irTpOn(){ return $("#ir_tables_panel").length > 0; }
+      function irTpMoney(v){
+          let n = parseFloat(v); if(isNaN(n)){ n = 0; }
+          let pr = parseInt(ir_precision, 10); if(isNaN(pr)){ pr = 2; }
+          return n.toFixed(pr);
+      }
+      function irTpElapsed(date_time, server_now){
+          if(!date_time){ return ""; }
+          let t = new Date(String(date_time).replace(" ", "T"));
+          let now = server_now ? new Date(String(server_now).replace(" ", "T")) : new Date();
+          let mins = Math.max(0, Math.round((now - t) / 60000));
+          if(isNaN(mins)){ return ""; }
+          if(mins < 60){ return mins + "m"; }
+          return Math.floor(mins / 60) + "h " + String(mins % 60).padStart(2, "0") + "m";
+      }
+      function irTpEsc(v){ return String(v === undefined || v === null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+      function irTpReadLocal(done){
+          let out = [];
+          if(typeof db === "undefined" || !db){ done(out); return; }
+          let login = Number($("#user_id").val());
+          let store = db.transaction(['sales'], "readonly").objectStore("sales");
+          store.openCursor(null, 'prev').onsuccess = function(event){
+              let cursor = event.target.result;
+              if(cursor){
+                  let rec = cursor.value;
+                  if(Number(rec.user_id) === login){
+                      let j = null; try{ j = JSON.parse(rec.order); }catch(e){}
+                      if(j){
+                          out.push({ sale_no: rec.sale_no || j.sale_no, value: j.total_payable, tables: j.orders_table_text || "", table_id: j.table_id || "",
+                                     date_time: j.date_time || "", local: true, pending: Number(rec.kitchen_pending) === 1 || Number(rec.kitchen_pending) === 3 || Number(rec.kitchen_pending) === 2,
+                                     sales_id: rec.sales_id, merged: !!(rec.merge_id) || String(rec.sale_no || j.sale_no).indexOf(" || ") > -1, order: rec.order });
+                      }
+                  }
+                  cursor.continue();
+                  return;
+              }
+              done(out);
+          };
+      }
+      function irTpFetchServer(done){
+          /* Always try: the online flag is only refreshed every 2 s, and on a fresh
+             page it is still unset when the panel first opens. A failed request
+             simply means "local cards only" (done(null)). */
+          $.ajax({
+              url: base_url + "Sale/myTablesAjax", method: "POST", dataType: "json", timeout: 8000,
+              data: { csrf_irestoraplus: csrf_value_ },
+              success: function(res){ done(res && res.ok ? res : null); },
+              error: function(){ done(null); }
+          });
+      }
+      var ir_tp_items = {};
+      var ir_tp_server_now = null;
+      function irTpRender(local, server){
+          let by = {}; let order = [];
+          for(let i = 0; i < local.length; i++){ by[local[i].sale_no] = local[i]; order.push(local[i].sale_no); }
+          let empties = [];
+          if(server){
+              for(let i = 0; i < server.orders.length; i++){
+                  let o = server.orders[i];
+                  if(by[o.sale_no]){
+                      by[o.sale_no].items_total = Number(o.items_total); by[o.sale_no].items_done = Number(o.items_done);
+                      if(!by[o.sale_no].tables && o.table_names){ by[o.sale_no].tables = o.table_names; }
+                  }else{
+                      by[o.sale_no] = { sale_no: o.sale_no, value: o.total_payable, tables: o.table_names || "", table_id: o.first_table_id || "", date_time: o.date_time, local: false, items_total: Number(o.items_total), items_done: Number(o.items_done) };
+                      order.push(o.sale_no);
+                  }
+              }
+              empties = server.empty_tables || [];
+          }
+          let html = "";
+          let count = 0;
+          for(let i = 0; i < empties.length; i++){
+              count++;
+              html += '<div class="ir-tcard ir-tc-empty" tabindex="0" data-kind="table" data-table_id="' + irTpEsc(empties[i].id) + '" data-table_name="' + irTpEsc(empties[i].name) + '">' +
+                      '<span class="ir-tc-badge">' + irTpEsc(irTpMsg("ir_tp_status_new", "New")) + '</span>' +
+                      '<div class="ir-tc-name">' + irTpEsc(empties[i].name) + '</div>' +
+                      '<div class="ir-tc-meta"><div class="ir-tc-value">' + irTpMoney(0) + '</div><div class="ir-tc-time"></div></div></div>';
+          }
+          for(let i = 0; i < order.length; i++){
+              let c = by[order[i]]; count++;
+              let cls = "ir-tcard", badge = "";
+              if(c.pending){ cls += " ir-tc-offline"; badge = irTpMsg("ir_tp_status_offline", "Offline"); }
+              else if(c.items_total > 0 && c.items_done >= c.items_total){ cls += " ir-tc-served"; badge = irTpMsg("ir_tp_status_served", "Served"); }
+              else if(c.items_total > 0){ cls += " ir-tc-kitchen"; badge = irTpMsg("ir_tp_status_kitchen", "In kitchen"); }
+              let name = c.tables ? c.tables : c.sale_no;
+              html += '<div class="' + cls + '" tabindex="0" data-kind="order" data-sale_no="' + irTpEsc(c.sale_no) + '" data-local="' + (c.local ? 1 : 0) + '">' +
+                      (badge ? '<span class="ir-tc-badge">' + irTpEsc(badge) + '</span>' : '') +
+                      '<div class="ir-tc-name">' + irTpEsc(name) + '</div>' +
+                      '<div class="ir-tc-meta"><div class="ir-tc-value">' + irTpMoney(c.value) + '</div><div class="ir-tc-time">' + irTpEsc(irTpElapsed(c.date_time, server ? server.server_time : null)) + '</div></div></div>';
+          }
+          if(!count){ html = '<div class="ir-tp-empty">' + irTpEsc(irTpMsg("ir_tp_no_tables", "No open tables. Tap + New Table to start one.")) + '</div>'; }
+          ir_tp_items = by; ir_tp_server_now = server ? server.server_time : null;
+          $("#ir_tp_grid").html(html);
+          let first = $("#ir_tp_first_name").val() || "";
+          $("#ir_tp_sub").text((first ? first + " " + String.fromCharCode(183) + " " : "") + count + " " + irTpMsg("ir_tp_open_tables", "open tables") + " " + String.fromCharCode(183) + " " + irTpMsg("ir_tp_tap_hint", "tap a table to open it"));
+          /* the server just answered -> creating a table will work; it did not -> it will not */
+          $("#ir_tp_new").prop("disabled", !server);
+      }
+      function irTpRefresh(){
+          if(ir_tp_busy){ return; }
+          ir_tp_busy = true;
+          irTpReadLocal(function(local){
+              irTpFetchServer(function(server){
+                  ir_tp_busy = false;
+                  if($("#ir_tables_panel").is(":visible") || !$("#ir_tables_panel").prop("hidden")){ irTpRender(local, server); }
+              });
+          });
+      }
+      function irOpenTablesPanel(){
+          if(!irTpOn()){ return; }
+          $("#ir_tables_panel").prop("hidden", false);
+          irTpRefresh();
+          if(ir_tp_timer){ clearInterval(ir_tp_timer); }
+          ir_tp_timer = setInterval(function(){ if(!$("#ir_tables_panel").prop("hidden")){ irTpRefresh(); } }, 10000);
+      }
+      function irCloseTablesPanel(){
+          $("#ir_tables_panel").prop("hidden", true);
+          if(ir_tp_timer){ clearInterval(ir_tp_timer); ir_tp_timer = null; }
+      }
+      function irTpSelectTable(table_id, table_name){
+          $("#table_id").val(table_id);
+          $("#hidden_table_name").val(table_name);
+          $("#hidden_table_capacity").val(1);
+          $("#ir_tables_open").attr("data-tippy-content", irTpMsg("my_tables", "My tables") + " " + String.fromCharCode(183) + " " + table_name);
+          irCloseTablesPanel();
+          toastr['success'](table_name + " - " + irTpMsg("ir_msg_table_ready", "Table ready - add items and place the order"), '', {timeOut: 3000});
+          try{ $(".main_right #search").first().focus(); }catch(e){}
+      }
+      function irTpNewTable(){
+          let btn = $("#ir_tp_new");
+          if(btn.prop("disabled")){ toastr['warning'](irTpMsg("ir_msg_tables_offline", "New tables need the server. You are offline."), ''); return; }
+          btn.prop("disabled", true);
+          $.ajax({
+              url: base_url + "Sale/createWaiterTable", method: "POST", dataType: "json", timeout: 8000,
+              data: { csrf_irestoraplus: csrf_value_ },
+              success: function(res){
+                  btn.prop("disabled", false);
+                  if(res && res.ok && res.id){ irTpSelectTable(res.id, res.name); }
+                  else{ toastr['error'](irTpMsg("ir_msg_table_create_failed", "Could not create a table - please try again"), ''); }
+              },
+              error: function(){ btn.prop("disabled", false); toastr['error'](irTpMsg("ir_msg_table_create_failed", "Could not create a table - please try again"), ''); }
+          });
+      }
+      function irTpOpenOrder(sale_no, is_local){
+          let select = function(){
+              let tries = 0;
+              let tm = setInterval(function(){
+                  tries++;
+                  let card = $('.holder .order_details > .single_order[data-sale_no="' + sale_no + '"]');
+                  if(card.length){ clearInterval(tm); card.trigger("click"); irCloseTablesPanel(); return; }
+                  if(tries >= 40){ clearInterval(tm); }
+              }, 150);
+          };
+          if(is_local){ select(); return; }
+          irAdoptOrder(sale_no, function(ok){ if(ok){ select(); } });
+      }
+      function irTablesPanelAfterPlacement(){
+          if($("#ir_tables_panel_on_load").val() === "1"){ setTimeout(irOpenTablesPanel, 800); }
+      }
+      $(document).on("click", "#ir_tp_new", function(e){ e.preventDefault(); irTpNewTable(); });
+      $(document).on("click", "#ir_tp_close", function(e){ e.preventDefault(); irCloseTablesPanel(); });
+      $(document).on("click", "#ir_tables_open", function(e){ e.preventDefault(); irOpenTablesPanel(); });
+      $(document).on("click", "#ir_tp_grid .ir-tcard", function(e){
+          e.preventDefault();
+          let card = $(this);
+          if(card.attr("data-kind") === "table"){ irTpSelectTable(card.attr("data-table_id"), card.attr("data-table_name")); return; }
+          irTpOpenOrder(card.attr("data-sale_no"), card.attr("data-local") === "1");
+      });
       function getRandomCode(length) {
           let result           = '';
           //this is random character pattern
@@ -9382,6 +9563,7 @@
                           add_sale_by_ajax_kot_print(update_sale_id,order_info,outlet_id_indexdb,company_id_indexdb,sale_no_new,"");
                           //add sale details for kitchen status
                           push_online_for_kitchen(order_info,'',sale_no_new,1);
+                          if(!update_sale_id){ irTablesPanelAfterPlacement(); }
                       }
                   }
   

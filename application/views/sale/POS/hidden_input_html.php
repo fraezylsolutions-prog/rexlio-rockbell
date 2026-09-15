@@ -263,9 +263,18 @@ foreach ($waiters as $waiter){
 <input type="hidden" id="ir_msg_gone" value="<?php echo lang('ir_msg_gone'); ?>">
 <input type="hidden" id="ir_msg_invoiced_elsewhere" value="<?php echo lang('ir_msg_invoiced_elsewhere'); ?>">
 <input type="hidden" id="ir_msg_kitchen_synced" value="<?php echo lang('ir_msg_kitchen_synced'); ?>">
+<input type="hidden" id="ir_tables_panel_on_load" value="<?php echo isWaiterUser() ? '1' : '0'; ?>">
+<input type="hidden" id="ir_tp_first_name" value="<?php echo escape_output(strtolower(strtok(trim((string) $this->session->userdata('full_name')), ' '))); ?>">
 <input type="hidden" id="ir_msg_table_ready" value="<?php echo lang('ir_msg_table_ready'); ?>">
 <input type="hidden" id="ir_msg_table_create_failed" value="<?php echo lang('ir_msg_table_create_failed'); ?>">
 <input type="hidden" id="ir_msg_tables_offline" value="<?php echo lang('ir_msg_tables_offline'); ?>">
+<input type="hidden" id="ir_tp_no_tables" value="<?php echo lang('ir_tp_no_tables'); ?>">
+<input type="hidden" id="ir_tp_status_new" value="<?php echo lang('ir_tp_status_new'); ?>">
+<input type="hidden" id="ir_tp_status_kitchen" value="<?php echo lang('ir_tp_status_kitchen'); ?>">
+<input type="hidden" id="ir_tp_status_served" value="<?php echo lang('ir_tp_status_served'); ?>">
+<input type="hidden" id="ir_tp_status_offline" value="<?php echo lang('ir_tp_status_offline'); ?>">
+<input type="hidden" id="ir_tp_open_tables" value="<?php echo lang('ir_tp_open_tables'); ?>">
+<input type="hidden" id="ir_tp_tap_hint" value="<?php echo lang('ir_tp_tap_hint'); ?>">
 <div class="modalOverlay"></div>
 <input type="hidden" id="base_url_customer" value="<?php echo base_url()?>">
 <input type="hidden" id="csrf_name_" value="<?php echo escape_output($this->security->get_csrf_token_name()); ?>">

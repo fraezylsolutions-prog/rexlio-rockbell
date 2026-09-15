@@ -191,6 +191,18 @@ body,
 .main-header .navbar .nav > li > a,
 .main-header .navbar a{color:var(--rx-ink-soft)}
 
+/* The mobile menu trigger (hamburger + link icon, shown below 1026px) was
+   INVISIBLE in dark mode. common.css:  .menu-trigger-box svg{color:#061237}
+   paints the icon a hardcoded dark navy, and feather icons draw with
+   stroke="currentColor", so on the dark header (#0B1128) the icon was drawn in
+   almost exactly the background colour. It was present, 44x45 and clickable the
+   whole time - just unseeable, which is why it read as "missing".
+
+   Painted from the same token as the other header links, so it now matches them
+   in both themes. In light this moves the icon from #061237 to #4A4568, which is
+   the colour the header's other links already use via the rule above. */
+.menu-trigger-box svg{color:var(--rx-ink-soft) !important}
+
 /* ==========================================================================
    4. Cards / boxes  (dashboard + every list screen)
    ========================================================================== */
@@ -1084,3 +1096,351 @@ a.category_button.all_category{
         inset 0 -3px 0 rgba(0,0,0,.13),
         0 3px 5px rgba(0,0,0,.16) !important;
 }
+
+
+/* ==========================================================================
+   23. Dashboard + header - mobile layout
+   --------------------------------------------------------------------------
+   Matches the client's reference mockup below 768px. Everything is inside a
+   max-width query: the dashboard and header are shared with every other screen
+   and desktop must not move.
+
+   THE ORDERING PROBLEM. The reference wants one row reading
+       menu -> location -> lock -> link -> theme -> language
+   but those controls live in TWO sibling .navbar-custom-menu containers, and
+   the menu/link pair is nested a level deeper again. Rather than restructure
+   the header markup (used by every screen), the wrappers are set to
+   display:contents so their children become flex items of one shared row, and
+   `order` then places them. Nothing is moved in the DOM.
+
+   Measured at 390px the six requested controls needed 486px at their natural
+   widths, so the two items NOT in the reference - the quick-action strip and
+   the user avatar - are hidden here, and the language selector drops its label.
+   ========================================================================== */
+@media only screen and (max-width: 767.98px) {
+
+    /* ---- one-row topbar ---- */
+    .main-header .navbar .wrapper_up_wrapper .hh_wrapper{
+        display:flex !important;
+        flex-wrap:nowrap !important;
+        align-items:center;
+        gap:6px;
+        padding:6px 8px;
+        width:100%;
+    }
+    .main-header .navbar-custom-menu,
+    .main-header .menu-trigger-box,
+    .main-header ul.menu-list{display:contents !important}
+
+    /* not in the reference layout, and the row cannot afford them */
+    .main-header .user-info-box{display:none !important}
+
+
+    .main-header .menu-trigger-box a.st{order:1}
+    .main-header .ir-topbar-outlet{order:2; flex:1 1 auto; min-width:0}
+    .main-header .rx-manage-reg-li{order:3}
+    .main-header .menu-trigger-box a.om{order:4}
+    .main-header .rx-theme-li{order:5}
+    .main-header .lang-dropdown{order:6}
+
+    .main-header .menu-trigger-box a.st,
+    .main-header .menu-trigger-box a.om{
+        padding:0 !important; width:34px; height:34px;
+        display:flex !important; align-items:center; justify-content:center;
+        flex:0 0 auto;
+    }
+    .main-header .rx-manage-reg-li a.new-btn{width:34px !important; min-width:34px !important; height:34px !important}
+    .main-header .rx-theme-li{flex:0 0 auto}
+    .main-header .rx-theme-toggle{transform:scale(.86); transform-origin:center}
+
+    /* language collapses to the globe - the label is the widest thing in the row */
+    .main-header .lang-dropdown{flex:0 0 auto}
+    .main-header .lang-dropdown > button{padding:0 8px !important; height:34px}
+    .main-header .lang-dropdown > button span,
+    .main-header .lang-dropdown > button .lang_text{display:none !important}
+
+    /* the outlet mirror injected into the header on mobile */
+    .ir-topbar-outlet{display:flex; align-items:center; min-width:0}
+    .ir-topbar-outlet select{
+        width:100%; max-width:100%; height:34px;
+        border:1px solid var(--rx-line); border-radius:9px;
+        background:var(--rx-surface); color:var(--rx-ink);
+        font-size:12.5px; padding:0 6px;
+        text-overflow:ellipsis;
+    }
+
+    /* ---- filter: date, date, time, time, search on ONE row ---- */
+    .dashboardDateRange{
+        display:grid !important;
+        grid-template-columns:1fr 1fr 1fr 1fr 40px;
+        gap:5px;
+        align-items:center;
+        background:var(--rx-surface);
+        border:1px solid var(--rx-line);
+        border-radius:13px;
+        padding:8px;
+        margin-bottom:8px;
+    }
+    /* the outlet now lives in the topbar, so its in-form copy is hidden here.
+       It still submits - it is only visually removed. */
+    .dashboardDateRange .select2-container,
+    .dashboardDateRange > select.select_outlet_dashboard{
+        position:absolute !important; width:1px !important; height:1px !important;
+        overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;
+    }
+    .dashboardDateRange > input[type="text"],
+    .dashboardDateRange > input[type="time"]{
+        width:100% !important; min-width:0; margin:0 !important;
+        height:38px; border-radius:9px; padding:0 2px;
+        font-size:10.5px; text-align:center;
+    }
+    /* the date inputs carry a full "2026-09-30" in a ~78px track, so the glyphs
+       are tightened rather than the value truncated */
+    .dashboardDateRange > input[type="text"]{letter-spacing:-.2px}
+    .dashboardDateRange > input[type="time"]::-webkit-calendar-picker-indicator{
+        margin:0; padding:0; width:12px;
+    }
+    .dashboardDateRange > button{
+        width:40px; height:38px; padding:0; border-radius:9px;
+        display:flex; align-items:center; justify-content:center;
+    }
+    .dashboardDateRange > button svg{margin:0}
+    .dashboardDateRange > button span,
+    .dashboardDateRange > button > *:not(svg){display:none}
+
+    /* The filter's own 8px margin was only part of the gap: the section carries
+       Bootstrap's mb-2 and the form/row add their own, stacking to ~21px. These
+       are flattened so the spacing below the filter is the 8px actually set. */
+    .dashboardDateRangeWrap{display:block; margin-bottom:0 !important}
+    #ir_dash_filter_form{margin-bottom:0 !important}
+    #ir_dash_filter_form > .row{margin-bottom:0 !important}
+    #ir_dash_filter_form > .row > [class*="col-"]{margin-bottom:0 !important}
+    /* tightened: this greeting sits directly above the filter card, so the gap
+       under it was doing nothing but pushing content down the screen */
+    .dashboardDateRangeWrap h3{margin-bottom:4px !important}
+    /* the greeting, smaller again on mobile where the row is tight */
+    .ir-dash-user{font-size:12.5px !important; font-weight:600 !important}
+    .ir-dash-user span{
+        display:block; max-width:100%;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+
+    /* ---- cards: 3 across ---- */
+    .grid_view{
+        display:grid !important;
+        grid-template-columns:repeat(3,1fr) !important;
+        gap:10px !important;
+        grid-gap:10px !important;
+        align-items:stretch;
+        margin:0 0 16px 0 !important;
+        padding:0 !important;
+    }
+    /* Every margin is zeroed, not just the bottom one. The vendor rules set
+       margin-bottom on these tiles per breakpoint, and any leftover margin on a
+       grid item eats into the gap and reads as tiles touching or overlapping.
+       Height comes from content with a floor, never a fixed value, so a label
+       that wraps to two lines grows its tile instead of spilling out of it. */
+    .grid_view .btn-dblue1{
+        margin:0 !important;
+        border-radius:12px;
+        padding:10px 9px !important;
+        display:flex !important;
+        flex-direction:column;
+        align-items:flex-start;
+        justify-content:flex-start;
+        gap:4px;
+        min-height:92px;
+        height:auto !important;
+        box-sizing:border-box;
+        text-align:left;
+        overflow:hidden;
+        position:relative;
+        float:none !important;
+    }
+    .grid_view .btn-dblue1 .card-icon{
+        order:-1; position:static !important; margin:0;
+        width:26px; height:26px; border-radius:8px;
+        display:flex; align-items:center; justify-content:center;
+    }
+    .grid_view .btn-dblue1 .card-icon svg{width:13px; height:13px}
+    /* !important on both sizes: userHomeResponsive.css sets .grid_view h5 inside
+       its own breakpoints, and common.css sizes the label - without the flag a
+       seven-figure amount was still being laid out at the inherited size and
+       clipped at ~169px against a 99px track. */
+    .grid_view .btn-dblue1 p{
+        margin:0; font-size:9px !important; line-height:1.15; opacity:.85;
+        overflow-wrap:break-word; width:100%;
+    }
+    /* Sized so a seven-figure amount fits on one line without ellipsis. At 3
+       columns on a 390px screen each card gives about 103px of text width, and
+       "3,000,000.00" is 12 characters - at 12px with tabular figures and slight
+       negative tracking it measures ~80px, leaving headroom rather than sitting
+       exactly on the limit. tabular-nums also stops the digits jittering as the
+       spincrement counter animates. */
+    .grid_view .btn-dblue1 h5{
+        margin:0; font-size:11px !important; font-weight:700; width:100%;
+        line-height:1.25;
+        font-variant-numeric:tabular-nums;
+        letter-spacing:-.3px;
+        white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis;
+    }
+
+    /* ---- "Today" hero spans the full row ---- */
+    .grid_view > a:first-child{
+        grid-column:1 / -1;
+        display:grid !important;
+        grid-template-columns:52px 1fr;
+        align-items:center;
+        column-gap:12px; row-gap:0;
+        min-height:84px;
+        background:linear-gradient(115deg,#1B2A6B 0%,#2743A8 55%,#3E63D6 100%) !important;
+        border:0 !important;
+        color:#fff !important;
+    }
+    .grid_view > a:first-child .card-icon{
+        grid-column:1; grid-row:1 / span 2; order:-1;
+        width:52px; height:52px; border-radius:14px;
+        background:rgba(255,255,255,.16) !important;
+    }
+    .grid_view > a:first-child .card-icon svg{width:24px; height:24px; color:#fff !important}
+    /* colour must be restated here: section 4's .btn-dblue1 h5 sets
+       var(--rx-ink) !important, which is near-black in LIGHT - dark text on the
+       blue gradient. It only looked right in dark because the token is light
+       there. The hero is always dark-on-blue, so it is pinned to white in both
+       themes rather than read from a token. */
+    .grid_view > a:first-child p,
+    .grid_view > a:first-child h5{color:#fff !important}
+    /* !important is required here: the card-value rule above sets 11px with the
+       flag, and !important beats specificity, so without it the hero date was
+       rendering at the same 11px as the tile figures. The date is the headline
+       of this banner and must read larger than anything in the tiles. */
+    .grid_view > a:first-child p{
+        grid-column:2; grid-row:1; align-self:end;
+        font-size:12px !important; opacity:.92; font-weight:500;
+    }
+    .grid_view > a:first-child h5{
+        grid-column:2; grid-row:2; align-self:start;
+        font-size:20px !important; font-weight:700; letter-spacing:-.2px;
+        white-space:nowrap;
+    }
+
+    /* ---- revenue heading + range toggles ---- */
+    .char_elastick{flex-wrap:wrap; gap:8px}
+    .sale_report_header{width:auto !important; margin:0 8px 0 0; font-size:18px}
+    .title-wraper{display:flex; gap:7px; flex-wrap:wrap}
+    .get_date_by_custom_btn{border-radius:9px; padding:6px 14px; font-size:13px}
+}
+
+/* The More card exists only for the mobile grid. */
+.ir_more_card{display:none}
+@media only screen and (max-width: 767.98px){ .ir_more_card{display:flex !important} }
+
+/* The dashboard heading now carries the signed-in user's name rather than the
+   page title, so it is sized as a greeting rather than a page header. Set
+   outside the mobile query too, since the change applies at every width. */
+/* Scoped to min-width on purpose. Unscoped, this sat AFTER the mobile rule in
+   section 23 with the same specificity and the same !important, so it won and
+   the phone got the desktop size. */
+@media only screen and (min-width: 768px){
+    .ir-dash-user{
+        font-size:15px !important; font-weight:600 !important; letter-spacing:-.01em;
+        margin-bottom:6px !important;
+    }
+}
+
+/* ==========================================================================
+   24. Quick-action panel (the link icon's dropdown)
+   --------------------------------------------------------------------------
+   Scoped to max-width 1025.98px, NOT 767.98px. The vendor shows this strip
+   inline only from 1026px up (style.css:452); below that it is already a
+   dropdown - position:absolute, top:60px, left:40px, background-color:WHITE,
+   opacity-toggled by .active. Two consequences drove this section:
+
+     * the hardcoded white ignored the theme, so in dark mode the panel came out
+       as a white slab with washed-out text;
+     * styling it only below 768px left tablet on the vendor's version, where
+       the rows render as unlabelled icons - the label text lives inside
+       <i data-feather>, which feather replaces with an <svg>, discarding it.
+
+   One block now covers both widths, painted from tokens, with the labels drawn
+   from the tooltip attribute that survives.
+   ========================================================================== */
+@media only screen and (max-width: 1025.98px) {
+
+    /* hidden at rest, shown as a panel when .om sets .active (new-script.js:39) */
+    .main-header ul.screen-list{display:none !important}
+
+    .main-header ul.screen-list.active{
+        display:flex !important;
+        flex-direction:column;
+        align-items:stretch;
+        position:absolute !important;
+        top:calc(100% + 6px) !important;
+        /* LEFT-anchored, not right. Right-anchoring pinned the panel to the far
+           end of .hh_wrapper, which on a tablet-width window sits behind the
+           collapsed sidebar rail - the panel then started left of the visible
+           area and clipped two or three characters off every label. The trigger
+           icons live at the LEFT of the header at every width below 1026px, so
+           dropping the panel from there is both correct and unclippable. */
+        left:8px !important;
+        right:auto !important;
+        width:auto !important;
+        min-width:170px;
+        max-width:min(220px, calc(100vw - 20px));
+        max-height:70vh;
+        overflow-y:auto;
+        /* themed, and forced past the vendor's background-color:white */
+        background:var(--rx-surface) !important;
+        border:1px solid var(--rx-line) !important;
+        border-radius:10px !important;
+        box-shadow:var(--rx-shadow) !important;
+        padding:5px !important;
+        margin:0 !important;
+        z-index:1200;
+        /* the vendor fades it in via opacity/transform; .active already sets
+           these, but they are restated so the panel cannot inherit the resting
+           opacity:0 from the max-width:1024 rule above it */
+        opacity:1 !important;
+        transform:none !important;
+        pointer-events:auto !important;
+    }
+
+    .main-header ul.screen-list.active > li{
+        width:100%; display:block !important; margin:0 !important;
+        border:0 !important;
+    }
+
+    /* These are .new-btn pills in the inline strip - purple fill, icon-sized.
+       In the panel they read as compact menu rows instead. */
+    .main-header ul.screen-list.active > li > a{
+        display:flex !important; align-items:center; gap:8px;
+        width:100% !important; min-width:0 !important; height:auto !important;
+        padding:7px 9px !important; border-radius:7px;
+        background:transparent !important; box-shadow:none !important;
+        border:0 !important;
+        color:var(--rx-ink) !important;
+        justify-content:flex-start !important;
+    }
+    .main-header ul.screen-list.active > li > a:hover{
+        background:var(--rx-accent-soft) !important;
+        color:var(--rx-accent) !important;
+    }
+
+    /* label recovered from the tooltip, since feather destroyed the text node */
+    .main-header ul.screen-list.active > li > a::after{
+        content:attr(data-bs-original-title);
+        font-size:12px; line-height:1.2; white-space:nowrap; color:inherit;
+    }
+    .main-header ul.screen-list.active > li > a svg{
+        width:15px; height:15px; flex:0 0 auto; color:var(--rx-muted);
+    }
+    .main-header ul.screen-list.active > li > a:hover svg{color:var(--rx-accent)}
+
+    /* .menu-trigger-box / .navbar-custom-menu are display:contents at mobile, so
+       the row itself is the containing block the panel anchors to. */
+    .main-header .navbar .wrapper_up_wrapper .hh_wrapper{position:relative}
+}
+
+
+/* =============================================================================

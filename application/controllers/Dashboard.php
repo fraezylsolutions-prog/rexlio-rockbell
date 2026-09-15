@@ -91,6 +91,13 @@ class Dashboard extends Cl_Controller {
         $data['start_date_dashboard'] = $first_day_this_month;
         $data['end_date_dashboard'] = $last_day_this_month;
 
+        //Echoed back so the time inputs survive the form submit. Without this they
+        //blank on reload and the filter looks like it did nothing - the JS reads
+        //the rendered inputs to build its request. No default: blank means "no
+        //time filter", which must stay the resting state.
+        $data['start_time_dashboard'] = isset($_POST['start_time_dashboard']) ? trim((string)$_POST['start_time_dashboard']) : '';
+        $data['end_time_dashboard']   = isset($_POST['end_time_dashboard'])   ? trim((string)$_POST['end_time_dashboard'])   : '';
+
         $data['low_stock_ingredients'] = $this->Inventory_model->getInventoryAlertList($outlet_id);
         $data['top_ten_food_menu'] = $this->Dashboard_model->top_ten_food_menu($first_day_this_month, $last_day_this_month,$outlet_id);
         $data['top_ten_customer'] = $this->Dashboard_model->top_ten_customer($first_day_this_month, $last_day_this_month,$outlet_id);
@@ -275,24 +282,69 @@ class Dashboard extends Cl_Controller {
             $outlet_id = $this->session->userdata('outlet_id');
         }
 
-        $transaction_details_main = (object)$this->Report_model->getTotalTransaction($start_date, $end_date,$outlet_id);
+        //Time-of-day range. Applies to the tbl_sales-derived figures only - see the
+        //Net Profit note below. Blank means no time predicate at all.
+        $start_time = isset($_POST['start_time_dashboard']) ? trim((string)$_POST['start_time_dashboard']) : '';
+        $end_time   = isset($_POST['end_time_dashboard'])   ? trim((string)$_POST['end_time_dashboard'])   : '';
+
+        //Cards 1-3 remain TODAY-only, exactly as before - $start_date/$end_date
+        //above are both date('Y-m-d'). Cards 1 and 3 now also honour the time range.
         $return_value_set_total_1 = 0;
         $return_value_set_total_2 = 0;
         $return_value_set_total_3 = 0;
-        $return_value_set_total_4 = 0;
 
+        //Card 1 - Revenue. Moved off profitLossReport()'s profit_1 onto the same
+        //query card 5 uses, so the time range can be applied without also
+        //time-filtering profit_9 (which must not be - see below). The two are
+        //arithmetically identical with no time filter set: profit_1 is
+        //sum(total_payable) on tbl_sales, order_status 3, same outlet and
+        //del_status. Verified equal before this change shipped.
+        $revenue_details = $this->Dashboard_model->completed_order_value($start_date, $end_date, $outlet_id, $start_time, $end_time);
+        $return_value_set_total_1 += $revenue_details->completed_order_value;
+
+        //Card 2 - Net Profit. DELIBERATELY NOT TIME-FILTERED, by client decision.
+        //profit_9 nets sales against wastes, expenses and transfers, and those
+        //three tables record a DATE only - they have no time column at all. Time
+        //-filtering the sales half while counting a whole day's expenses would
+        //understate profit by however much falls outside the window, and it would
+        //look entirely plausible while doing so. The card therefore stays on the
+        //date range, and the view carries a note saying so.
         $profit_details = (object)$this->Report_model->profitLossReport($start_date, $end_date,$outlet_id);
-        $customer_details = (object)$this->Report_model->getTotalCustomer($start_date, $end_date,$outlet_id);
+        $return_value_set_total_2 += $profit_details->profit_9;
 
-        $return_value_set_total_1+=($profit_details->profit_1);
-        $return_value_set_total_2+=$profit_details->profit_9;
-        $return_value_set_total_3+=$transaction_details_main->total_transaction;
-        $return_value_set_total_4+=$customer_details->total_customer;
+        //Card 3 - Transactions. Own query rather than Report_model::getTotalTransaction(),
+        //which is shared with the dashboard charts.
+        $transaction_details_main = $this->Dashboard_model->transaction_count($start_date, $end_date, $outlet_id, $start_time, $end_time);
+        $return_value_set_total_3 += $transaction_details_main->transaction_count;
+
+        //Card 4 - Running Order Value. A LIVE snapshot: no date range at all, by
+        //decision. An order open last week is either still open (and counted
+        //now) or was completed (and belongs to card 5), so a date filter here
+        //would answer a question nobody asks.
+        $running_details = $this->Dashboard_model->running_order_value($outlet_id);
+        $return_value_set_total_4 = $running_details->running_order_value;
+
+        //Card 5 - Completed Order Value. Honours the dashboard's date range,
+        //which is what distinguishes it from the Revenue card above (same
+        //formula, but Revenue is fixed to today).
+        //The date fallback matters: a time range with no dates would otherwise
+        //reach the query with both blank, and while completed_order_value() has no
+        //early-return gate (so it would still return a figure), that figure would
+        //silently span all history. Falling back to today keeps a time-only
+        //selection meaning "today, between these hours".
+        $range_start = isset($_POST['start_date_dashboard']) && $_POST['start_date_dashboard'] ? $_POST['start_date_dashboard'] : $start_date;
+        $range_end   = isset($_POST['end_date_dashboard']) && $_POST['end_date_dashboard'] ? $_POST['end_date_dashboard'] : $end_date;
+        $completed_details = $this->Dashboard_model->completed_order_value($range_start, $range_end, $outlet_id, $start_time, $end_time);
+        $return_value_set_total_5 = $completed_details->completed_order_value;
 
         $return_array['set_total_1'] =  getAmtP($return_value_set_total_1);
         $return_array['set_total_2'] =  getAmtP($return_value_set_total_2);
         $return_array['set_total_3'] =  getAmtP($return_value_set_total_3);
         $return_array['set_total_4'] =  getAmtP($return_value_set_total_4);
+        $return_array['set_total_5'] =  getAmtP($return_value_set_total_5);
+        //count is not shown on the card, but is cheap to return and useful if the
+        //client later asks "how many orders is that?"
+        $return_array['running_order_count'] = $running_details->running_order_count;
 
         echo json_encode($return_array);
     }

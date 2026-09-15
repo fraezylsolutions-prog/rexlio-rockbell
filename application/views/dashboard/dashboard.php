@@ -33,12 +33,24 @@
     </section> -->
 
 
-    <form method="POST" action="<?php echo base_url()?>Dashboard/dashboard">
+    <?php /* id added so the mobile topbar's outlet selector can drive this form
+             from outside it - see the mobile block in dashboard.php's script at
+             the foot of this file. */ ?>
+    <form method="POST" id="ir_dash_filter_form" action="<?php echo base_url()?>Dashboard/dashboard">
         <div class="row">
         <div class="col-xl-12">
             <section class="content-header mb-2 dashboardDateRangeWrap">
-            <h3 class="mb-0 d-flex align-items-center top-left-header <?= returnSessionLng()=="arabic" ? 'ps-2" ' : 'pe-2'?>">
-                <span><?php echo lang('dashboard'); ?></span>
+            <?php /* Shows who is signed in rather than the page name - the sidebar
+                     and browser tab already say "Dashboard", and on mobile this line
+                     is prime space. Falls back to the page name if the session has no
+                     full_name, so the heading is never blank. */
+                $ir_dash_name = $this->session->userdata('full_name');
+                $ir_dash_heading = $ir_dash_name
+                    ? lang('welcome') . ' ' . $ir_dash_name
+                    : lang('dashboard');
+            ?>
+            <h3 class="mb-0 d-flex align-items-center top-left-header ir-dash-user <?= returnSessionLng()=="arabic" ? 'ps-2" ' : 'pe-2'?>">
+                <span><?php echo escape_output($ir_dash_heading); ?></span>
             </h3>
             <div class="dashboardDateRange">
                 <?php
@@ -60,6 +72,16 @@
                 <input tabindex="3" type="text" name="start_date_dashboard" id="start_date_dashboard" class="form-control customDatepicker <?= returnSessionLng()=="arabic" ? 'ms-2" ' : 'me-2'?>" placeholder="<?php echo lang('start_date'); ?>" value="<?=isset($start_date_dashboard) && $start_date_dashboard?$start_date_dashboard:date('Y-m-d',strtotime('today -30days'))?>">
 
                 <input tabindex="3" type="text" name="end_date_dashboard" id="end_date_dashboard" class="form-control customDatepicker <?= returnSessionLng()=="arabic" ? 'ms-2" ' : 'me-2'?>" placeholder="<?php echo lang('start_date'); ?>" value="<?=isset($end_date_dashboard) && $end_date_dashboard?$end_date_dashboard:date('Y-m-d',strtotime('today'))?>">
+
+                <?php /* Time-of-day range, filtered on tbl_sales.order_time. CLOCK time,
+                         independent of the date range above (which filters the BUSINESS
+                         day). Applies to Revenue, Transactions and Completed Order Value.
+                         It deliberately does NOT apply to Net Profit - see the note on
+                         that card - or to Running Order Value, which is a live snapshot.
+                         Left blank, it filters nothing. */ ?>
+                <input tabindex="3" type="time" name="start_time_dashboard" id="start_time_dashboard" class="form-control <?= returnSessionLng()=="arabic" ? 'ms-2" ' : 'me-2'?>" title="<?php echo lang('start_time'); ?>" value="<?=isset($start_time_dashboard) ? escape_output($start_time_dashboard) : ''?>">
+
+                <input tabindex="3" type="time" name="end_time_dashboard" id="end_time_dashboard" class="form-control <?= returnSessionLng()=="arabic" ? 'ms-2" ' : 'me-2'?>" title="<?php echo lang('end_time'); ?>" value="<?=isset($end_time_dashboard) ? escape_output($end_time_dashboard) : ''?>">
 
                 <button type="submit" class="btn new-btn h-40" id="dashboard_search">
                 <i data-feather="search"></i> <?php echo lang('search'); ?></button>
@@ -130,8 +152,15 @@
                 <i data-feather="loader"></i>
             </div>
         </a>
-        <a href="javascript:void(0)" class="get_action_prevent btn btn-dblue1" role="button">
-            <p><?php echo lang('net_profit')?></p>
+        <?php /* Net Profit is deliberately NOT time-filtered. It nets sales against
+                 wastes, expenses and transfers, and those tables record a DATE only -
+                 no time column exists on them. Filtering the sales half while counting
+                 a whole day's expenses would understate profit while looking entirely
+                 plausible. The title attribute says so on hover rather than adding a
+                 permanent line of small print to the card. */ ?>
+        <a href="javascript:void(0)" class="get_action_prevent btn btn-dblue1" role="button"
+           title="<?php echo lang('net_profit_time_note'); ?>">
+            <p><?php echo lang('net_profit')?> <span class="ir_np_daily">*</span></p>
             <h5 class="spincrement set_today_total_2">0</h5>
             <div class="card-icon success_icon">
                 <i data-feather="trending-up"></i>
@@ -144,18 +173,37 @@
                 <i data-feather="activity"></i>
             </div>
         </a>
+        <?php /* Running Order Value: a LIVE snapshot of what is currently open,
+                 deliberately ignoring the date picker - an order open last week
+                 is either still open (counted here) or completed (counted in the
+                 next card). Sourced from tbl_kitchen_sales, because a running
+                 order does not exist in tbl_sales until it is invoiced. It has no
+                 trend-chart toggle by design: there is no history to plot. */ ?>
         <a href="javascript:void(0)" class="get_action_prevent btn btn-dblue1" role="button">
-            <p><?php echo lang('Customers')?></p>
+            <p><?php echo lang('running_order_value')?></p>
             <h5 class="spincrement set_today_total_4">0</h5>
             <div class="card-icon info_icon">
-                <i data-feather="users"></i>
+                <i data-feather="clock"></i>
             </div>
         </a>
+        <?php /* Completed Order Value: same formula as the Revenue card above,
+                 but over the selected date range rather than today only. */ ?>
         <a href="javascript:void(0)" class="get_action_prevent btn btn-dblue1" role="button">
-            <p><?php echo lang('average_receipt')?></p>
+            <p><?php echo lang('completed_order_value')?></p>
             <h5 class="spincrement set_today_total_5">0</h5>
             <div class="card-icon purple_icon">
-                <i data-feather="repeat"></i>
+                <i data-feather="check-circle"></i>
+            </div>
+        </a>
+        <?php /* "More" completes the 3x2 grid on mobile and scrolls to the
+                 dashboard content below the cards rather than leaving the page.
+                 Hidden on desktop, where nothing is below the fold in the same
+                 way and the grid is a different shape. */ ?>
+        <a href="javascript:void(0)" id="ir_dash_more" class="get_action_prevent btn btn-dblue1 ir_more_card" role="button">
+            <p><?php echo lang('more')?></p>
+            <h5>&nbsp;</h5>
+            <div class="card-icon purple_icon">
+                <i data-feather="more-horizontal"></i>
             </div>
         </a>
     </div>
@@ -636,7 +684,7 @@
     </div>
 </section>
 
-<script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/dashboard_chart_custom.js?v=7.6.9"></script>
+<script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/dashboard_chart_custom.js?v=7.7.2"></script>
 <!-- ChartJS -->
 <script src="<?php echo base_url(); ?>assets/bower_components/chart.js/Chart.js"></script>
 <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/local/loader.js"></script>
@@ -645,3 +693,81 @@
 <link rel="stylesheet" href="<?php echo base_url(); ?>assets/bower_components/morris.js/morris.css">
 <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/jquery.cookie.js"></script>
 <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/dashboard.js"></script>
+
+<?php /* ==========================================================================
+     Mobile dashboard behaviour (below 768px only).
+
+     1. OUTLET SELECTOR IN THE TOPBAR. The reference layout puts the location
+        next to the menu button. The real selector lives inside the filter form
+        further down the page, and a form control cannot be reparented without
+        losing its form binding - so rather than move it, a compact mirror is
+        cloned into the topbar and the two are kept in sync. The original still
+        submits, so nothing about the filter changes.
+
+     2. "MORE" scrolls to the content below the cards instead of navigating.
+     ========================================================================== */ ?>
+<script>
+(function(){
+    "use strict";
+    var MOBILE = 767.98;
+    function isMobile(){ return window.matchMedia("(max-width: " + MOBILE + "px)").matches; }
+
+    function buildTopbarOutlet(){
+        var real = document.getElementById("outlet_id_dashboard");
+        var host = document.querySelector(".main-header .menu-trigger-box");
+        if(!real || !host || document.getElementById("ir_topbar_outlet")) return;
+
+        var wrap = document.createElement("span");
+        wrap.className = "ir-topbar-outlet";
+        var sel = document.createElement("select");
+        sel.id = "ir_topbar_outlet";
+        // no name attribute: this control never submits, it only drives the real one
+        for(var i=0;i<real.options.length;i++){
+            var o = document.createElement("option");
+            o.value = real.options[i].value;
+            o.textContent = real.options[i].textContent;
+            if(real.options[i].selected) o.selected = true;
+            sel.appendChild(o);
+        }
+        sel.addEventListener("change", function(){
+            real.value = sel.value;
+            // select2 replaces the native control, so it needs telling directly
+            if(window.jQuery && jQuery(real).data("select2")){ jQuery(real).trigger("change.select2"); }
+            var f = document.getElementById("ir_dash_filter_form");
+            if(f) f.submit();
+        });
+        wrap.appendChild(sel);
+        host.appendChild(wrap);
+    }
+
+    function removeTopbarOutlet(){
+        var w = document.querySelector(".ir-topbar-outlet");
+        if(w) w.parentNode.removeChild(w);
+    }
+
+    function syncOutlet(){ isMobile() ? buildTopbarOutlet() : removeTopbarOutlet(); }
+
+    document.addEventListener("DOMContentLoaded", function(){
+        syncOutlet();
+
+        var more = document.getElementById("ir_dash_more");
+        if(more){
+            more.addEventListener("click", function(e){
+                e.preventDefault();
+                /* First content block below the summary cards. Retarget here if
+                   the client would rather it jump further down (Quick Links, or
+                   the alert / top-ten boxes). */
+                var target = document.querySelector(".char_elastick") ||
+                             document.querySelector(".sale_report_header");
+                if(target){
+                    var y = target.getBoundingClientRect().top + window.pageYOffset - 12;
+                    window.scrollTo({top:y, behavior:"smooth"});
+                }
+            });
+        }
+    });
+
+    var t;
+    window.addEventListener("resize", function(){ clearTimeout(t); t = setTimeout(syncOutlet, 200); });
+})();
+</script>

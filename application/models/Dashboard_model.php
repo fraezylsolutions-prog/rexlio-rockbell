@@ -372,6 +372,143 @@ FROM tbl_food_menus fm  INNER JOIN (select * from tbl_food_menu_categories where
      * @param string
      * @param int
      */
+    /**
+     * Running Order Value - the value of orders open RIGHT NOW.
+     *
+     * Deliberately takes NO date range. A running order is a live snapshot, not
+     * a period figure: "orders open last week" is not a meaningful concept, and
+     * anything still open from last week is still open now and already counted.
+     * The dashboard's date picker is therefore ignored for this card by design.
+     *
+     * Reads tbl_kitchen_sales, not tbl_sales - a running order does not exist in
+     * tbl_sales until it is completed and invoiced. The status filter mirrors
+     * Sale_model::getRunningKitchenOrders() exactly, so this total always agrees
+     * with what the Running Order screen actually lists.
+     *
+     * @access public
+     * @return object
+     * @param int
+     */
+    public function running_order_value($outlet_id='') {
+        $this->db->select('sum(total_payable) as running_order_value, count(id) as running_order_count');
+        $this->db->from('tbl_kitchen_sales');
+        $this->db->where('tbl_kitchen_sales.outlet_id', $outlet_id);
+        $this->db->where('tbl_kitchen_sales.del_status', 'Live');
+        $this->db->where("(tbl_kitchen_sales.order_status='1' OR tbl_kitchen_sales.order_status='2')");
+        $this->db->where("(tbl_kitchen_sales.future_sale_status='1' OR tbl_kitchen_sales.future_sale_status='3')");
+        $result = $this->db->get()->row();
+
+        if (empty($result->running_order_value)) {
+            $result->running_order_value = 0;
+        }
+        if (empty($result->running_order_count)) {
+            $result->running_order_count = 0;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Completed Order Value - the value of completed/invoiced orders in range.
+     *
+     * Same column, table and status the Revenue card derives from
+     * (Report_model::profitLossReport()'s profit_1 is sum(total_payable) on
+     * order_status 3). The difference is the window: Revenue is hardcoded to
+     * today, this honours the dashboard's date picker. Kept as its own small
+     * query rather than calling profitLossReport(), which runs a dozen
+     * unrelated purchase/waste/expense/transfer queries to produce one number.
+     *
+     * @access public
+     * @return object
+     * @param string, string, int
+     */
+    public function completed_order_value($start_date, $end_date, $outlet_id='', $start_time='', $end_time='') {
+        $this->db->select('sum(total_payable) as completed_order_value');
+        $this->db->from('tbl_sales');
+        if ($start_date != '' && $end_date != '') {
+            $this->db->where('tbl_sales.sale_date>=', $start_date);
+            $this->db->where('tbl_sales.sale_date <=', $end_date);
+        }
+        if ($start_date != '' && $end_date == '') {
+            $this->db->where('tbl_sales.sale_date', $start_date);
+        }
+        if ($start_date == '' && $end_date != '') {
+            $this->db->where('tbl_sales.sale_date', $end_date);
+        }
+        $this->applyTimeRange($start_time, $end_time);
+        $this->db->where('tbl_sales.order_status', 3);
+        $this->db->where('tbl_sales.outlet_id', $outlet_id);
+        $this->db->where('tbl_sales.del_status', 'Live');
+        $result = $this->db->get()->row();
+
+        if (empty($result->completed_order_value)) {
+            $result->completed_order_value = 0;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Count of completed orders, with the same filters as completed_order_value.
+     * Its own method rather than adding time to Report_model::getTotalTransaction(),
+     * which is shared with the dashboard charts and would change their behaviour.
+     *
+     * @access public
+     * @return object
+     * @param string, string, int, string, string
+     */
+    public function transaction_count($start_date, $end_date, $outlet_id='', $start_time='', $end_time='') {
+        $this->db->select('count(id) as transaction_count');
+        $this->db->from('tbl_sales');
+        if ($start_date != '' && $end_date != '') {
+            $this->db->where('tbl_sales.sale_date>=', $start_date);
+            $this->db->where('tbl_sales.sale_date <=', $end_date);
+        }
+        if ($start_date != '' && $end_date == '') {
+            $this->db->where('tbl_sales.sale_date', $start_date);
+        }
+        if ($start_date == '' && $end_date != '') {
+            $this->db->where('tbl_sales.sale_date', $end_date);
+        }
+        $this->applyTimeRange($start_time, $end_time);
+        $this->db->where('tbl_sales.order_status', 3);
+        $this->db->where('tbl_sales.outlet_id', $outlet_id);
+        $this->db->where('tbl_sales.del_status', 'Live');
+        $result = $this->db->get()->row();
+
+        if (empty($result->transaction_count)) {
+            $result->transaction_count = 0;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Time-of-day predicates on tbl_sales.order_time, shared by the queries above.
+     *
+     * CLOCK time, deliberately independent of the date range, which filters
+     * sale_date (the BUSINESS day) - a late-night sale books to the next business
+     * day, so the two can legitimately disagree. order_time is a real TIME column,
+     * so these compare as times rather than as strings. Same column and pattern as
+     * the Detailed Sale Report and Sales by Category filters, so all three screens
+     * mean the same thing by "time".
+     *
+     * Blank values add no predicate at all, so an unfiltered dashboard produces
+     * exactly the query it did before.
+     *
+     * @access private
+     * @return void
+     * @param string, string
+     */
+    private function applyTimeRange($start_time, $end_time) {
+        if ($start_time !== '' && $start_time !== NULL) {
+            $this->db->where('tbl_sales.order_time >=', $start_time);
+        }
+        if ($end_time !== '' && $end_time !== NULL) {
+            $this->db->where('tbl_sales.order_time <=', $end_time);
+        }
+    }
+
     public function sale_sum($first_day_this_month, $last_day_this_month,$outlet_id='') {
         $this->db->select('sum(paid_amount) as sale_sum');
         $this->db->from('tbl_sales');  

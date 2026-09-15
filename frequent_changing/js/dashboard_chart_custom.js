@@ -95,12 +95,27 @@ $(function () {
         let csrf_name_ = $("#csrf_name_").val();
         let csrf_value_ = $("#csrf_value_").val();
         let outlet_id = $("#outlet_id_dashboard").val();
+        /* The date range is now sent because card 5 (Completed Order Value)
+           honours it. Cards 1-4 ignore it server-side: 1-3 are deliberately
+           today-only as before, and 4 (Running Order Value) is a live snapshot
+           by design. */
+        let start_date = $("#start_date_dashboard").val();
+        let end_date = $("#end_date_dashboard").val();
+        /* Time range applies to Revenue, Transactions and Completed Order Value.
+           Net Profit ignores it server-side (wastes/expenses/transfers have no
+           time column), and Running Order Value ignores it as a live snapshot. */
+        let start_time = $("#start_time_dashboard").val();
+        let end_time = $("#end_time_dashboard").val();
         $.ajax({
             url: base_url+"Dashboard/get_sale_report_charge_today",
             type: "POST",
             dataType: "json",
             data: {
                 outlet_id: outlet_id,
+                start_date_dashboard: start_date,
+                end_date_dashboard: end_date,
+                start_time_dashboard: start_time,
+                end_time_dashboard: end_time,
                 csrf_name_: csrf_value_,
             },
             success: function (response) {
@@ -108,11 +123,10 @@ $(function () {
                 $(".set_today_total_2").html(response.set_total_2);
                 $(".set_today_total_3").html(response.set_total_3);
                 $(".set_today_total_4").html(response.set_total_4);
-                if(Number(response.set_total_3)){
-                    $(".set_today_total_5").html((Number(response.set_total_1)/Number(response.set_total_3)).toFixed(2));
-                }else{
-                    $(".set_today_total_5").html((0).toFixed(2));
-                }
+                /* set_total_5 now comes from the server. It used to be derived
+                   here as revenue/transactions (Average Receipt); that card is
+                   now Completed Order Value, which is a query, not a ratio. */
+                $(".set_today_total_5").html(response.set_total_5);
 
                 $('.spincrement').spincrement({
                     from: 0.0,

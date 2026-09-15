@@ -1,11 +1,24 @@
+/* Part B: the keywords FOOD and DRINKS (also DRINK), typed in any case, list a whole
+   kind - matched EXACTLY against item_kind, which the page derives from the drink
+   flag. They replace VEG / BEV / BAR: BEV compared a spelling the data never had,
+   BAR had no field at all, and VEG (upper case only) listed the drinks. */
+function irSearchKind(nameKey){
+    let k = String(nameKey || "").trim().toUpperCase();
+    if(k === "FOOD"){ return "FOOD"; }
+    if(k === "DRINKS" || k === "DRINK"){ return "DRINKS"; }
+    return "";
+}
 function search(nameKey, myArray){
     let foundResult=new Array();
     let counter = 0;
+    let kind = irSearchKind(nameKey);
     for (let i=0; i < myArray.length; i++) {
         // if (myArray[i].item_name === nameKey) {
         //     return myArray[i];
         // }
-        if (myArray[i].item_name.toLowerCase().includes(nameKey.toLowerCase()) || myArray[i].item_code.toLowerCase().includes(nameKey.toLowerCase()) || myArray[i].category_name.toLowerCase().includes(nameKey.toLowerCase()) || myArray[i].veg_item.includes(nameKey) || myArray[i].beverage_item.toUpperCase().includes(nameKey)) {
+        /* a keyword is authoritative: FOOD / DRINKS list the kind and nothing else (an item filed
+           under a category called "Drinks" but flagged not-a-drink is Food, as on the Food button) */
+        if (kind !== "" ? (myArray[i].item_kind === kind) : (myArray[i].item_name.toLowerCase().includes(nameKey.toLowerCase()) || myArray[i].item_code.toLowerCase().includes(nameKey.toLowerCase()) || myArray[i].category_name.toLowerCase().includes(nameKey.toLowerCase()))) {
             foundResult.push(myArray[i]);
             counter++;
             if (nameKey && counter == 12) {

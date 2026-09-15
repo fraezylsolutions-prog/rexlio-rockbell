@@ -294,6 +294,37 @@ Configured via the existing `tbl_companies.google_map` setting. **No code change
 
 **⚠️ Flagged as likely broken, unverified.** All three views render it as `<iframe src="<?= escape_output($company_info->google_map) ?>">`, i.e. they expect a **bare URL**. The stored value is a full HTML-escaped `<iframe …>` snippet, which cannot work as a `src` attribute. Needs checking on the live frontend; the fix is most likely to store only the `https://www.google.com/maps/embed?pb=…` URL rather than the whole embed code.
 
+### POS Sale screen — Food / Drinks, Search button, search clears (2026-09-15, "Part B"). Local only; not on live.
+Staff feedback against their previous, simpler system. Display-only rename plus three small behaviour changes.
+- **Labels.** `vegetarian_items` → Food, `beverage_items` → Drinks, `is_it_beverage` → "Is it a Drink" (+ its
+  validation text), the search placeholder and the two help lines, in all four language files. Kept on purpose:
+  `is_it_veg` (genuine dietary information, no longer drives the POS) and `vegetarian` (a dish link on the public
+  website). Stored values (`Veg Yes`, `Bev Yes` …) and column names unchanged.
+- **Food is DERIVED, not the veg flag.** On the real data every drink was also `Veg Yes` and no food item was, so
+  the old "Vegetarian" button listed the drinks and nothing listed the food. The page now emits `item_kind`
+  (`DRINKS` = `beverage_item` Yes, `FOOD` = everything else); the Food / Drinks buttons and the search keywords use it.
+- **Search keywords.** `FOOD` and `DRINKS` (also `DRINK`), any case, exact word, authoritative (an item filed under a
+  category called "Drinks" but flagged not-a-drink is Food, as on the button). They replace `VEG` / `BEV` / `BAR`:
+  BEV compared a spelling the data never had, BAR had no field, VEG (upper case only) listed the drinks.
+- **Search button.** The category rail's "All" is now 🔍 Search: `focus()` on the existing box (0.1 ms) plus the
+  light `show_all_items()` reset the box already uses when emptied (~25–40 ms in the browser, full gallery rebuilt
+  off the click path). The two phone-only "All" buttons stay (the POS never auto-focuses the keyboard on phones).
+- **Clearing.** Picking an item from a search result clears the box and puts the whole gallery back.
+- **Vendor bugs fixed alongside.** The Add Food Menu form saved `Beverage Yes/No` while the Edit form, the POS filter
+  and the details pages expect `Bev Yes/No` (an item added there never showed under Drinks; its Edit form
+  preselected nothing) — form fixed, rows normalised by migration `2026-09-15_05` (PASS on scratch and local;
+  `Cup Yogurt` + two deleted rows). Left alone: `PreMadeFood.php:226` writes `Beverage No` into `tbl_pre_made_foods`,
+  a table this install does not have (dead vendor path).
+- Search button styling: 60 px navy pill, 20 px white label, 22 px amber magnifier (`a.ir_rail_search`) - a colour no category uses.
+- Cache-busters: `pos_script_v7.3.js?v=5.3`, `items.js?v=7.6`, `rexlio_theme.css?v=7.9.0` (both files).
+
+| Test | Result |
+|---|---|
+| Search matcher (Node, real `items.js`, the 193 real item objects): FOOD/DRINKS/DRINK in every case → one kind only, 12-cap; VEG/BEV/BAR no longer keywords; partial words are not keywords; name / category / code search unchanged | 21/21 |
+| HTTP (scratch): POS page labels, icons, placeholder, Search button, 112/81 `item_kind`, busters, tables panel intact; Add form values, Edit form preselects, details page; four language files; data | 18/18 |
+| Real browser (real page, real items, real scripts): Food → 81 / no drinks, Drinks → 112 / no food; Search button 30–40 ms, cursor in the box, 193 items back; "drinks" / "Food" typed → one kind; pick → box empty, gallery back, cursor kept | PASS |
+| Regression: tables-panel suites 5a 55/55, 5b 22/22, 5c 28/28, deep-link 16/16 | green |
+
 ### Deferred out of this batch
 - **Waiter's own order history on their profile/dashboard** — the third item of a three-item request. Not built. Needs a new screen, its own permission and therefore its own migration and re-login cycle; deferred rather than rushed into a launch window.
 - **Running Order inline actions** (Order Details, Modify, Re-print KOT, Invoice, Bill, Cancel executed on the Running Order screen instead of deep-linking to the POS). Only Order Details is inline today; the other five are `<a href>` links into the sale screen. Invoice and Bill are payment completion against device-bound IndexedDB state and were judged unsafe to build in the available window. Assessment recorded: Order Details and Re-print KOT are genuinely feasible inline (server-side reads), Cancel Order is borderline, and Modify/Invoice/Bill are the hard ones.

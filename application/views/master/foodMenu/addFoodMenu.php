@@ -481,8 +481,11 @@
                                         class="required_star">*</span></label>
                                 <select tabindex="2" class="w-100 form-control select2" id="beverage_item"
                                     name="beverage_item">
-                                    <option value="Beverage No"><?php echo lang('no'); ?></option>
-                                    <option value="Beverage Yes"><?php echo lang('yes'); ?></option>
+                                    <?php /* Part B fix: the stored value is 'Bev Yes' / 'Bev No' everywhere else (the Edit form,
+                                             the POS filter, the details pages). This form used to save 'Beverage Yes/No', so an
+                                             item added here never showed under Drinks and its Edit form preselected nothing. */ ?>
+                                    <option value="Bev No"><?php echo lang('no'); ?></option>
+                                    <option value="Bev Yes"><?php echo lang('yes'); ?></option>
                                 </select>
                             </div>
                             <?php if (form_error('beverage_item')) { ?>

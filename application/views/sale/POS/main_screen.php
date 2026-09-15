@@ -133,6 +133,13 @@ foreach($food_menus as $single_menus){
     if($single_menus->beverage_item=="Bev Yes"){
         $beverage_status = "yes";
     }
+    //Part B (Food / Drinks): the POS's two kinds are DERIVED from the drink flag
+    //alone - Drinks = beverage_item Yes, Food = everything else. The veg flag is
+    //dietary information and no longer drives any POS button or search keyword
+    //(on the real data every drink was also marked Veg Yes, so the old
+    //"Vegetarian" button listed the drinks). Both spellings of Yes are accepted
+    //because the add form used to save 'Beverage Yes' (fixed alongside).
+    $item_kind = ($single_menus->beverage_item == 'Bev Yes' || $single_menus->beverage_item == 'Beverage Yes') ? 'DRINKS' : 'FOOD';
     $bar_status_pos = "no";
     //check for promotion
     $is_promo = '';
@@ -204,7 +211,7 @@ foreach($food_menus as $single_menus){
     }
 
     //checks and hold the status of beverage item
-    if($single_menus->beverage_item=='Beverage Yes'){
+    if($single_menus->beverage_item=='Bev Yes' || $single_menus->beverage_item=='Beverage Yes'){
         $soft_status = "BEV";
     }else{
         $soft_status = "";
@@ -262,9 +269,9 @@ foreach($food_menus as $single_menus){
     }
 
     if($total_menus==$i){
-        $javascript_obects .= "{item_id:'".$single_menus->id."',kitchen_id:'".$single_menus->kitchen_id."',kitchen_name:'".$single_menus->kitchen_name."',is_promo:'".$is_promo."',qty:'".$qty."',modal_item_name_row:'".$modal_item_name_row."',promo_type:'".$promo_type."',get_food_menu_id:'".$get_food_menu_id."',string_text:'".$string_text."',get_qty:'".$get_qty."',discount:'".$discount."',parent_id:'".$single_menus->parent_id."',product_type:'".$single_menus->product_type."',product_comb:'".$product_comb."',is_variation:'".$is_variation."',item_code:'".getPlanText($single_menus->code)."',category_name:'".getPlanText($single_menus->category_name)."',item_name:'".getPlanText($single_menus->name)."',alternative_name:'" . getPlanText($single_menus->alternative_name) . "',item_name_tmp:'".getPlanText($item_name_tmp)."',price:'".getAmtP($sale_price)."',price_take:'".getAmtP($sale_price_take)."',price_delivery:'".getAmtP($sale_price_delivery)."',price_vip:'".getAmtP($sale_price_vip)."',price_club:'".getAmtP($sale_price_club)."',price_delivery_details:'".($sale_price_delivery_details)."',image:'".$image_path."',tax_information:'".$single_menus->tax_information."',vat_percentage:'0',veg_item:'".$veg_status."',beverage_item:'".$soft_status."',oversale_block:'".(oversaleBlocked($single_menus->id) ? '1' : '0')."',available_units:'".(isset($available_units[$single_menus->id]) && $available_units[$single_menus->id]!==NULL ? $available_units[$single_menus->id] : '')."',sold_for:'".$single_menus->item_sold."',veg_item_status:'".$veg_status1."',beverage_item_status:'".$beverage_status."',modifiers:[".$modifiers."]}";
+        $javascript_obects .= "{item_id:'".$single_menus->id."',kitchen_id:'".$single_menus->kitchen_id."',kitchen_name:'".$single_menus->kitchen_name."',is_promo:'".$is_promo."',qty:'".$qty."',modal_item_name_row:'".$modal_item_name_row."',promo_type:'".$promo_type."',get_food_menu_id:'".$get_food_menu_id."',string_text:'".$string_text."',get_qty:'".$get_qty."',discount:'".$discount."',parent_id:'".$single_menus->parent_id."',product_type:'".$single_menus->product_type."',product_comb:'".$product_comb."',is_variation:'".$is_variation."',item_code:'".getPlanText($single_menus->code)."',category_name:'".getPlanText($single_menus->category_name)."',item_name:'".getPlanText($single_menus->name)."',alternative_name:'" . getPlanText($single_menus->alternative_name) . "',item_name_tmp:'".getPlanText($item_name_tmp)."',price:'".getAmtP($sale_price)."',price_take:'".getAmtP($sale_price_take)."',price_delivery:'".getAmtP($sale_price_delivery)."',price_vip:'".getAmtP($sale_price_vip)."',price_club:'".getAmtP($sale_price_club)."',price_delivery_details:'".($sale_price_delivery_details)."',image:'".$image_path."',tax_information:'".$single_menus->tax_information."',vat_percentage:'0',veg_item:'".$veg_status."',beverage_item:'".$soft_status."',oversale_block:'".(oversaleBlocked($single_menus->id) ? '1' : '0')."',available_units:'".(isset($available_units[$single_menus->id]) && $available_units[$single_menus->id]!==NULL ? $available_units[$single_menus->id] : '')."',sold_for:'".$single_menus->item_sold."',veg_item_status:'".$veg_status1."',beverage_item_status:'".$beverage_status."',item_kind:'".$item_kind."',modifiers:[".$modifiers."]}";
     }else{
-        $javascript_obects .= "{item_id:'".$single_menus->id."',kitchen_id:'".$single_menus->kitchen_id."',kitchen_name:'".$single_menus->kitchen_name."',is_promo:'".$is_promo."',qty:'".$qty."',modal_item_name_row:'".$modal_item_name_row."',promo_type:'".$promo_type."',get_food_menu_id:'".$get_food_menu_id."',string_text:'".$string_text."',get_qty:'".$get_qty."',discount:'".$discount."',parent_id:'".$single_menus->parent_id."',product_type:'".$single_menus->product_type."',product_comb:'".$product_comb."',is_variation:'".$is_variation."',item_code:'".getPlanText($single_menus->code)."',category_name:'".getPlanText($single_menus->category_name)."',item_name:'".getPlanText($single_menus->name)."',alternative_name:'" . getPlanText($single_menus->alternative_name) . "',item_name_tmp:'".getPlanText($item_name_tmp)."',price:'".getAmtP($sale_price)."',price_take:'".getAmtP($sale_price_take)."',price_delivery:'".getAmtP($sale_price_delivery)."',price_vip:'".getAmtP($sale_price_vip)."',price_club:'".getAmtP($sale_price_club)."',price_delivery_details:'".($sale_price_delivery_details)."',image:'".$image_path."',tax_information:'".$single_menus->tax_information."',vat_percentage:'0',veg_item:'".$veg_status."',beverage_item:'".$soft_status."',oversale_block:'".(oversaleBlocked($single_menus->id) ? '1' : '0')."',available_units:'".(isset($available_units[$single_menus->id]) && $available_units[$single_menus->id]!==NULL ? $available_units[$single_menus->id] : '')."',sold_for:'".$single_menus->item_sold."',veg_item_status:'".$veg_status1."',beverage_item_status:'".$beverage_status."',modifiers:[".$modifiers."]},";
+        $javascript_obects .= "{item_id:'".$single_menus->id."',kitchen_id:'".$single_menus->kitchen_id."',kitchen_name:'".$single_menus->kitchen_name."',is_promo:'".$is_promo."',qty:'".$qty."',modal_item_name_row:'".$modal_item_name_row."',promo_type:'".$promo_type."',get_food_menu_id:'".$get_food_menu_id."',string_text:'".$string_text."',get_qty:'".$get_qty."',discount:'".$discount."',parent_id:'".$single_menus->parent_id."',product_type:'".$single_menus->product_type."',product_comb:'".$product_comb."',is_variation:'".$is_variation."',item_code:'".getPlanText($single_menus->code)."',category_name:'".getPlanText($single_menus->category_name)."',item_name:'".getPlanText($single_menus->name)."',alternative_name:'" . getPlanText($single_menus->alternative_name) . "',item_name_tmp:'".getPlanText($item_name_tmp)."',price:'".getAmtP($sale_price)."',price_take:'".getAmtP($sale_price_take)."',price_delivery:'".getAmtP($sale_price_delivery)."',price_vip:'".getAmtP($sale_price_vip)."',price_club:'".getAmtP($sale_price_club)."',price_delivery_details:'".($sale_price_delivery_details)."',image:'".$image_path."',tax_information:'".$single_menus->tax_information."',vat_percentage:'0',veg_item:'".$veg_status."',beverage_item:'".$soft_status."',oversale_block:'".(oversaleBlocked($single_menus->id) ? '1' : '0')."',available_units:'".(isset($available_units[$single_menus->id]) && $available_units[$single_menus->id]!==NULL ? $available_units[$single_menus->id] : '')."',sold_for:'".$single_menus->item_sold."',veg_item_status:'".$veg_status1."',beverage_item_status:'".$beverage_status."',item_kind:'".$item_kind."',modifiers:[".$modifiers."]},";
     }
     //end_new_added_zak
 
@@ -688,7 +695,7 @@ foreach ($notifications as $single_notification){
          rather than the real cut. Same family and host as the existing import,
          so this adds a weight - not another typeface. */ ?>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap">
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.8.9">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.0">
 </head>
 
 <body>
@@ -921,7 +928,8 @@ foreach ($notifications as $single_notification){
                     <li class="<?php echo escape_output($is_self_order_class) ?>">
                         <a href="#" id="online_status" class="bg__green"><span class="online_status_counter display_none">(0)</span><span class="online_status_text"><?php echo lang('online'); ?></span></a>
                     </li>
-                    <li><a href="#" data-status="veg"
+                    <?php /* Part B: "Food" (everything that is not a drink) and "Drinks" */ ?>
+                    <li><a href="#" data-status="food"
                             class="veg_bev_item bg__green"><?php echo lang('vegetarian_items'); ?></a></li>
                     <li><a href="#" data-status="bev"
                             class="veg_bev_item bg__grey"><?php echo lang('beverage_items'); ?></a></li>
@@ -1538,7 +1546,9 @@ foreach ($notifications as $single_notification){
                     <div class="category-list scrollbar-macosx">
                         <ul class="list-of-item">
                             <li>
-                                <a href="#" class="button_category_show_all1"><?php echo lang('all'); ?></a>
+                                <?php /* Part B: was "All". Puts the cursor in the search box and shows every item again
+                                         (the light reset the search box uses when emptied, not the old full rebuild). */ ?>
+                                <a href="#" class="ir_rail_search" id="ir_rail_search" title="<?php echo lang('ir_search'); ?>"><i class="fas fa-search"></i> <?php echo lang('ir_search'); ?></a>
                             </li>
                             <!--This variable could not be escaped because this is html content-->
                             <?php echo ($cateogry_slide_to_show)?>
@@ -1582,7 +1592,7 @@ foreach ($notifications as $single_notification){
                     </ul>
                 </li>
                 <li><a href="#" data-status="bev" class="veg_bev_item"><i class="far fa-glass"></i> <?php echo lang('beverage_items'); ?></a></li>
-                <li><a href="#" data-status="veg" class="veg_bev_item"><i class="far fa-carrot"></i> <?php echo lang('vegetarian_items'); ?></a></li>
+                <li><a href="#" data-status="food" class="veg_bev_item"><i class="far fa-utensils"></i> <?php echo lang('vegetarian_items'); ?></a></li>
                 <li><a href="#" data-status="" class="get_prom_details"><i class="fas fa-poo"></i> <?php echo lang('View_Promo'); ?></a></li>
                 <li>
                     <a href="#" id="open_hold_sales">
@@ -4726,7 +4736,7 @@ foreach ($notifications as $single_notification){
     <div class="kot_exist_checker ir_display_none"></div>
     <script src="<?php echo base_url(); ?>frequent_changing/notify/toastr.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/marquee.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/items.js?v=7.5"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/items.js?v=7.6"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/datable.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/jquery.cookie.js?v=7.5"></script>
     <!-- For Tooltip -->
@@ -4742,7 +4752,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=5.2"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=5.3"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">

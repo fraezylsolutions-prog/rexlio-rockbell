@@ -5677,7 +5677,7 @@
           '<div id="searched_item_found" class="specific_category_items_holder 003">';
         for (let key in foundItems) {
             if (foundItems.hasOwnProperty(key)) {
-                if (status == "veg" && foundItems[key].veg_item_status == "yes") {
+                if (status == "food" && foundItems[key].item_kind !== "DRINKS") { /* Part B: Food = not a drink */
                     if (foundItems[key].parent_id == '0') {
                         searched_category_items_to_show +=
                             '<div class="single_item animate__animated animate__flipInX"   data-price="' + foundItems[key].price + '"  data-price_take="' + foundItems[key].price_take + '"    data-is_variation="' + foundItems[key].is_variation + '"  data-parent_id="' + foundItems[key].parent_id + '"    data-price_delivery="' + foundItems[key].price_delivery + '"  data-price_vip="' + foundItems[key].price_vip + '"  data-price_club="' + foundItems[key].price_club + '"  id="item_' +
@@ -5701,7 +5701,7 @@
                     }
                 } else if (
                     status == "bev" &&
-                    foundItems[key].beverage_item_status == "yes"
+                    foundItems[key].item_kind === "DRINKS"
                 ) {
                     if (foundItems[key].parent_id == '0') {
                         searched_category_items_to_show +=
@@ -6215,6 +6215,13 @@
         $(document).on("click", ".single_item", function () {
             //focus search field
               focusSearch();
+            /* Part B: an item picked from a search result - clear the search text and
+               put the full gallery back, so the next search starts clean. Nothing to
+               do when the item came from a category (the box is already empty). */
+            if($("#search").val() !== ""){
+                $("#search").val("");
+                show_all_items();
+            }
             //add for vr01 and clear previous cart before new addd
             $(".prom_txt").html('');
             let modal_item_is_offer = '';
@@ -11222,6 +11229,19 @@
           $("#modal_total_price").html(all_price);
       }
     // ==================================================
+    /* Part B: the category rail's Search button (was "All"). Puts the cursor into the
+       search box that is already on screen (a focus() call, ~0.1 ms, nothing rendered)
+       and shows every item again through show_all_items() - the same light reset the
+       box uses when it is emptied (~25 ms here), not the old "All" handler's full
+       gallery rebuild (60-180 ms). Unlike focusSearch() there is no width guard: the
+       tap is explicit, so a tablet keyboard is wanted here. */
+    $(document).on("click", "#ir_rail_search", function (e) {
+        e.preventDefault();
+        let box = $("#search");
+        box.val("");
+        try { box.get(0).focus(); } catch (err) { box.trigger("focus"); }
+        show_all_items();
+    });
     function show_all_items() {
       $(".specific_category_items_holder").hide();
   

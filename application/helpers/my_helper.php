@@ -4243,7 +4243,14 @@ if (!function_exists('getLockedPriceTier')) {
         }
         $counter_id = $CI->session->userdata('counter_id');
         if (!$counter_id) {
-            return 0;
+            //Waiters never open a register, so their session never carries a
+            //counter and the lock silently did not apply to them (tested: a
+            //Club-locked counter rendered a waiter's POS unlocked at Regular).
+            //Each outlet has exactly one counter, so resolve it from the outlet.
+            $counter_id = irOutletSingleCounterId($CI->session->userdata('outlet_id'));
+            if (!$counter_id) {
+                return 0;
+            }
         }
         $row = $CI->db->select('default_price_tier')
                       ->from('tbl_counters')
@@ -4253,6 +4260,32 @@ if (!function_exists('getLockedPriceTier')) {
         $tier = isset($row->default_price_tier) ? (int) $row->default_price_tier : 1;
         //tier 1 (Regular) means "unrestricted counter", so nothing is locked
         return ($tier > 1) ? $tier : 0;
+    }
+}
+if (!function_exists('irOutletSingleCounterId')) {
+    /**
+     * The outlet's counter. Outlets have one counter each in this deployment;
+     * if several ever exist the lowest id is used, deterministically. Cached
+     * per request. Returns 0 when the outlet has no live counter.
+     * @param int $outlet_id
+     * @return int
+     */
+    function irOutletSingleCounterId($outlet_id) {
+        static $cache = array();
+        $key = (string) (int) $outlet_id;
+        if (!(int) $outlet_id) {
+            return 0;
+        }
+        if (!array_key_exists($key, $cache)) {
+            $CI = &get_instance();
+            $row = $CI->db->select('id')->from('tbl_counters')
+                          ->where('outlet_id', (int) $outlet_id)
+                          ->where('del_status', 'Live')
+                          ->order_by('id', 'ASC')->limit(1)
+                          ->get()->row();
+            $cache[$key] = isset($row->id) ? (int) $row->id : 0;
+        }
+        return $cache[$key];
     }
 }
 if (!function_exists('orderTypeForPriceTier')) {

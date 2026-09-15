@@ -1704,6 +1704,7 @@
                         irApplyServerCopy(data.sale_no, data.self_order_content, data.version, data.invoice_msg, true);
                     }else{
                         toastr['error']((data.invoice_msg), '');
+                        irKitchenPendingRefused(sale_no);
                     }
                 }else{
                     if(data.version){ irSetLocalVersion(sale_no, data.version); }
@@ -1739,7 +1740,10 @@
 
               },
               error: function () {
-  
+                  /* The order is already in IndexedDB and on screen; only the server
+                     copy is missing (offline, or the request failed). Remember it so the
+                     7 s loop sends it when the server is back - see irPushPendingKitchen. */
+                  irMarkKitchenPending(sale_no, is_self_order, is_print);
               },
           });
       }
@@ -2202,6 +2206,79 @@
           ir_completion_conflicts[sale_no] = 1;
           let msg = $("#sale_no_completion_conflict").val() || "Sale number already used by another completed sale - this sale could not be synced";
           toastr['error'](msg + " (" + sale_no + ")", '', {timeOut: 0, extendedTimeOut: 0, closeButton: true});
+      }
+      /* ---- Kitchen sync for orders placed while offline (Stage 0b) -------------
+         Before this, an order placed offline existed only in this till's IndexedDB
+         until it was invoiced or modified online: no KOT was printed, and the
+         Running Order screen, kitchen display, Table Status and the cross-till sync
+         could not see it. Now the local record carries kitchen_pending:
+           1 = waiting to be sent, 3 = in flight, 2 = refused by the server (stock,
+           register...) - shown once, not retried automatically, 0/absent = synced.
+         The KOT is printed on the successful send (kitchen_print), because nothing
+         was printed at placement time. */
+      function irSetKitchenFlag(sale_no, fields, done){
+          if(typeof db === "undefined" || !db){ if(done){ done(false); } return; }
+          let found = false;
+          let store = db.transaction(['sales'], "readwrite").objectStore("sales");
+          store.openCursor().onsuccess = function(event){
+              let cursor = event.target.result;
+              if(cursor){
+                  if(cursor.value.sale_no == sale_no){
+                      let rec = cursor.value;
+                      for(let k in fields){ rec[k] = fields[k]; }
+                      cursor.update(rec);
+                      found = true;
+                  }
+                  cursor.continue();
+                  return;
+              }
+              if(done){ done(found); }
+          };
+      }
+      function irMarkKitchenPending(sale_no, is_self_order, is_print){
+          if(is_self_order === "Yes" || !sale_no){ return; }
+          irSetKitchenFlag(sale_no, {kitchen_pending: 1, kitchen_print: is_print ? 1 : 0}, null);
+      }
+      function irKitchenSynced(sale_no){
+          if(!sale_no){ return; }
+          /* added_offline_status 2 = the server has this order, so the cross-till
+             sync and the invoiced/cancelled-elsewhere cleanup now include it */
+          irSetKitchenFlag(sale_no, {kitchen_pending: 0, added_offline_status: 2}, function(found){
+              if(found){
+                  $('.holder .order_details > .single_order[data-sale_no="' + sale_no + '"] .running_order_order_number').attr("data-added_offline_status", 2);
+              }
+          });
+      }
+      function irKitchenPendingRefused(sale_no){
+          irSetKitchenFlag(sale_no, {kitchen_pending: 2}, null);
+      }
+      var ir_kitchen_sync_busy = false;
+      function irPushPendingKitchen(){
+          if(ir_kitchen_sync_busy || !checkInternetConnection() || typeof db === "undefined" || !db){ return; }
+          ir_kitchen_sync_busy = true;
+          let pending = [];
+          let store = db.transaction(['sales'], "readwrite").objectStore("sales");
+          store.openCursor().onsuccess = function(event){
+              let cursor = event.target.result;
+              if(cursor){
+                  if(Number(cursor.value.kitchen_pending) === 1){
+                      let rec = cursor.value;
+                      rec.kitchen_pending = 3;
+                      cursor.update(rec);
+                      pending.push({sale_no: rec.sale_no, order: rec.order, print: Number(rec.kitchen_print) === 1});
+                  }
+                  cursor.continue();
+                  return;
+              }
+              ir_kitchen_sync_busy = false;
+              for(let i = 0; i < pending.length; i++){
+                  push_online_for_kitchen(pending[i].order, '', pending[i].sale_no, pending[i].print ? 1 : 0);
+              }
+              if(pending.length){
+                  let msg = $("#ir_msg_kitchen_synced").val() || "Sending orders placed offline to the kitchen";
+                  toastr['info'](msg + " (" + pending.length + ")", '', {timeOut: 4000});
+              }
+          };
       }
       function getRandomCode(length) {
           let result           = '';
@@ -14349,6 +14426,8 @@
       setInterval(function () {
           if(checkInternetConnection()){
               new_notification_interval();
+              irPushPendingKitchen();
+              irPollSyncState();
           }
         refresh_orders_left();
       }, 7000);

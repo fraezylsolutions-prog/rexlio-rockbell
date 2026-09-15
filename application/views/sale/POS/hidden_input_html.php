@@ -262,6 +262,7 @@ foreach ($waiters as $waiter){
 <input type="hidden" id="ir_msg_refreshed_recheck" value="<?php echo lang('ir_msg_refreshed_recheck'); ?>">
 <input type="hidden" id="ir_msg_gone" value="<?php echo lang('ir_msg_gone'); ?>">
 <input type="hidden" id="ir_msg_invoiced_elsewhere" value="<?php echo lang('ir_msg_invoiced_elsewhere'); ?>">
+<input type="hidden" id="ir_msg_kitchen_synced" value="<?php echo lang('ir_msg_kitchen_synced'); ?>">
 <input type="hidden" id="ir_msg_table_ready" value="<?php echo lang('ir_msg_table_ready'); ?>">
 <input type="hidden" id="ir_msg_table_create_failed" value="<?php echo lang('ir_msg_table_create_failed'); ?>">
 <input type="hidden" id="ir_msg_tables_offline" value="<?php echo lang('ir_msg_tables_offline'); ?>">

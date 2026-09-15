@@ -1978,6 +1978,7 @@ $lang['ir_msg_refreshed'] = 'Order was changed on another till - refreshed';
 $lang['ir_msg_refreshed_recheck'] = 'Order was changed on another till - refreshed, please check it again before cancelling';
 $lang['ir_msg_gone'] = 'Order was cancelled on another till';
 $lang['ir_msg_invoiced_elsewhere'] = 'Order was invoiced on another till';
+$lang['ir_msg_kitchen_synced'] = 'Sending orders placed offline to the kitchen';
 $lang['ir_msg_table_ready'] = 'Table ready - add items and place the order';
 $lang['ir_msg_table_create_failed'] = 'Could not create a table - please try again';
 $lang['ir_msg_tables_offline'] = 'New tables need the server. You are offline - open one of your tables, or wait for the connection';

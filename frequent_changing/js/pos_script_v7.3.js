@@ -174,6 +174,105 @@
               }catch(e){ /* never let a close failure break order flow */ }
           }
       }
+
+      /* Waiter auto-logout after a successful order placement.
+         ------------------------------------------------------
+         Gated entirely on the server-computed flag (see
+         irIsWaiterForAutoLogout in my_helper.php) - no role logic lives here.
+
+         It navigates STRAIGHT to the logout URL, which is precisely what the
+         "Without Submit" button does (pos_script_v7.3.js: .without_submit is a
+         plain redirect, no server call, no order transfer). The Logout Alert
+         dialog is raised only inside the .logout_for_user CLICK handler, so
+         navigating directly never enters that code path - the manual flow and
+         its dialog are left completely untouched.
+
+         The ~3s delay is load-bearing: the KOT popup needs ~1.3s to print and
+         close itself, so leaving sooner can lose the print. */
+      function irWaiterAutoLogout(sale_no){
+          try{
+              if($("#ir_waiter_auto_logout").val() !== "1"){ return; }
+
+              /* OFFLINE GUARD - this is the important one.
+                 Login is server-only: Authentication::index checks credentials
+                 against tbl_users, there is no service worker, no cached login
+                 page and no local/PIN authentication. So with the server
+                 unreachable, NO page can load - not logout, not login. Worse,
+                 navigating away would destroy the one thing that still works
+                 offline: this already-loaded POS page and its IndexedDB queue.
+                 A waiter would be stranded on a browser error page until the
+                 connection returned, unable to take orders at all.
+
+                 Two layers of protection:
+                   1. This function is only reached from the SUCCESS callback of
+                      the server save (push_online_for_kitchen), whose error
+                      handler is empty - so a fully offline placement never gets
+                      here in the first place. That is what keeps offline order
+                      taking intact today.
+                   2. That leaves the window between the save succeeding and the
+                      redirect firing (~3s). The polled flag below is at most 2s
+                      stale, and the redirect itself re-verifies reachability
+                      with a live request before navigating - so a drop inside
+                      the window keeps the waiter on the POS rather than
+                      stranding them. */
+              if(!checkInternetConnection()){ return; }
+
+              var msg = $("#ir_order_placed_msg").val() || "Order placed";
+              if(sale_no){ msg = msg + " - " + sale_no; }
+              if(typeof toastr !== "undefined"){
+                  toastr["success"](msg, "", {timeOut: 3000, extendedTimeOut: 0, closeButton: false});
+              }
+              var url = $("#ir_logout_url").val();
+              var stay_msg = $("#ir_offline_stay_msg").val() || "Connection lost - staying signed in so you can keep taking orders.";
+              setTimeout(function(){
+                  /* Chrome's "Leave site? Changes you made may not be saved."
+                     was blocking this redirect until someone clicked Leave.
+                     The POS registers window.onbeforeunload unconditionally at
+                     load (see the end of this file) - it is not tied to there
+                     actually being unsaved cart data, so it fires on ANY
+                     navigation, including a deliberate one like this.
+
+                     Suppressed for THIS navigation only:
+                       - the handler stays armed for the entire session up to
+                         this point, so closing the tab mid-order-entry still
+                         warns as before;
+                       - non-waiters return early above and never reach here,
+                         so their protection is never touched;
+                       - it is restored on a short timer, so if the navigation
+                         is somehow blocked the page is not left unprotected.
+                       - the page normally unloads first, making the restore a
+                         no-op. */
+                  /* Re-verify with a LIVE request rather than trusting the polled
+                     flag, which can be up to 2s stale. Only navigate on a real
+                     response; on any failure stay on the POS, which keeps
+                     working offline. The guard suppression below is applied
+                     only once the server has answered, so an aborted logout
+                     never leaves the page unprotected. */
+                  $.ajax({
+                      url: base_url,
+                      method: "GET",
+                      cache: false,
+                      timeout: 4000,
+                      success: function(){
+                          var prev = window.onbeforeunload;
+                          try{ window.onbeforeunload = null; }catch(e){}
+                          setTimeout(function(){
+                              try{ if(window.onbeforeunload === null){ window.onbeforeunload = prev; } }catch(e){}
+                          }, 5000);
+                          try{ window.location.href = url; }catch(e){}
+                      },
+                      error: function(){
+                          /* server unreachable: abort the logout, keep the working POS */
+                          try{
+                              if(typeof toastr !== "undefined"){
+                                  toastr["warning"](stay_msg, "", {timeOut: 6000, closeButton: true});
+                              }
+                          }catch(e){}
+                      }
+                  });
+              }, 3000);
+          }catch(e){ /* a failure here must never block order placement */ }
+      }
       let close_order_msg = $("#close_order_msg").val();
       let cancel_order_msg = $("#cancel_order_msg").val();
       let pre_or_post_payment = Number($("#pre_or_post_payment").val());
@@ -1626,7 +1725,12 @@
                         $("#kot_print").val(2);
                         print_kot_popup_print(data.content_data_popup_print,1);
                     }
-                    
+                    /* Waiter auto-logout. Placed here, inside the success
+                       branch and AFTER the KOT print has been dispatched, so
+                       the order is confirmed saved and the print is already on
+                       its way before the session ends. Fires for waiters only
+                       (server-computed flag); a no-op for everyone else. */
+                    irWaiterAutoLogout(sale_no);
                 }
 
               },

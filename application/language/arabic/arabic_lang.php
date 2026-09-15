@@ -1962,6 +1962,10 @@ $lang['more']='More';
 $lang['welcome']='Welcome!';
 
 $lang['print_failed_notice']='Print failed - the print service did not respond. Check the printer and print service on this till.';
+
+$lang['order_placed_logging_out']='Order placed';
+
+$lang['offline_stay_signed_in']='Connection lost - staying signed in so you can keep taking orders.';
 $lang['sale_no_conflict'] = 'This order number is already in use on another till. The order is being renumbered and sent again.';
 $lang['sale_no_renumbered_notice'] = 'Order number was already in use on another till - renumbered to';
 $lang['sale_no_completion_conflict'] = 'Sale number already used by another completed sale - this sale could not be synced. Contact the manager.';

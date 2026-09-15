@@ -4876,6 +4876,61 @@ if (!function_exists('isSalesEnabledOutlet')) {
     }
 }
 
+if (!function_exists('irIsWaiterForAutoLogout')) {
+    /**
+     * Is the signed-in user a Waiter, for the auto-logout-after-order feature?
+     *
+     * Requires TWO independent confirmations, both authoritative:
+     *   1. session designation === 'Waiter'
+     *   2. the user's role_id resolves to tbl_roles.role_name === 'Waiter'
+     *
+     * WHAT IS DELIBERATELY NOT USED, AND WHY:
+     *
+     *   session 'is_waiter'  - set in POSChecker by which LOGIN ROUTE was used,
+     *     not by who the user is. Production waiters are designation='Waiter'
+     *     with is_waiter='No'. Branching on it is exactly what caused the
+     *     waiter order-placement crash, so it is avoided here on purpose.
+     *
+     *   session 'role'       - tbl_users.role is a legacy admin/non-admin flag,
+     *     NOT a role name: it holds 'Admin' for the admin and 'User' for every
+     *     other account, waiters and cashiers alike. A check for
+     *     role === 'Waiter' can never be true, so gating on it would make this
+     *     feature a silent no-op. role_id -> tbl_roles.role_name is the real
+     *     role, which is why it is looked up rather than read from session.
+     *
+     * Fails CLOSED: any doubt returns FALSE, so a non-waiter is never logged
+     * out mid-shift by this feature.
+     *
+     * @access public
+     * @return bool
+     */
+    function irIsWaiterForAutoLogout() {
+        $CI = & get_instance();
+
+        $designation = $CI->session->userdata('designation');
+        if (!$designation || strcasecmp(trim($designation), 'Waiter') !== 0) {
+            return FALSE;
+        }
+
+        $user_id = $CI->session->userdata('user_id');
+        if (!$user_id) {
+            return FALSE;
+        }
+
+        $CI->db->reset_query();
+        $row = $CI->db->select('tbl_roles.role_name')
+                      ->from('tbl_users')
+                      ->join('tbl_roles', 'tbl_roles.id = tbl_users.role_id', 'left')
+                      ->where('tbl_users.id', (int) $user_id)
+                      ->get()->row();
+
+        if (!isset($row->role_name) || !$row->role_name) {
+            return FALSE;
+        }
+        return strcasecmp(trim($row->role_name), 'Waiter') === 0;
+    }
+}
+
 if (!function_exists('irDeviceTagFromId')) {
     /**
      * Encode a tbl_device_tags auto-increment id as a short, unambiguous tag.

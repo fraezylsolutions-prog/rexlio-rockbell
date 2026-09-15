@@ -241,6 +241,15 @@ foreach ($waiters as $waiter){
          dead print service produced no indication at all - the first sign was
          food not arriving at the pass. */ ?>
 <input type="hidden" id="print_failed_notice" value="<?php echo lang('print_failed_notice'); ?>">
+<?php /* Auto-logout-after-order, Waiter only. The role test is done in PHP
+         (irIsWaiterForAutoLogout) rather than in JS, so the decision is made
+         once, server-side, against authoritative data - designation plus a
+         role_id -> role_name lookup. See the helper for why session 'role' and
+         'is_waiter' are both unusable here. */ ?>
+<input type="hidden" id="ir_waiter_auto_logout" value="<?php echo irIsWaiterForAutoLogout() ? '1' : '0'; ?>">
+<input type="hidden" id="ir_order_placed_msg" value="<?php echo lang('order_placed_logging_out'); ?>">
+<input type="hidden" id="ir_logout_url" value="<?php echo base_url(); ?>authentication/logout">
+<input type="hidden" id="ir_offline_stay_msg" value="<?php echo lang('offline_stay_signed_in'); ?>">
 <div class="modalOverlay"></div>
 <input type="hidden" id="base_url_customer" value="<?php echo base_url()?>">
 <input type="hidden" id="csrf_name_" value="<?php echo escape_output($this->security->get_csrf_token_name()); ?>">

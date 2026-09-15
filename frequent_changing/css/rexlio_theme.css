@@ -1455,7 +1455,7 @@ a.category_button.all_category{
 #ir_tables_panel .ir-tp-title{font:800 20px/1.2 Montserrat,system-ui,sans-serif; color:var(--rx-ink); margin:0}
 #ir_tables_panel .ir-tp-sub{font-size:13px; color:var(--rx-muted); margin:2px 0 0}
 #ir_tables_panel .ir-tp-actions{display:flex; align-items:center; gap:10px}
-#ir_tables_panel .ir-tp-new{display:inline-flex; align-items:center; gap:10px; background:var(--rx-good); color:#fff; border:0; border-radius:var(--rx-radius-sm); padding:14px 22px; font:800 17px/1 Montserrat,system-ui,sans-serif; box-shadow:var(--rx-shadow); cursor:pointer; letter-spacing:.2px}
+#ir_tables_panel .ir-tp-new{display:inline-flex; align-items:center; gap:10px; white-space:nowrap; background:var(--rx-good); color:#fff; border:0; border-radius:var(--rx-radius-sm); padding:14px 22px; font:800 17px/1 Montserrat,system-ui,sans-serif; box-shadow:var(--rx-shadow); cursor:pointer; letter-spacing:.2px}
 #ir_tables_panel .ir-tp-new[disabled]{opacity:.55; cursor:not-allowed}
 #ir_tables_panel .ir-tp-new i{font-size:18px}
 #ir_tables_panel .ir-tp-close{background:transparent; border:1px solid var(--rx-line); color:var(--rx-muted); border-radius:var(--rx-radius-sm); width:44px; height:44px; font-size:18px; cursor:pointer}
@@ -1481,6 +1481,35 @@ a.category_button.all_category{
     .ir-tcard{min-height:96px; padding:12px}
     .ir-tcard .ir-tc-name{font-size:16px}
     .ir-tcard .ir-tc-value{font-size:18px}
+}
+
+/* 25a. one tables screen (Stage 5b): counts, filters, free / view-only cards */
+#ir_tables_panel .ir-tp-counts{display:flex; gap:8px; flex-wrap:wrap}
+#ir_tables_panel .ir-tp-counts[hidden]{display:none !important}
+#ir_tables_panel .ir-tp-chip{font:600 12.5px/1 system-ui,sans-serif; color:var(--rx-muted); background:var(--rx-raise); border:1px solid var(--rx-line); border-radius:999px; padding:8px 12px; white-space:nowrap}
+#ir_tables_panel .ir-tp-chip b{color:var(--rx-ink); font-weight:800; margin-left:2px}
+#ir_tables_panel .ir-tp-chip-occ b{color:var(--rx-bad)}
+#ir_tables_panel .ir-tp-chip-free b{color:var(--rx-good)}
+#ir_tables_panel .ir-tp-filters{display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:10px 18px; background:var(--rx-surface); border-bottom:1px solid var(--rx-line)}
+#ir_tables_panel .ir-tp-filters[hidden]{display:none !important}
+#ir_tables_panel .ir-tp-f{display:inline-flex; align-items:center; gap:8px; margin:0; background:var(--rx-raise); border:1px solid var(--rx-line); border-radius:var(--rx-radius-sm); padding:0 10px; height:40px; color:var(--rx-muted); font-size:14px}
+#ir_tables_panel .ir-tp-f[hidden]{display:none !important}
+#ir_tables_panel .ir-tp-f select, #ir_tables_panel .ir-tp-f input{background:transparent; border:0; color:var(--rx-ink); font:600 14px system-ui,sans-serif; height:38px; min-width:150px; outline:none}
+#ir_tables_panel .ir-tp-f select option{color:#111}
+#ir_tables_panel .ir-tp-f-clear{background:transparent; border:1px solid var(--rx-line); color:var(--rx-muted); border-radius:var(--rx-radius-sm); height:40px; padding:0 12px; font:600 13px system-ui,sans-serif; cursor:pointer}
+#ir_tables_panel .ir-tp-f-clear[hidden]{display:none !important}
+.ir-tcard .ir-tc-sub{font-size:12.5px; color:var(--rx-muted); margin-top:4px; padding-right:74px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.ir-tcard.ir-tc-empty .ir-tc-badge{background:rgba(16,185,129,.14); color:var(--rx-good)}
+.ir-tcard.ir-tc-viewonly{border-style:dashed; opacity:.82}
+.ir-tcard.ir-tc-viewonly .ir-tc-name::after{content:"\f06e"; font-family:"Font Awesome 5 Pro","Font Awesome 5 Free"; font-weight:900; font-size:12px; color:var(--rx-muted); margin-left:8px}
+#ir_action_sheet .ir-as-view{padding:16px 20px 20px}
+#ir_action_sheet .ir-as-view[hidden]{display:none !important}
+#ir_action_sheet .ir-as-view-text{font-size:14px; color:var(--rx-muted); margin:0 0 12px; line-height:1.4}
+#ir_action_sheet .ir-as-view .ir-as-btn[hidden]{display:none !important}
+@media (max-width:767.98px){
+    #ir_tables_panel .ir-tp-counts{display:none}
+    #ir_tables_panel .ir-tp-filters{padding:8px 12px; gap:6px}
+    #ir_tables_panel .ir-tp-f select, #ir_tables_panel .ir-tp-f input{min-width:110px; font-size:13px}
 }
 
 /* 25b. six-action sheet over the tables panel (Stage 3) */

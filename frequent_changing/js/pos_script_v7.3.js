@@ -2332,64 +2332,167 @@
               done(out);
           };
       }
+      /* ---- Stage 5b: one tables screen ---------------------------------------------
+         Sale/myTablesAjax is the single data source (Stage 5a). The server decides
+         scope, filters and per-order can_act; this code only renders what it says.
+         Filters live in ir_tp_filters and ride on every fetch, so the 10 s poll
+         never widens the view. The outlet / user lists come once (with_lists). */
+      var ir_tp_filters = { outlet_id: "", view_user_id: "", sale_date: "" };
+      var ir_tp_lists_loaded = false;
       function irTpFetchServer(done){
           /* Always try: the online flag is only refreshed every 2 s, and on a fresh
              page it is still unset when the panel first opens. A failed request
              simply means "local cards only" (done(null)). */
           $.ajax({
               url: base_url + "Sale/myTablesAjax", method: "POST", dataType: "json", timeout: 8000,
-              data: { csrf_irestoraplus: csrf_value_ },
+              data: { csrf_irestoraplus: csrf_value_, outlet_id: ir_tp_filters.outlet_id, view_user_id: ir_tp_filters.view_user_id,
+                      sale_date: ir_tp_filters.sale_date, with_lists: ir_tp_lists_loaded ? 0 : 1 },
               success: function(res){ done(res && res.ok ? res : null); },
               error: function(){ done(null); }
           });
       }
       var ir_tp_items = {};
       var ir_tp_server_now = null;
-      function irTpRender(local, server){
-          let by = {}; let order = [];
-          for(let i = 0; i < local.length; i++){ by[local[i].sale_no] = local[i]; order.push(local[i].sale_no); }
-          let empties = [];
+      function irTpFiltersActive(server){
+          if(!server || !server.filters){ return false; }
+          let f = server.filters;
+          return String(f.outlet_id || "") !== "" || String(f.view_user_id || "") !== "" || String(f.sale_date || "") !== "";
+      }
+      /* merge this till's records with the server answer (pure: no DOM). The local
+         copy wins for value and tables (it can be newer, modified offline); the
+         server adds kitchen progress, who is serving, the outlet and can_act. A
+         local record the server does not list keeps can_act (it is this user's own
+         order on this till) - unless a filter is active, then only listed orders show. */
+      function irTpMerge(local, server){
+          let by = {}; let order = []; let listed = {};
+          for(let i = 0; i < local.length; i++){
+              let l = local[i]; l.can_act = true; l.same_outlet = true; l.waiter_name = ""; l.outlet_name = "";
+              by[l.sale_no] = l; order.push(l.sale_no);
+          }
           if(server){
               for(let i = 0; i < server.orders.length; i++){
-                  let o = server.orders[i];
+                  let o = server.orders[i]; listed[o.sale_no] = true;
                   if(by[o.sale_no]){
-                      by[o.sale_no].items_total = Number(o.items_total); by[o.sale_no].items_done = Number(o.items_done);
-                      if(!by[o.sale_no].tables && o.table_names){ by[o.sale_no].tables = o.table_names; }
+                      let c = by[o.sale_no];
+                      c.items_total = Number(o.items_total); c.items_done = Number(o.items_done);
+                      if(!c.tables && o.table_names){ c.tables = o.table_names; }
+                      c.waiter_name = o.waiter_name || ""; c.outlet_name = o.outlet_name || ""; c.outlet_id = o.outlet_id;
+                      c.can_act = Number(o.can_act) === 1; c.same_outlet = Number(o.same_outlet) === 1;
                   }else{
-                      by[o.sale_no] = { sale_no: o.sale_no, value: o.total_payable, tables: o.table_names || "", table_id: o.first_table_id || "", date_time: o.date_time, local: false, items_total: Number(o.items_total), items_done: Number(o.items_done) };
+                      by[o.sale_no] = { sale_no: o.sale_no, value: o.total_payable, tables: o.table_names || "", table_id: o.first_table_id || "", date_time: o.date_time,
+                                        local: false, items_total: Number(o.items_total), items_done: Number(o.items_done),
+                                        waiter_name: o.waiter_name || "", outlet_name: o.outlet_name || "", outlet_id: o.outlet_id,
+                                        can_act: Number(o.can_act) === 1, same_outlet: Number(o.same_outlet) === 1,
+                                        merged: String(o.sale_no).indexOf(" || ") > -1 };
                       order.push(o.sale_no);
                   }
               }
-              empties = server.empty_tables || [];
+              if(irTpFiltersActive(server)){
+                  order = order.filter(function(n){ return listed[n] === true; });
+              }
           }
-          let html = "";
-          let count = 0;
-          for(let i = 0; i < empties.length; i++){
-              count++;
-              html += '<div class="ir-tcard ir-tc-empty" tabindex="0" data-kind="table" data-table_id="' + irTpEsc(empties[i].id) + '" data-table_name="' + irTpEsc(empties[i].name) + '">' +
-                      '<span class="ir-tc-badge">' + irTpEsc(irTpMsg("ir_tp_status_new", "New")) + '</span>' +
-                      '<div class="ir-tc-name">' + irTpEsc(empties[i].name) + '</div>' +
-                      '<div class="ir-tc-meta"><div class="ir-tc-value">' + irTpMoney(0) + '</div><div class="ir-tc-time"></div></div></div>';
+          return { by: by, order: order };
+      }
+      /* card builders (pure) */
+      function irTpOrderCardHtml(c, ctx){
+          let cls = "ir-tcard", badge = "";
+          if(c.pending){ cls += " ir-tc-offline"; badge = ctx.msg("ir_tp_status_offline", "Offline"); }
+          else if(c.items_total > 0 && c.items_done >= c.items_total){ cls += " ir-tc-served"; badge = ctx.msg("ir_tp_status_served", "Served"); }
+          else if(c.items_total > 0){ cls += " ir-tc-kitchen"; badge = ctx.msg("ir_tp_status_kitchen", "In kitchen"); }
+          if(!c.can_act){ cls += " ir-tc-viewonly"; }
+          let name = c.tables ? c.tables : c.sale_no;
+          let sub = [];
+          if(!c.tables){ sub.push(ctx.msg("ir_tp_no_table", "No table")); }
+          if(ctx.see_all && c.waiter_name){ sub.push(c.waiter_name); }
+          if(ctx.multi_outlet && c.outlet_name){ sub.push(c.outlet_name); }
+          return '<div class="' + cls + '" tabindex="0" data-kind="order" data-sale_no="' + irTpEsc(c.sale_no) + '" data-local="' + (c.local ? 1 : 0) + '" data-can_act="' + (c.can_act ? 1 : 0) + '">' +
+                 (badge ? '<span class="ir-tc-badge">' + irTpEsc(badge) + '</span>' : '') +
+                 '<div class="ir-tc-name">' + irTpEsc(name) + '</div>' +
+                 (sub.length ? '<div class="ir-tc-sub">' + irTpEsc(sub.join(" " + String.fromCharCode(183) + " ")) + '</div>' : '') +
+                 '<div class="ir-tc-meta"><div class="ir-tc-value">' + irTpMoney(c.value) + '</div><div class="ir-tc-time">' + irTpEsc(ctx.elapsed(c.date_time)) + '</div></div></div>';
+      }
+      function irTpFreeCardHtml(t, ctx){
+          let sub = [];
+          if(t.sit_capacity){ sub.push(t.sit_capacity + " " + ctx.msg("ir_tp_seats", "seats")); }
+          if(ctx.multi_outlet && t.outlet_name){ sub.push(t.outlet_name); }
+          let same = Number(t.same_outlet) === 1;
+          return '<div class="ir-tcard ir-tc-empty' + (same ? '' : ' ir-tc-viewonly') + '" tabindex="0" data-kind="table" data-table_id="' + irTpEsc(t.id) + '" data-table_name="' + irTpEsc(t.name) + '" data-same_outlet="' + (same ? 1 : 0) + '" data-outlet_id="' + irTpEsc(t.outlet_id) + '" data-outlet_name="' + irTpEsc(t.outlet_name || "") + '">' +
+                 '<span class="ir-tc-badge">' + irTpEsc(ctx.msg("ir_tp_status_free", "Free")) + '</span>' +
+                 '<div class="ir-tc-name">' + irTpEsc(t.name) + '</div>' +
+                 (sub.length ? '<div class="ir-tc-sub">' + irTpEsc(sub.join(" " + String.fromCharCode(183) + " ")) + '</div>' : '') +
+                 '<div class="ir-tc-meta"><div class="ir-tc-value">' + irTpMoney(0) + '</div><div class="ir-tc-time"></div></div></div>';
+      }
+      /* the whole grid (pure) */
+      function irTpGridHtml(local, server, ctx){
+          let m = irTpMerge(local, server);
+          let html = ""; let count = 0;
+          let frees = server && server.free_tables ? server.free_tables : [];
+          for(let i = 0; i < frees.length; i++){ count++; html += irTpFreeCardHtml(frees[i], ctx); }
+          for(let i = 0; i < m.order.length; i++){ count++; html += irTpOrderCardHtml(m.by[m.order[i]], ctx); }
+          if(!count){
+              html = '<div class="ir-tp-empty">' + irTpEsc(irTpFiltersActive(server) ? ctx.msg("ir_tp_no_results", "Nothing matches these filters") : ctx.msg("ir_tp_no_tables", "No open tables. Tap + New Table to start one.")) + '</div>';
           }
-          for(let i = 0; i < order.length; i++){
-              let c = by[order[i]]; count++;
-              let cls = "ir-tcard", badge = "";
-              if(c.pending){ cls += " ir-tc-offline"; badge = irTpMsg("ir_tp_status_offline", "Offline"); }
-              else if(c.items_total > 0 && c.items_done >= c.items_total){ cls += " ir-tc-served"; badge = irTpMsg("ir_tp_status_served", "Served"); }
-              else if(c.items_total > 0){ cls += " ir-tc-kitchen"; badge = irTpMsg("ir_tp_status_kitchen", "In kitchen"); }
-              let name = c.tables ? c.tables : c.sale_no;
-              html += '<div class="' + cls + '" tabindex="0" data-kind="order" data-sale_no="' + irTpEsc(c.sale_no) + '" data-local="' + (c.local ? 1 : 0) + '">' +
-                      (badge ? '<span class="ir-tc-badge">' + irTpEsc(badge) + '</span>' : '') +
-                      '<div class="ir-tc-name">' + irTpEsc(name) + '</div>' +
-                      '<div class="ir-tc-meta"><div class="ir-tc-value">' + irTpMoney(c.value) + '</div><div class="ir-tc-time">' + irTpEsc(irTpElapsed(c.date_time, server ? server.server_time : null)) + '</div></div></div>';
-          }
-          if(!count){ html = '<div class="ir-tp-empty">' + irTpEsc(irTpMsg("ir_tp_no_tables", "No open tables. Tap + New Table to start one.")) + '</div>'; }
-          ir_tp_items = by; ir_tp_server_now = server ? server.server_time : null;
-          $("#ir_tp_grid").html(html);
+          return { html: html, count: count, items: m.by };
+      }
+      function irTpFillSelect(sel, rows, keep){
+          let first = sel.find("option").first().clone();
+          sel.empty().append(first);
+          for(let i = 0; i < rows.length; i++){ sel.append($("<option>").attr("value", rows[i].id).text(rows[i].name)); }
+          sel.val(keep);
+          if(sel.val() === null){ sel.val(""); }
+      }
+      function irTpRenderHead(server, count){
+          let see_all = !!(server && Number(server.see_all) === 1);
+          $("#ir_tp_title").text(see_all ? irTpMsg("ir_tp_title_all", "Tables") : irTpMsg("my_tables", "My tables"));
           let first = $("#ir_tp_first_name").val() || "";
-          $("#ir_tp_sub").text((first ? first + " " + String.fromCharCode(183) + " " : "") + count + " " + irTpMsg("ir_tp_open_tables", "open tables") + " " + String.fromCharCode(183) + " " + irTpMsg("ir_tp_tap_hint", "tap a table to open it"));
+          $("#ir_tp_sub").text((first && !see_all ? first + " " + String.fromCharCode(183) + " " : "") + count + " " + irTpMsg("ir_tp_open_tables", "open tables") + " " + String.fromCharCode(183) + " " + irTpMsg("ir_tp_tap_hint", "tap a table to open it"));
+          if(server && server.counts){
+              $("#ir_tp_c_occ").text(server.counts.occupied); $("#ir_tp_c_free").text(server.counts.free); $("#ir_tp_c_orders").text(server.counts.orders);
+              $("#ir_tp_counts").prop("hidden", false);
+          }else{
+              $("#ir_tp_counts").prop("hidden", true);
+          }
+          if(server && server.filters){
+              let f = server.filters;
+              let o = Number(f.outlet_allowed) === 1, u = Number(f.user_allowed) === 1, d = Number(f.date_allowed) === 1;
+              $("#ir_tp_f_outlet_wrap").prop("hidden", !o); $("#ir_tp_f_user_wrap").prop("hidden", !u); $("#ir_tp_f_date_wrap").prop("hidden", !d);
+              $("#ir_tp_filters").prop("hidden", !(o || u || d));
+              if(server.outlets){ irTpFillSelect($("#ir_tp_f_outlet"), server.outlets, ir_tp_filters.outlet_id); ir_tp_lists_loaded = true; }
+              if(server.users){ irTpFillSelect($("#ir_tp_f_user"), server.users, ir_tp_filters.view_user_id); }
+              $("#ir_tp_f_clear").prop("hidden", !irTpFiltersActive(server));
+          }
+      }
+      function irTpRender(local, server){
+          let ctx = {
+              msg: irTpMsg,
+              see_all: !!(server && Number(server.see_all) === 1),
+              multi_outlet: !!(server && server.filters && Number(server.filters.outlet_allowed) === 1),
+              elapsed: function(dt){ return irTpElapsed(dt, server ? server.server_time : null); }
+          };
+          let g = irTpGridHtml(local, server, ctx);
+          ir_tp_items = g.items; ir_tp_server_now = server ? server.server_time : null;
+          $("#ir_tp_grid").html(g.html);
+          irTpRenderHead(server, g.count);
           /* the server just answered -> creating a table will work; it did not -> it will not */
           $("#ir_tp_new").prop("disabled", !server);
+      }
+      $(document).on("change", "#ir_tp_f_outlet, #ir_tp_f_user, #ir_tp_f_date", function(){
+          ir_tp_filters = { outlet_id: $("#ir_tp_f_outlet").val() || "", view_user_id: $("#ir_tp_f_user").val() || "", sale_date: $("#ir_tp_f_date").val() || "" };
+          irTpRefresh();
+      });
+      $(document).on("click", "#ir_tp_f_clear", function(e){
+          e.preventDefault();
+          ir_tp_filters = { outlet_id: "", view_user_id: "", sale_date: "" };
+          $("#ir_tp_f_outlet").val(""); $("#ir_tp_f_user").val(""); $("#ir_tp_f_date").val("");
+          irTpRefresh();
+      });
+      /* a table or order in another outlet: offer to switch, the POS reopens there
+         with the panel (Outlet::setOutletSession/<id>/pos). Its register and stock. */
+      function irTpOfferSwitch(outlet_id, outlet_name){
+          if(!outlet_id){ return; }
+          swal({ title: irTpMsg("ir_tp_switch_title", "Switch outlet?"), text: (outlet_name ? outlet_name + ". " : "") + irTpMsg("ir_tp_view_only_outlet", "This table is in another outlet. Switch to that outlet to act on it."),
+                 confirmButtonColor: "#3c8dbc", confirmButtonText: irTpMsg("ir_tp_switch_outlet", "Switch to") + " " + (outlet_name || ""), showCancelButton: true },
+               function(){ window.location.href = base_url + "Outlet/setOutletSession/" + encodeURIComponent(outlet_id) + "/pos"; });
       }
       function irTpRefresh(){
           if(ir_tp_busy){ return; }
@@ -2458,7 +2561,11 @@
       $(document).on("click", "#ir_tp_grid .ir-tcard", function(e){
           e.preventDefault();
           let card = $(this);
-          if(card.attr("data-kind") === "table"){ irTpSelectTable(card.attr("data-table_id"), card.attr("data-table_name")); return; }
+          if(card.attr("data-kind") === "table"){
+              /* Stage 5b: a free table in another outlet -> offer the switch */
+              if(card.attr("data-same_outlet") === "0"){ irTpOfferSwitch(card.attr("data-outlet_id"), card.attr("data-outlet_name")); return; }
+              irTpSelectTable(card.attr("data-table_id"), card.attr("data-table_name")); return;
+          }
           irSheetOpen(card.attr("data-sale_no"));
       });
       /* ---- six-action sheet (Stage 3) ----------------------------------------------
@@ -2473,10 +2580,25 @@
           let it = ir_tp_items[sale_no]; if(!it){ return; }
           ir_sheet_sale_no = sale_no;
           $("#ir_as_title").text(it.tables ? it.tables : sale_no);
-          $("#ir_as_sub").text(sale_no + " " + String.fromCharCode(183) + " " + irTpMoney(it.value) + (it.date_time ? " " + String.fromCharCode(183) + " " + irTpMsg("ir_as_open_min", "open") + " " + irTpElapsed(it.date_time, ir_tp_server_now) : ""));
-          $("#ir_as_merge").prop("hidden", true); $("#ir_as_grid").prop("hidden", false);
+          let sub = sale_no + " " + String.fromCharCode(183) + " " + irTpMoney(it.value) + (it.date_time ? " " + String.fromCharCode(183) + " " + irTpMsg("ir_as_open_min", "open") + " " + irTpElapsed(it.date_time, ir_tp_server_now) : "");
+          if(it.waiter_name){ sub += " " + String.fromCharCode(183) + " " + it.waiter_name; }
+          $("#ir_as_sub").text(sub);
+          $("#ir_as_merge").prop("hidden", true);
+          /* Stage 5b: the server said this order cannot be acted on from here -
+             another outlet (offer the switch) or the role lacks the permission.
+             The six buttons stay hidden; the adoption check on the server is the backstop. */
+          let can_act = (it.can_act !== false);
+          $("#ir_as_grid").prop("hidden", !can_act);
+          $("#ir_as_view").prop("hidden", can_act);
+          if(!can_act){
+              let other_outlet = (it.same_outlet === false);
+              $("#ir_as_view_text").text(other_outlet ? irTpMsg("ir_tp_view_only_outlet", "This table is in another outlet. Switch to that outlet to act on it.") : irTpMsg("ir_tp_view_only_permission", "You can see this order but your role cannot act on it"));
+              $("#ir_as_switch").prop("hidden", !other_outlet).attr("data-outlet_id", it.outlet_id || "").attr("data-outlet_name", it.outlet_name || "");
+              $("#ir_as_switch_label").text(irTpMsg("ir_tp_switch_outlet", "Switch to") + " " + (it.outlet_name || ""));
+          }
           $("#ir_action_sheet").prop("hidden", false);
       }
+      $(document).on("click", "#ir_as_switch", function(e){ e.preventDefault(); let b = $(this); irSheetClose(); irTpOfferSwitch(b.attr("data-outlet_id"), b.attr("data-outlet_name")); });
       function irSheetClose(){ $("#ir_action_sheet").prop("hidden", true); ir_sheet_sale_no = null; }
       /* adopt if needed, then wait for the running-order card, then hand it over */
       function irTpEnsureLocalCard(sale_no, done){
@@ -2528,6 +2650,7 @@
           for(let k in ir_tp_items){
               if(k === sale_no){ continue; }
               let o = ir_tp_items[k]; if(o.merged){ continue; }
+              if(o.can_act === false){ continue; } /* Stage 5b: not actionable from here (other outlet / no permission) */
               html += '<button type="button" class="ir-as-btn" data-merge_with="' + irTpEsc(k) + '"><i class="fas fa-code-branch"></i><div>' + irTpEsc(o.tables ? o.tables : k) + '<small>' + irTpEsc(irTpMoney(o.value)) + '</small></div></button>';
           }
           if(!html){ html = '<div class="ir-as-merge-empty">' + irTpEsc(irTpMsg("ir_as_no_merge_targets", "No other open table to merge with")) + '</div>'; }

@@ -688,7 +688,7 @@ foreach ($notifications as $single_notification){
          rather than the real cut. Same family and host as the existing import,
          so this adds a weight - not another typeface. */ ?>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap">
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.8.8">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.8.9">
 </head>
 
 <body>
@@ -1441,13 +1441,29 @@ foreach ($notifications as $single_notification){
                 <div id="ir_tables_panel" hidden>
                     <div class="ir-tp-head">
                         <div>
-                            <p class="ir-tp-title"><?php echo lang('my_tables'); ?></p>
+                            <p class="ir-tp-title" id="ir_tp_title"><?php echo lang('my_tables'); ?></p>
                             <p class="ir-tp-sub" id="ir_tp_sub"></p>
+                        </div>
+                        <?php /* Stage 5b: occupied / free / orders, from Sale/myTablesAjax counts */ ?>
+                        <div class="ir-tp-counts" id="ir_tp_counts" hidden>
+                            <span class="ir-tp-chip ir-tp-chip-occ"><?php echo lang('ir_tp_occupied'); ?> <b id="ir_tp_c_occ">0</b></span>
+                            <span class="ir-tp-chip ir-tp-chip-free"><?php echo lang('ir_tp_free'); ?> <b id="ir_tp_c_free">0</b></span>
+                            <span class="ir-tp-chip"><?php echo lang('ir_tp_orders'); ?> <b id="ir_tp_c_orders">0</b></span>
                         </div>
                         <div class="ir-tp-actions">
                             <button type="button" class="ir-tp-new" id="ir_tp_new"><i class="fas fa-plus"></i> <?php echo lang('new_table'); ?></button>
                             <button type="button" class="ir-tp-close" id="ir_tp_close" title="<?php echo lang('close'); ?>"><i class="fas fa-times"></i></button>
                         </div>
+                    </div>
+                    <?php /* Stage 5b: filters. Each control is shown only when the server says the
+                             caller may use it (filters.*_allowed): Location for a view-all caller or
+                             a user assigned to several outlets; User and Date for view-all callers.
+                             A change refreshes at once; the 10 s poll carries the same values. */ ?>
+                    <div class="ir-tp-filters" id="ir_tp_filters" hidden>
+                        <label class="ir-tp-f" id="ir_tp_f_outlet_wrap" hidden><i class="fas fa-map-marker-alt"></i><select id="ir_tp_f_outlet"><option value=""><?php echo lang('ir_tp_all_locations'); ?></option></select></label>
+                        <label class="ir-tp-f" id="ir_tp_f_user_wrap" hidden><i class="fas fa-user"></i><select id="ir_tp_f_user"><option value=""><?php echo lang('ir_tp_all_users'); ?></option></select></label>
+                        <label class="ir-tp-f" id="ir_tp_f_date_wrap" hidden><i class="fas fa-calendar-alt"></i><input type="date" id="ir_tp_f_date"></label>
+                        <button type="button" class="ir-tp-f-clear" id="ir_tp_f_clear" hidden><i class="fas fa-times"></i> <?php echo lang('ir_tp_clear_filters'); ?></button>
                     </div>
                     <div class="ir-tp-grid" id="ir_tp_grid"></div>
                 </div>
@@ -1467,6 +1483,12 @@ foreach ($notifications as $single_notification){
                             <button type="button" class="ir-as-btn" data-action="merge"><i class="fas fa-code-branch"></i><div><?php echo lang('merge_table'); ?><small><?php echo lang('ir_as_hint_merge'); ?></small></div></button>
                             <button type="button" class="ir-as-btn" data-action="bill"><i class="fas fa-print"></i><div><?php echo lang('bill'); ?><small><?php echo lang('ir_as_hint_bill'); ?></small></div></button>
                             <button type="button" class="ir-as-btn ir-as-danger" data-action="cancel"><i class="fas fa-times"></i><div><?php echo lang('cancel_order'); ?><small><?php echo lang('ir_as_hint_cancel'); ?></small></div></button>
+                        </div>
+                        <?php /* Stage 5b: shown instead of the six buttons when the order cannot be acted
+                                 on from here - another outlet (offers the switch) or no permission. */ ?>
+                        <div class="ir-as-view" id="ir_as_view" hidden>
+                            <p class="ir-as-view-text" id="ir_as_view_text"></p>
+                            <button type="button" class="ir-as-btn ir-as-primary" id="ir_as_switch" hidden><i class="fas fa-exchange-alt"></i><div><span id="ir_as_switch_label"></span></div></button>
                         </div>
                         <div class="ir-as-merge" id="ir_as_merge" hidden>
                             <p class="ir-as-merge-title"><?php echo lang('ir_as_merge_pick'); ?></p>
@@ -4723,7 +4745,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=5.1"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=5.2"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">

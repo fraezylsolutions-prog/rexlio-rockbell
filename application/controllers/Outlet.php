@@ -270,7 +270,7 @@ class Outlet extends Cl_Controller {
      * @return void
      * @param int
      */
-    public function setOutletSession($encrypted_id) {
+    public function setOutletSession($encrypted_id, $then = '') {
         $outlet_id = $this->custom->encrypt_decrypt($encrypted_id, 'decrypt');
 
         //BASE-PRODUCT FIX: this method trusted the id in the URL. It checked only
@@ -303,7 +303,17 @@ class Outlet extends Cl_Controller {
             $outlet_session['default_waiter'] = $setting->default_waiter;
         endif;
         $this->session->set_userdata($outlet_session);
-        
+
+        //Stage 5b (one tables screen): "Switch to <outlet>" from the tables panel.
+        //The caller wants the POS of the outlet just entered, whatever their role -
+        //an Admin would otherwise be sent to the dashboard below. The POS's own
+        //register guard still applies there.
+        if ($then === 'pos') {
+            $this->session->unset_userdata('clicked_controller');
+            $this->session->unset_userdata('clicked_method');
+            redirect('Sale/POS');
+        }
+
         if (!$this->session->has_userdata('clicked_controller')) {
             
             if ($this->session->userdata('role') == 'Admin') {

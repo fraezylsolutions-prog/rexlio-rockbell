@@ -415,3 +415,17 @@ $self_order_table_id = $this->session->userdata('self_order_table_id');
 <input type="hidden" id="pulled_successfully" value="<?php echo lang('pulled_successfully'); ?>">
 <input type="hidden" id="this_order_engage" value="<?php echo lang('this_order_engage'); ?>">
 <input type="hidden" id="zatca_invoice_value" value="">
+<?php /* Stage 5b - one tables screen */ ?>
+<input type="hidden" id="ir_tp_title_all" value="<?php echo lang('ir_tp_title_all'); ?>">
+<input type="hidden" id="ir_tp_status_free" value="<?php echo lang('ir_tp_status_free'); ?>">
+<input type="hidden" id="ir_tp_seats" value="<?php echo lang('ir_tp_seats'); ?>">
+<input type="hidden" id="ir_tp_no_table" value="<?php echo lang('ir_tp_no_table'); ?>">
+<input type="hidden" id="ir_tp_all_locations" value="<?php echo lang('ir_tp_all_locations'); ?>">
+<input type="hidden" id="ir_tp_all_users" value="<?php echo lang('ir_tp_all_users'); ?>">
+<input type="hidden" id="ir_tp_no_results" value="<?php echo lang('ir_tp_no_results'); ?>">
+<input type="hidden" id="ir_tp_view_only" value="<?php echo lang('ir_tp_view_only'); ?>">
+<input type="hidden" id="ir_tp_view_only_permission" value="<?php echo lang('ir_tp_view_only_permission'); ?>">
+<input type="hidden" id="ir_tp_view_only_outlet" value="<?php echo lang('ir_tp_view_only_outlet'); ?>">
+<input type="hidden" id="ir_tp_switch_title" value="<?php echo lang('ir_tp_switch_title'); ?>">
+<input type="hidden" id="ir_tp_switch_outlet" value="<?php echo lang('ir_tp_switch_outlet'); ?>">
+<input type="hidden" id="ir_session_outlet_id" value="<?php echo (int) $this->session->userdata('outlet_id'); ?>">

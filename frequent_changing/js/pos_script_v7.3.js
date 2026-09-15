@@ -17878,6 +17878,31 @@
        never turns up we say so instead of leaving the operator on a blank POS.
        Selection only, on purpose: firing Invoice or Cancel automatically from a
        URL would run a financial action without the operator confirming it. */
+    /* Stage 4: the Table Status screen's action buttons arrive as
+       ?open_sale_no=X&ir_action=modify|invoice|split|bill|cancel|merge. Once the
+       card is selected (above), run that action through the same code the tables
+       panel's sheet uses; merge opens the panel's sheet so the operator picks the
+       other table. A free table's "New Order" arrives as ?ir_table_id=&ir_table_name=
+       and preselects the table exactly as "+ New Table" does. */
+    function irDeepLinkAction(sale_no){
+        let m = window.location.search.match(/[?&]ir_action=([a-z]+)/);
+        if(!m){ return; }
+        let action = m[1];
+        if(["modify", "invoice", "split", "bill", "cancel"].indexOf(action) > -1){
+            setTimeout(function(){ irRunOrderAction(sale_no, action); }, 300);
+        }else if(action === "merge" && typeof irOpenTablesPanel === "function"){
+            irOpenTablesPanel();
+            setTimeout(function(){ if(ir_tp_items[sale_no]){ irSheetOpen(sale_no); irSheetMergePicker(sale_no); } }, 1500);
+        }
+        try{ history.replaceState(null, "", window.location.pathname); }catch(e){}
+    }
+    (function openTableFromDeepLink(){
+        let m = window.location.search.match(/[?&]ir_table_id=(\d+)/);
+        if(!m){ return; }
+        let name_m = window.location.search.match(/[?&]ir_table_name=([^&]+)/);
+        let name = name_m ? decodeURIComponent(name_m[1].replace(/\+/g, " ")) : ("#" + m[1]);
+        setTimeout(function(){ irTpSelectTable(m[1], name); try{ history.replaceState(null, "", window.location.pathname); }catch(e){} }, 900);
+    })();
     (function openSaleFromDeepLink(){
         let deep_link_match = window.location.search.match(/[?&]open_sale_no=([^&]+)/);
         if(!deep_link_match){
@@ -17900,6 +17925,7 @@
                 if(target_card.get(0) && target_card.get(0).scrollIntoView){
                     target_card.get(0).scrollIntoView({block: "nearest"});
                 }
+                irDeepLinkAction(target_sale_no);
                 return;
             }
             let render_finished = (window.ir_running_orders_rendered === true);
@@ -17918,7 +17944,8 @@
                             clearInterval(select_timer);
                             card.trigger("click");
                             if(card.get(0) && card.get(0).scrollIntoView){ card.get(0).scrollIntoView({block: "nearest"}); }
-                                        return;
+                            irDeepLinkAction(target_sale_no);
+                            return;
                         }
                         if(select_attempts >= 40){ clearInterval(select_timer); }
                     }, 150);

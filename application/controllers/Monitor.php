@@ -175,9 +175,53 @@ class Monitor extends Cl_Controller {
      */
     public function tables() {
         $data = array();
-        $data['tables'] = $this->buildTableStatus();
+        $company_id = $this->session->userdata('company_id');
+        //Stage 4 (table-first flow): a role holding view_all_running_orders sees
+        //every table in every outlet it may access, filterable by outlet, user and
+        //date; act_on_any_running_order adds the six actions on other users'
+        //tables (own orders are always actionable). Both are ordinary tbl_access
+        //rows - nothing here tests a role name.
+        $data['can_view_all'] = $this->canViewAllUsers();
+        $data['can_act_any'] = checkAccess("372", "act_on_any_running_order") ? TRUE : FALSE;
+        $data['filters'] = $this->collectTableFilters($data['can_view_all']);
+        $data['outlets'] = $data['can_view_all'] ? $this->accessibleOutlets() : array();
+        $data['users'] = $data['can_view_all'] ? $this->Common_model->getAllByCompanyIdForDropdown($company_id, 'tbl_users') : array();
+        $data['tables'] = $this->buildTableStatus($data['filters']);
         $data['main_content'] = $this->load->view('monitor/tables', $data, TRUE);
         $this->load->view('userHome', $data);
+    }
+    /**
+     * Table Status filters. Outlet and user are only honoured for a caller who
+     * may view all; the outlet must be one the caller may access. sale_date is
+     * YYYY-MM-DD or empty.
+     * @access private
+     * @return array
+     * @param bool
+     */
+    private function collectTableFilters($can_view_all) {
+        $filters = array('can_view_all' => $can_view_all, 'outlet_id' => '', 'view_user_id' => '', 'sale_date' => '');
+        if($can_view_all){
+            $outlet_id = (int) $this->input->post('outlet_id');
+            $accessible = getAccessibleOutletIds();
+            $filters['outlet_id'] = ($outlet_id && in_array($outlet_id, $accessible, TRUE)) ? $outlet_id : '';
+            $filters['view_user_id'] = (int) $this->input->post('view_user_id') ? (int) $this->input->post('view_user_id') : '';
+            $sale_date = trim((string) $this->input->post('sale_date'));
+            $filters['sale_date'] = preg_match('/^\d{4}-\d{2}-\d{2}$/', $sale_date) ? $sale_date : '';
+        }
+        return $filters;
+    }
+    /**
+     * outlets the caller may access, for the filter dropdown
+     * @access private
+     * @return array
+     */
+    private function accessibleOutlets() {
+        $ids = getAccessibleOutletIds();
+        if(!$ids){
+            return array();
+        }
+        return $this->db->select('id, outlet_name')->from('tbl_outlets')->where_in('id', $ids)
+                        ->where('del_status', 'Live')->order_by('outlet_name', 'ASC')->get()->result();
     }
 
     /**
@@ -187,9 +231,11 @@ class Monitor extends Cl_Controller {
      * @param no
      */
     public function tablesAjax() {
-        $tables = $this->buildTableStatus();
+        $can_view_all = $this->canViewAllUsers();
+        $filters = $this->collectTableFilters($can_view_all);
+        $tables = $this->buildTableStatus($filters);
         //render the same partial the page uses so the card markup is not duplicated
-        $html = $this->load->view('monitor/_table_cards', array('tables' => $tables), TRUE);
+        $html = $this->load->view('monitor/_table_cards', array('tables' => $tables, 'can_act_any' => checkAccess("372", "act_on_any_running_order") ? TRUE : FALSE, 'can_view_all' => $can_view_all), TRUE);
         $occupied = 0;
         foreach($tables as $table){
             if($table->is_occupied){
@@ -209,9 +255,14 @@ class Monitor extends Cl_Controller {
      * @access private
      * @return array
      */
-    private function buildTableStatus() {
+    private function buildTableStatus($filters = array()) {
         $outlet_id = $this->session->userdata('outlet_id');
-        $tables = $this->Sale_model->getTableStatus($outlet_id);
+        //a viewer of all: one chosen outlet, or every accessible outlet
+        $scope = $outlet_id;
+        if(!empty($filters['can_view_all'])){
+            $scope = !empty($filters['outlet_id']) ? (int) $filters['outlet_id'] : getAccessibleOutletIds();
+        }
+        $tables = $this->Sale_model->getTableStatus($scope, $filters);
         if(!$tables){
             return array();
         }

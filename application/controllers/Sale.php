@@ -4256,6 +4256,17 @@ We hope to see you again!";
             echo json_encode($out);
             return;
         }
+        //Stage 4: seeing another user's order (view_all_running_orders) is not the
+        //same as acting on it. Opening it here IS acting - it hands the till a copy
+        //to modify, invoice or cancel - so someone else's order also needs
+        //act_on_any_running_order. Own orders (user or waiter) are always allowed.
+        $user_id = (int) $this->session->userdata('user_id');
+        $is_own = ((int) $row->user_id === $user_id || (int) $row->waiter_id === $user_id);
+        if(!$is_own && !checkAccess("372", "act_on_any_running_order")){
+            $out['reason'] = 'permission';
+            echo json_encode($out);
+            return;
+        }
         if(getSaleDetailsBySaleNo($sale_no)){
             $out['reason'] = 'invoiced';
             echo json_encode($out);

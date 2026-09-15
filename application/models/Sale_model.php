@@ -586,13 +586,26 @@ class Sale_model extends CI_Model {
      * @return array
      * @param int
      */
-    public function getTableStatus($outlet_id){
-        //every table for the outlet, with its area
-        $this->db->select('tbl_tables.*, tbl_areas.area_name');
+    public function getTableStatus($outlet_id, $filters = array()){
+        //Stage 4 (table-first flow): $outlet_id may be one id or a list of ids
+        //(higher roles see every outlet they may access); $filters may carry
+        //view_user_id (user or waiter) and sale_date. When either of those is set
+        //only tables holding a matching order are returned - a free table has no
+        //user or date to match. Without them every table is listed, as before.
+        $outlet_ids = is_array($outlet_id) ? array_values(array_map('intval', $outlet_id)) : array((int) $outlet_id);
+        if(!$outlet_ids){
+            return array();
+        }
+        $view_user_id = isset($filters['view_user_id']) && $filters['view_user_id'] !== '' && $filters['view_user_id'] !== NULL ? (int) $filters['view_user_id'] : 0;
+        $sale_date = isset($filters['sale_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $filters['sale_date']) ? $filters['sale_date'] : '';
+        //every table for the outlet(s), with its area and outlet
+        $this->db->select('tbl_tables.*, tbl_areas.area_name, tbl_outlets.outlet_name');
         $this->db->from('tbl_tables');
         $this->db->join('tbl_areas', 'tbl_areas.id = tbl_tables.area', 'left');
-        $this->db->where('tbl_tables.outlet_id', $outlet_id);
+        $this->db->join('tbl_outlets', 'tbl_outlets.id = tbl_tables.outlet_id', 'left');
+        $this->db->where_in('tbl_tables.outlet_id', $outlet_ids);
         $this->db->where('tbl_tables.del_status', 'Live');
+        $this->db->order_by('tbl_outlets.outlet_name', 'ASC');
         $this->db->order_by('tbl_areas.area_name', 'ASC');
         $this->db->order_by('tbl_tables.name', 'ASC');
         $tables = $this->db->get()->result();
@@ -604,6 +617,7 @@ class Sale_model extends CI_Model {
         //(merged) so this can return more than one row per sale.
         $this->db->select("tbl_kitchen_sales.id as sale_id, tbl_kitchen_sales.sale_no,
             tbl_kitchen_sales.order_type, tbl_kitchen_sales.total_payable, tbl_kitchen_sales.date_time,
+            tbl_kitchen_sales.user_id, tbl_kitchen_sales.outlet_id as order_outlet_id,
             tbl_kitchen_sales.waiter_id, tbl_users.full_name as waiter_name,
             tbl_customers.name as customer_name,
             tbl_orders_table.persons as persons,
@@ -612,7 +626,16 @@ class Sale_model extends CI_Model {
         $this->db->join('tbl_orders_table', "tbl_orders_table.sale_id = tbl_kitchen_sales.id AND tbl_orders_table.del_status = 'Live'", 'left');
         $this->db->join('tbl_users', 'tbl_users.id = tbl_kitchen_sales.waiter_id', 'left');
         $this->db->join('tbl_customers', 'tbl_customers.id = tbl_kitchen_sales.customer_id', 'left');
-        $this->db->where('tbl_kitchen_sales.outlet_id', $outlet_id);
+        $this->db->where_in('tbl_kitchen_sales.outlet_id', $outlet_ids);
+        if($view_user_id){
+            $this->db->group_start();
+            $this->db->where('tbl_kitchen_sales.user_id', $view_user_id);
+            $this->db->or_where('tbl_kitchen_sales.waiter_id', $view_user_id);
+            $this->db->group_end();
+        }
+        if($sale_date !== ''){
+            $this->db->where('tbl_kitchen_sales.sale_date', $sale_date);
+        }
         $this->db->where('tbl_kitchen_sales.del_status', 'Live');
         $this->db->where("(tbl_kitchen_sales.order_status='1' OR tbl_kitchen_sales.order_status='2')");
         $this->db->where("(tbl_kitchen_sales.future_sale_status='1' OR tbl_kitchen_sales.future_sale_status='3')");
@@ -656,9 +679,15 @@ class Sale_model extends CI_Model {
             $table->orders = isset($orders_by_table[$table->id]) ? $orders_by_table[$table->id] : array();
             $table->is_occupied = count($table->orders) > 0 ? 1 : 0;
             $table->total_guests = 0;
+            $table->order_value = 0;
             foreach($table->orders as $table_order){
                 $table->total_guests += (int) $table_order->persons;
+                $table->order_value += (float) $table_order->total_payable;
             }
+        }
+        //a user or date filter is about orders: keep only the tables that matched
+        if($view_user_id || $sale_date !== ''){
+            $tables = array_values(array_filter($tables, function($t){ return $t->is_occupied; }));
         }
         return $tables;
     }

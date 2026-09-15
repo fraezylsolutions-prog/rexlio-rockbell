@@ -54,6 +54,12 @@ $(function () {
             url: base_url + "Monitor/tablesAjax",
             method: "POST",
             dataType: "json",
+            /* Stage 4: the poll carries the same filters the page was rendered with */
+            data: {
+                outlet_id: $("#ts_outlet_id").length ? $("#ts_outlet_id").val() : "",
+                view_user_id: $("#ts_view_user_id").length ? $("#ts_view_user_id").val() : "",
+                sale_date: $("#ts_sale_date").length ? $("#ts_sale_date").val() : ""
+            },
             success: function (response) {
                 if (response && response.html !== undefined) {
                     $("#ts_card_area").html(response.html);

@@ -2005,3 +2005,5 @@ $lang['ir_as_merge_pick'] = 'Merge with which table?';
 $lang['ir_as_no_merge_targets'] = 'No other open table to merge with';
 $lang['ir_as_already_merged'] = 'This order is already a merged bill';
 $lang['ir_as_open_min'] = 'open';
+$lang['view_only'] = 'View only';
+$lang['order_value'] = 'Order value';

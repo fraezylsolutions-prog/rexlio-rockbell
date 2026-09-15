@@ -203,3 +203,11 @@
     color: #8f8f8f;
     padding: 30px 0;
 }
+
+/* Stage 4: order value, six actions, view-only marker */
+.ts_row_value .ts_value_money { font-weight: 800; font-size: 16px; }
+.ts_card_actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.ts_card_actions .ts_btn { flex: 1 1 calc(50% - 6px); font-size: 12px; padding: 6px 4px; }
+.ts_btn_danger { background-color: #f5d8d8; color: #a12020; }
+.ts_btn_danger:hover { background-color: #edc2c2; color: #7d1616; }
+.ts_view_only { display: inline-block; font-size: 11px; color: #716E8C; padding: 6px 4px; }

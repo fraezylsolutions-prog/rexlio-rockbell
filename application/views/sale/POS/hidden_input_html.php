@@ -236,6 +236,11 @@ foreach ($waiters as $waiter){
 <input type="hidden" id="please_add_your_table_person_number" value="<?php echo lang('please_add_your_table_person_number'); ?>">
 <input type="hidden" id="you_need_to_add_address_with_your_selected_customer" value="<?php echo lang('you_need_to_add_address_with_your_selected_customer'); ?>">
 <input type="hidden" id="menu_not_permit_access" value="<?php echo lang('menu_not_permit_access'); ?>">
+<?php /* Shown when a direct-print request to the till's print service fails.
+         Every one of those calls previously had an empty error handler, so a
+         dead print service produced no indication at all - the first sign was
+         food not arriving at the pass. */ ?>
+<input type="hidden" id="print_failed_notice" value="<?php echo lang('print_failed_notice'); ?>">
 <div class="modalOverlay"></div>
 <input type="hidden" id="base_url_customer" value="<?php echo base_url()?>">
 <input type="hidden" id="csrf_name_" value="<?php echo escape_output($this->security->get_csrf_token_name()); ?>">

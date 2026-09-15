@@ -81,6 +81,99 @@
       let inv_bill_no = $("#inv_bill_no").val();
       let inv_token_number = $("#inv_token_number").val();
       let menu_not_permit_access = $("#menu_not_permit_access").val();
+      let print_failed_notice = $("#print_failed_notice").val();
+      /* Surfaces a failed direct-print call. Every request to the till's print
+         service used to carry an empty error handler, so a stopped service or
+         an unreachable printer failed completely silently - the first symptom
+         was food never reaching the kitchen. Deliberately NOT a blocking
+         dialog: the order itself has already been saved, so this must inform
+         without interrupting service. The printer label is included when the
+         payload carries one, so staff know WHICH printer to check. */
+      function irPrintFailed(which){
+          try{
+              let msg = print_failed_notice || "Print failed - check the printer and print service on this till.";
+              if(which){ msg = msg + " (" + which + ")"; }
+              if(typeof toastr !== "undefined"){
+                  toastr["error"](msg, "", {timeOut: 8000, extendedTimeOut: 4000, closeButton: true});
+              }else{
+                  console.error(msg);
+              }
+          }catch(e){ console.error("print failed", e); }
+      }
+      /* Auto-close for the print preview popups.
+         --------------------------------------------------------------------
+         These windows are opened with window.open() and written to with
+         document.write(), so they are same-origin and script-opened - the
+         opener may both drive and close them. Nothing closed them before, so
+         every order left a preview window on screen for staff to dismiss by
+         hand, which defeats hands-free printing entirely.
+
+         Closing is driven by 'afterprint', which Chrome fires in BOTH modes:
+         after --kiosk-printing auto-confirms, and after a human dismisses the
+         native dialog (whether they print or cancel). matchMedia('print') is
+         a second signal for engines where afterprint is unreliable. The 60s
+         timer is only a last-resort net - deliberately long, so it can never
+         close the window while someone is still choosing a printer.
+
+         The 250ms delay before close matters: closing the instant the print
+         call returns can tear the window down before the job reaches the
+         spooler, which cancels the print.
+
+         alreadyPrints=true for the popups whose injected HTML already calls
+         window.print(), so they are not printed twice. print_bill's HTML has
+         no print call at all, so it is printed from here. */
+      function irAutoPrintAndClose(popup, alreadyPrints){
+          if(!popup){ return; }
+          /* The close logic is INJECTED INTO the popup rather than attached
+             from here, so its listeners and timers belong to the popup itself.
+             That matters because the opener does not always survive: the
+             waiter auto-logout navigates this page to the login screen moments
+             after an order is placed, and anything scheduled in THIS context
+             would die with it - leaving the preview window orphaned on screen,
+             which is the exact fault this was written to remove.
+
+             Injected as a <script> element so it is evaluated inside the
+             popup's own window. A belt-and-braces close from this side is kept
+             below for the case where injection is refused; closing an already
+             closed window is a harmless no-op. */
+          var selfClose =
+              "(function(){var done=false;" +
+              "function fin(){if(done){return;}done=true;" +
+              "setTimeout(function(){try{window.close();}catch(e){}},250);}" +
+              "try{window.addEventListener('afterprint',fin);}catch(e){}" +
+              "try{if(window.matchMedia){var mq=window.matchMedia('print');" +
+              "var h=function(m){if(!m.matches){fin();}};" +
+              "if(mq.addEventListener){mq.addEventListener('change',h);}" +
+              "else if(mq.addListener){mq.addListener(h);}}}catch(e){}" +
+              (alreadyPrints ? "" :
+                  "setTimeout(function(){try{window.focus();window.print();}catch(e){}},1000);") +
+              "setTimeout(fin,60000);})();";
+          var injected = false;
+          try{
+              var doc = popup.document;
+              var s = doc.createElement("script");
+              s.text = selfClose;
+              (doc.body || doc.documentElement).appendChild(s);
+              injected = true;
+          }catch(e){ injected = false; }
+
+          if(!injected){
+              /* fallback: drive it from here, as before */
+              try{
+                  var done = false;
+                  function finish(){
+                      if(done){ return; }
+                      done = true;
+                      setTimeout(function(){ try{ popup.close(); }catch(e){} }, 250);
+                  }
+                  try{ popup.addEventListener("afterprint", finish); }catch(e){}
+                  if(!alreadyPrints){
+                      setTimeout(function(){ try{ popup.focus(); popup.print(); }catch(e){} }, 1000);
+                  }
+                  setTimeout(finish, 60000);
+              }catch(e){ /* never let a close failure break order flow */ }
+          }
+      }
       let close_order_msg = $("#close_order_msg").val();
       let cancel_order_msg = $("#cancel_order_msg").val();
       let pre_or_post_payment = Number($("#pre_or_post_payment").val());
@@ -1472,6 +1565,7 @@
                 popup.document.write(invoice_print);
                 popup.document.close();
                 popup.focus();
+                irAutoPrintAndClose(popup, true);
             }
           
           } 
@@ -1525,7 +1619,7 @@
                                         content_data: "["+(JSON.stringify(content_data_direct_print[key]))+"]",print_type:data.print_type,
                                     },
                                     success: function (data) {},
-                                    error: function () {},
+                                    error: function () { irPrintFailed(data.print_type); },
                                 });
                             }
                         }
@@ -2493,6 +2587,7 @@
           popup.document.write(invoice_print);
           popup.document.close();
           popup.focus();
+          irAutoPrintAndClose(popup, true);
       }
       function call_print_invoice(order_info,inv_qr_code_enable_status) {
         let order = JSON.parse(order_info);
@@ -2843,6 +2938,7 @@
         popup.document.write(invoice_print);
         popup.document.close();
         popup.focus();
+        irAutoPrintAndClose(popup, true);
     }
      
     function print_bill(order_info, sale_no) {
@@ -3099,6 +3195,7 @@
         popup.document.write(invoice_print);
         popup.document.close();
         popup.focus();
+        irAutoPrintAndClose(popup, false);
     }
   
       $(document).on("click", ".edit_customer", function (e) {
@@ -4658,11 +4755,11 @@
                                                       content_data: JSON.stringify(data.content_data),print_type:data.print_type,
                                                   },
                                                   success: function (data) {},
-                                                  error: function () {},
+                                                  error: function () { irPrintFailed(data.print_type); },
                                               });
                                           }
                                       },
-                                      error: function () {},
+                                      error: function () { irPrintFailed(""); },
                                   });
                               }
                           }else{
@@ -11126,7 +11223,7 @@
                                       content_data: "["+(JSON.stringify(content_data_direct_print[key]))+"]",print_type:data.print_type,
                                   },
                                   success: function (data) {},
-                                  error: function () {},
+                                  error: function () { irPrintFailed(data.print_type); },
                               });
                           }
                       }
@@ -12968,11 +13065,11 @@
                                         content_data: JSON.stringify(data.content_data),print_type:data.print_type,
                                     },
                                     success: function (data) {},
-                                    error: function () {},
+                                    error: function () { irPrintFailed(data.print_type); },
                                 });
                             }
                         },
-                        error: function () {},
+                        error: function () { irPrintFailed(""); },
                     });
                 }else{
                     call_print_invoice(order_info,inv_qr_code_enable_status);
@@ -13013,11 +13110,11 @@
                                         content_data: JSON.stringify(data.content_data),print_type:data.print_type,
                                     },
                                     success: function (data) {},
-                                    error: function () {},
+                                    error: function () { irPrintFailed(data.print_type); },
                                 });
                             }
                         },
-                        error: function () {},
+                        error: function () { irPrintFailed(""); },
                     });
                 }else{
                     call_print_invoice(order_info,inv_qr_code_enable_status);

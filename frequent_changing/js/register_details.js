@@ -14,6 +14,15 @@ $(function () {
 
                 $(".html_content").html(response.html_content_for_div);
 
+                /* PERF: the DataTables bundle is loaded on demand (see main_screen.php). */
+                window.irLoadDataTables(function(ok){
+                    if(!ok){
+                        /* bundle could not be fetched (offline, or a blocked file): the
+                           table is already on screen as plain HTML; just say the export
+                           buttons are unavailable. The next open retries the load. */
+                        if(typeof toastr !== "undefined"){ toastr.warning("Export buttons unavailable - could not load the export tools. Try again when online."); }
+                        return;
+                    }
                 $(`#datatable`).DataTable({
                     'autoWidth'   : false,
                     'ordering'    : false,
@@ -43,6 +52,7 @@ $(function () {
                         },
                         
                     ]
+                });
                 });
             },
             error: function () {
@@ -138,6 +148,15 @@ $(function () {
                     $("#opening_register_time").html(response.opening_date_time);
                     $(".html_content").html(response.html_content_for_div);
 
+                    /* PERF: the DataTables bundle is loaded on demand (see main_screen.php). */
+                    window.irLoadDataTables(function(ok){
+                    if(!ok){
+                        /* bundle could not be fetched (offline, or a blocked file): the
+                           table is already on screen as plain HTML; just say the export
+                           buttons are unavailable. The next open retries the load. */
+                        if(typeof toastr !== "undefined"){ toastr.warning("Export buttons unavailable - could not load the export tools. Try again when online."); }
+                        return;
+                    }
                     $(`#datatable`).DataTable({
                         'autoWidth'   : false,
                         'ordering'    : false,
@@ -166,6 +185,7 @@ $(function () {
                                 titleAttr: "PDF",
                             },
                         ]
+                    });
                     });
 
 

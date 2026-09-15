@@ -190,3 +190,31 @@ only when shown). Not done now because there is nothing to measure it against lo
 Expected end state on a warm till after 1–3: DCL well under 0.5 s on this machine; on live,
 0.27 s network + ~0.05 s server + browser work — "one touch" becomes realistic, with the
 hosting distance the remaining floor.
+
+### 8.9 Proposals 1 and 2 implemented (2026-09-15, later)
+- **1. DataTables bundle deferred.** `main_screen.php` no longer loads the second (unminified)
+  jQuery, DataTables, Buttons, jszip, pdfmake and vfs_fonts. A 40-line inline loader
+  (`window.irLoadDataTables`) fetches the nine files in order the first time the register
+  details modal initialises its table (`register_details.js`, both call sites wrapped). The
+  second jQuery is gone for good: `pos_script` binds the first copy in
+  `(function($){…})(jQuery)` and the scripts that followed use no jQuery plugins.
+  Verified in the real browser: files load in order, `DataTable`/`pdfMake`/`JSZip` present
+  afterwards, a DataTables init with Print/Excel/PDF buttons renders all three, concurrent
+  callers each called once, later calls immediate, single jQuery 3.3.1 throughout.
+  First modal open pays ≈ 0.65 s once (cold) instead of every page paying it.
+- **2. Polls asynchronous.** `getWaiterOrders` in the 7-second loop and
+  `pull_running_order_checker()` at load no longer use `async:false`; a busy flag prevents
+  overlapping polls. Still synchronous by design: `push_online*` (only when unsynced completed
+  sales exist; serialised on purpose), the manual pull/handover buttons, and `add_sale_table`
+  at order placement — the last is worth a follow-up on the Table-first path (one round trip
+  per booked table, blocking, at every placement).
+
+| Warm DOMContentLoaded, real browser, same conditions | |
+|---|---|
+| Original page | 1.7–2.0 s |
+| + placeholder / go.js / ping | 0.86 s |
+| **+ deferral + async polls (final)** | **0.50–0.57 s** (three runs: 561 / 571 / 504 ms) |
+
+Scripts parsed per open: 5.7 MB → 2.06 MB. HTML 800 KB → 482 KB. Cache-busters:
+`pos_script_v7.3.js?v=4.7`, `register_details.js?v=7.6`.
+Regression after: Step 1 suites 13/13 · 18/18 · 13/13, Step 2 suites 21/21 · 23/23.

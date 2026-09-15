@@ -14026,15 +14026,23 @@
             }
         });
   
+        /* PERF: this ran with async:false every 7 seconds - the whole UI froze for
+           the length of the request (a full round trip on live) 8 times a minute.
+           Now asynchronous; the handler below is unchanged and did not depend on
+           anything after this call. A busy flag stops a slow reply from letting
+           the next tick start a second request on top of it. */
+        if(window.ir_waiter_orders_busy){ return; }
+        window.ir_waiter_orders_busy = true;
         $.ajax({
             url: base_url + "Sale/getWaiterOrders",
             method: "POST",
             dataType:'json',
-            async:false,
+            timeout: 20000,
             data: {
                 sale_no_all: sale_no_all,
                 csrf_irestoraplus: csrf_value_,
             },
+            complete: function(){ window.ir_waiter_orders_busy = false; },
             success: function (response) {
                 let order = '';
                 let get_waiter_orders = (response.get_waiter_orders);
@@ -14985,10 +14993,12 @@
           };
       }
       function pull_running_order_checker(){
+          /* PERF: was async:false at page load, blocking the first paint for one
+             round trip. Its only effect is hiding a button; asynchronous is fine. */
           $.ajax({
               url: base_url + "Sale/pull_running_order_server",
               method: "POST",
-              async:false,
+              timeout: 20000,
               data: {
                   csrf_irestoraplus: csrf_value_,
               },

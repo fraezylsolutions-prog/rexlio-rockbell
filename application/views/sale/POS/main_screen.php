@@ -4676,7 +4676,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=4.5"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=4.7"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">
@@ -4733,18 +4733,49 @@ foreach ($notifications as $single_notification){
     </script>
 
     <!--for datatable-->
-    <script src="<?php echo base_url(); ?>assets/datatable_custom/jquery-3.3.1.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>frequent_changing/js/dataTable/jquery.dataTables.min.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>assets/bower_components/datatables.net-bs/js/dataTables.bootstrap.min.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>frequent_changing/js/dataTable/dataTables.bootstrap4.min.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>frequent_changing/js/dataTable/dataTables.buttons.min.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>frequent_changing/js/dataTable/buttons.html5.min.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>frequent_changing/js/dataTable/buttons.print.min.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>frequent_changing/js/dataTable/jszip.min.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>frequent_changing/js/dataTable/pdfmake.min.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>frequent_changing/js/dataTable/vfs_fonts.js?v=7.5"></script>
+    <?php /* PERF: DataTables + Buttons + jszip + pdfmake + vfs_fonts (about 2.6 MB) are
+             used by exactly one thing on this page: the export buttons in the register
+             details modal. They used to load, parse and run on every POS open; measured
+             at ~330 ms of DOMContentLoaded on a warm cache. They now load the first
+             time that modal asks for them (irLoadDataTables in register_details.js).
+             The second, unminified jQuery that preceded them is gone for good:
+             pos_script binds the first jQuery inside (function($){...})(jQuery), and
+             the scripts below use no jQuery plugins, so nothing needed it. */ ?>
+    <script>
+    window.irLoadDataTables = (function(){
+        var base = "<?php echo base_url(); ?>";
+        var files = [
+            "frequent_changing/js/dataTable/jquery.dataTables.min.js?v=7.5",
+            "assets/bower_components/datatables.net-bs/js/dataTables.bootstrap.min.js?v=7.5",
+            "frequent_changing/js/dataTable/dataTables.bootstrap4.min.js?v=7.5",
+            "frequent_changing/js/dataTable/dataTables.buttons.min.js?v=7.5",
+            "frequent_changing/js/dataTable/buttons.html5.min.js?v=7.5",
+            "frequent_changing/js/dataTable/buttons.print.min.js?v=7.5",
+            "frequent_changing/js/dataTable/jszip.min.js?v=7.5",
+            "frequent_changing/js/dataTable/pdfmake.min.js?v=7.5",
+            "frequent_changing/js/dataTable/vfs_fonts.js?v=7.5"
+        ];
+        var state = null; /* null = not asked, 'loading', 'ready', 'failed' */
+        var waiting = [];
+        function next(i){
+            if(i >= files.length){ state = 'ready'; var w = waiting; waiting = []; w.forEach(function(cb){ try{ cb(true); }catch(e){} }); return; }
+            var el = document.createElement('script');
+            el.src = base + files[i];
+            el.onload = function(){ next(i + 1); };
+            el.onerror = function(){ state = 'failed'; var w = waiting; waiting = []; w.forEach(function(cb){ try{ cb(false); }catch(e){} }); };
+            document.head.appendChild(el);
+        }
+        return function(cb){
+            if(state === 'ready'){ if(cb){ cb(true); } return; }
+            if(cb){ waiting.push(cb); }
+            if(state === 'loading'){ return; }
+            state = 'loading';
+            next(0);
+        };
+    })();
+    </script>
     <script src="<?php echo base_url(); ?>frequent_changing/newDesign/js/forTable.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>frequent_changing/js/register_details.js?v=7.5"></script>
+    <script src="<?php echo base_url(); ?>frequent_changing/js/register_details.js?v=7.6"></script>
     <script src="<?php echo base_url(); ?>frequent_changing/js/rexlio_theme.js?v=7.6.9"></script>
 </body>
 

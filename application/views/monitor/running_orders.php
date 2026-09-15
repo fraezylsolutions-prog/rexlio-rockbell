@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/running_orders.css?v=7.8">
+<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/running_orders.css?v=7.9">
 
 <section class="main-content-wrapper">
     <section class="content-header">

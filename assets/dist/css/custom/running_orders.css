@@ -89,6 +89,18 @@
     color: #ffffff;
 }
 
+/* "Open here" - adopt the order onto this till (Step 2, cross-till orders) */
+.ro_btn_open_here {
+    background-color: #d9f1e3;
+    color: #146c43;
+    font-weight: 700;
+}
+
+.ro_btn_open_here:hover {
+    background-color: #bfe6d0;
+    color: #0f5132;
+}
+
 .ro_btn_danger {
     background-color: #f5d8d8;
     color: #a12020;

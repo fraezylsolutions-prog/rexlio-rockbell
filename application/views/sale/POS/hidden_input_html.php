@@ -250,6 +250,21 @@ foreach ($waiters as $waiter){
 <input type="hidden" id="ir_order_placed_msg" value="<?php echo lang('order_placed_logging_out'); ?>">
 <input type="hidden" id="ir_logout_url" value="<?php echo base_url(); ?>authentication/logout">
 <input type="hidden" id="ir_offline_stay_msg" value="<?php echo lang('offline_stay_signed_in'); ?>">
+<input type="hidden" id="sale_no_renumbered_notice" value="<?php echo lang('sale_no_renumbered_notice'); ?>">
+<input type="hidden" id="sale_no_completion_conflict" value="<?php echo lang('sale_no_completion_conflict'); ?>">
+<input type="hidden" id="ir_version_hidden" value="">
+<input type="hidden" id="ir_msg_opened_here" value="<?php echo lang('ir_msg_opened_here'); ?>">
+<input type="hidden" id="ir_msg_adopt_outlet" value="<?php echo lang('ir_msg_adopt_outlet'); ?>">
+<input type="hidden" id="ir_msg_adopt_permission" value="<?php echo lang('ir_msg_adopt_permission'); ?>">
+<input type="hidden" id="ir_msg_adopt_invoiced" value="<?php echo lang('ir_msg_adopt_invoiced'); ?>">
+<input type="hidden" id="ir_msg_adopt_missing" value="<?php echo lang('ir_msg_adopt_missing'); ?>">
+<input type="hidden" id="ir_msg_refreshed" value="<?php echo lang('ir_msg_refreshed'); ?>">
+<input type="hidden" id="ir_msg_refreshed_recheck" value="<?php echo lang('ir_msg_refreshed_recheck'); ?>">
+<input type="hidden" id="ir_msg_gone" value="<?php echo lang('ir_msg_gone'); ?>">
+<input type="hidden" id="ir_msg_invoiced_elsewhere" value="<?php echo lang('ir_msg_invoiced_elsewhere'); ?>">
+<input type="hidden" id="ir_msg_table_ready" value="<?php echo lang('ir_msg_table_ready'); ?>">
+<input type="hidden" id="ir_msg_table_create_failed" value="<?php echo lang('ir_msg_table_create_failed'); ?>">
+<input type="hidden" id="ir_msg_tables_offline" value="<?php echo lang('ir_msg_tables_offline'); ?>">
 <div class="modalOverlay"></div>
 <input type="hidden" id="base_url_customer" value="<?php echo base_url()?>">
 <input type="hidden" id="csrf_name_" value="<?php echo escape_output($this->security->get_csrf_token_name()); ?>">
@@ -385,7 +400,5 @@ $self_order_table_id = $this->session->userdata('self_order_table_id');
 <input type="hidden" id="at_least_select_two_table" value="<?php echo lang('at_least_select_two_table'); ?>">
 <input type="hidden" id="are_you_sure_for_pull" value="<?php echo lang('are_you_sure_for_pull'); ?>">
 <input type="hidden" id="pulled_successfully" value="<?php echo lang('pulled_successfully'); ?>">
-<input type="hidden" id="sale_no_renumbered_notice" value="<?php echo lang('sale_no_renumbered_notice'); ?>">
-<input type="hidden" id="sale_no_completion_conflict" value="<?php echo lang('sale_no_completion_conflict'); ?>">
 <input type="hidden" id="this_order_engage" value="<?php echo lang('this_order_engage'); ?>">
 <input type="hidden" id="zatca_invoice_value" value="">

@@ -249,3 +249,95 @@ cache-buster `?v=4.4`), `hidden_input_html.php` (2 inputs), 4 language files (3 
 Not verified: a real browser driving the real POS page (the browser pane cannot carry the
 session cookie). That is what the two-till staged rollout in step 3 is for.
 Number length is 14 (was 13): `t` + 3-char tag + `YYMMDD` + `-` + 3-digit counter.
+
+---
+
+## 5. Step 2 — "Open here" adoption + version-based stale-copy protection (design, 2026-09-15)
+
+### 5.1 What was found that shapes the design
+- The Running Order screen's five action links already deep-link to the POS with
+  `?open_sale_no=`; the POS deep-link handler (Phase C) polls the local panel and, if the order
+  is absent, shows "not available on this device". **Adoption plugs in exactly there**: absent
+  locally → ask the server → adopt → select. All five existing actions become cross-till with
+  no per-action code. An explicit "Open here" button is added as the first card action.
+- Invoice-open (`#print_invoice`) already fetches the kitchen row from the server and takes
+  `total_payable` from it. So the invoice modal is already server-fresh for the *amount*; only
+  the local items copy could be stale. The version check there refreshes the local copy before
+  the modal opens — a check *before money*, never a rejection after.
+- Cancel already does an online pre-check (`Kitchen/check_update_kitchen_status_ajax`); a
+  version/existence check is added in front of it.
+- The vendor's 7 s loop already removes local copies of online-placed orders that were invoiced
+  or cancelled elsewhere (for `added_offline_status==2`). Only *modified-elsewhere* refresh is
+  missing; that is the version column's job.
+- Adoption re-runs `add_sale_by_ajax`, which also re-posts table bookings
+  (`put_table_content` adds `persons` on re-add). Adoption suppresses that server post; the
+  bookings already exist from the original placement.
+
+### 5.2 Mechanism
+- **Migration** `2026-09-15_02`: `tbl_kitchen_sales.version INT NOT NULL DEFAULT 1`,
+  `adopted_by INT NULL`, `adopted_at DATETIME NULL`. No new permission rows.
+- **Version** increments on every server-side change to the row: modify
+  (`add_kitchen_sale_by_ajax` update branch) and adoption. The number is carried in the order
+  JSON as `ir_version` (set on adoption and after every successful push), shown on the card as
+  `data-ir_version`, and copied to `#ir_version_hidden` when an order is opened for modify.
+- **Stale push rejected**: modify posts `ir_version`; if it differs from the row's `version`
+  the server answers `invoice_status=1, stale_version=1` plus the current content and version.
+  The till replaces its local copy, clears the cart and tells the operator to re-apply. Legacy
+  local copies without `ir_version` are not checked (no false rejections), and receive the
+  version on their next successful push.
+- **Adoption** (`Sale/getOrderForAdoption`): row must be live, in the *session outlet*
+  (cross-outlet stays view-only), not invoiced, and visible to the caller — own order
+  (`user_id` or `waiter_id` = me) or `checkAccess("372","view_all_running_orders")`; the same
+  rule the Running Order screen already applies, so no new permission. Adoption bumps
+  `version` and stamps `adopted_by/at`, which is how the originating till learns.
+- **Fan-out refresh** (`Sale/orderSyncState`, called from the 7 s loop with
+  `sale_no:version` pairs of online-placed local orders): `stale` → replace local copy + toast
+  "updated on another till"; `invoiced` / `gone` → remove local copy + toast. Offline-placed
+  orders (`added_offline_status==1`) are never sent, so they can never be wrongly removed.
+- **Policy defaults applied**: originating till is refreshed, never locked; existing
+  role permissions govern Modify/Invoice/Cancel on an adopted order.
+- **Offline**: adoption and the checks need the server; when offline the till behaves exactly
+  as today (local copy is authoritative, sync on reconnect, clash guards from Step 1 apply).
+
+### 5.3 Step 2 — implemented and tested (2026-09-15). NOT yet on live, not yet committed.
+Files: `db/migrations/2026-09-15_02_running-order-versioning.sql` (new), `Sale.php`
+(`getOrderForAdoption`, `orderSyncState`, `irCanSeeRunningOrder`, stale check + version bump in
+`add_kitchen_sale_by_ajax`, `version` in its response), `pos_script_v7.3.js` (`irAdoptOrder`,
+`irApplyServerCopy`, `irSetLocalVersion`, `irPollSyncState`, `irCheckBeforeCancel`; deep-link
+adopts; `ir_version` carried on cards, modify JSON and hidden input; invoice-open refresh;
+`add_sale_table` skip during adoption; cache-buster `?v=4.5`), `_running_order_cards.php`
+("Open here" button, same-outlet only), `running_orders.css` (`?v=7.9`),
+`hidden_input_html.php` (10 inputs), 4 language files (11 keys). The Step 1 migration also gained
+the project's PASS/FAIL verification query (post-commit edit).
+
+| Test | Where | Result |
+|---|---|---|
+| Migration applies with PASS on scratch and local dev; existing rows start at version 1 | `rexlio_scratch`, local `rexlio` | PASS |
+| Adoption: own order ok (version 2, stamped, audited); other outlet refused; someone else's order without `view_all_running_orders` refused; invoiced refused; unknown refused; order where I am the waiter ok | HTTP, local WAMP, cloned local waiter session (9 checks) | 9/9 |
+| Sync state: stale/invoiced/gone reported; not-visible not reported; equal version silent; legacy (no version) never stale | HTTP (6 checks) | 6/6 |
+| Stale modify refused with current content, row untouched; current version accepted and bumped; response carries new version; legacy copy never refused | HTTP (5 checks) | 5/5 |
+| Client: adopt (versioned copy, no table re-post, flag released, all four refusal reasons, offline path); poll (pairs from online-placed cards only, stale→replace+warn, invoiced/gone→remove+notice, offline-placed untouched, silent offline); cancel pre-check (proceed / refresh-and-stop / server-error proceeds); version stamping; stale-modify cart clear | Node, real functions incl. vendor `updateOrderForWaiter`/`closeOrderForWaiter`/`deleteOrderForWaiter`, fake IndexedDB + minimal jQuery (23 checks) | 23/23 |
+| Running Order screen renders "Open here" with the `?open_sale_no=` deep link; CSS v7.9 loaded | HTTP against local Monitor | PASS |
+| Step 1 suites re-run after Step 2 | Node 18/18, PHP 13/13, HTTP 13/13 | no regression |
+
+Not verified by tooling (same limit as Step 1): a real browser driving the POS page — the
+adopt-then-select flow, the 7 s refresh on the originating till, the invoice-open refresh and
+the stale-modify toast. That is the two-till staged test in step 3.
+
+### 5.4 Two-till test script for step 3 (owner runs, one outlet, both tills online)
+1. Till A (waiter): place order X with a table. Till B (same waiter, or a cashier with
+   `view_all_running_orders`): Running Order screen shows X → **Open here** → POS opens with X
+   selected and toast "Order opened on this till". Within ~7 s Till A shows "changed on another
+   till - refreshed" (adoption bumps the version).
+2. Till B: Modify X (add an item) → place. Till A within ~7 s: card refreshed, new item visible.
+3. Till A: open X for modify **without** waiting, add an item, place → expect "changed on
+   another till… re-apply", cart cleared, card refreshed. Re-open and re-apply → succeeds.
+4. Till B: Invoice X → Till A within ~7 s: card removed, "invoiced on another till".
+5. Repeat 1 with order Y; Till A cancels Y → Till B within ~7 s: card removed, "cancelled on
+   another till". Then Till B tries Cancel on an order Till A just modified → "refreshed, please
+   check again", not cancelled.
+6. Offline leg: Till B offline → Open here on a new order Z → "Order not available on this
+   device" (no adoption offline); place a fresh order on Till B offline → works as before;
+   reconnect → syncs, no clash toasts.
+7. Cross-outlet: Running Order screen with another outlet's order (after Tier 1 filters, or an
+   Admin session) → no "Open here" button; the Modify link → "belongs to another outlet".

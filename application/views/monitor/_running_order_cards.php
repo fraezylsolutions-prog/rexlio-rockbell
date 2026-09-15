@@ -44,6 +44,14 @@
             </div>
             <div class="ro_card_actions">
                 <button type="button" class="btn ro_btn ro_btn_details" data-sale_id="<?php echo escape_output($sale_id) ?>"><?php echo lang('order_details'); ?></button>
+                <?php /* "Open here": the POS adopts the server copy of this order into
+                         THIS till when it is not already there, then the five actions
+                         below work on it. Same deep link; the POS decides whether it needs
+                         to adopt. Only for the session outlet - another outlet's order is
+                         a different register and stock, so it stays view-only. */ ?>
+                <?php if ((int) $order->outlet_id === (int) $this->session->userdata('outlet_id')): ?>
+                <a class="btn ro_btn ro_btn_open_here" href="<?php echo $pos_link ?>" title="<?php echo lang('open_here'); ?>"><?php echo lang('open_here'); ?></a>
+                <?php endif; ?>
                 <a class="btn ro_btn ro_btn_pos" href="<?php echo $pos_link ?>" title="<?php echo lang('open_in_pos'); ?>"><?php echo lang('modify_order_'); ?></a>
                 <a class="btn ro_btn ro_btn_pos" href="<?php echo $pos_link ?>" title="<?php echo lang('open_in_pos'); ?>"><?php echo lang('kot_tooltip'); ?></a>
                 <a class="btn ro_btn ro_btn_pos" href="<?php echo $pos_link ?>" title="<?php echo lang('open_in_pos'); ?>"><?php echo lang('invoice'); ?></a>

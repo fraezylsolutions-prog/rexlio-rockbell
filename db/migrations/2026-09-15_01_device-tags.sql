@@ -45,10 +45,14 @@ ALTER TABLE `tbl_orders_table`          MODIFY `sale_no` VARCHAR(50) NOT NULL;
 ALTER TABLE `tbl_running_order_tables`  MODIFY `sale_no` VARCHAR(50) DEFAULT NULL;
 ALTER TABLE `tbl_running_orders`        MODIFY `sale_no` VARCHAR(50) DEFAULT NULL;
 
--- ---------------------------------------------------------------------------
--- Verification (run after applying):
---   SELECT COUNT(*) FROM tbl_device_tags;                       -- 0 on a fresh apply
---   SELECT table_name, column_type FROM information_schema.columns
---     WHERE table_schema = DATABASE() AND column_name = 'sale_no';
---   -- expect varchar(50) for the three side tables, varchar(500) for the two main ones
--- ---------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- VERIFICATION - must print PASS. If it prints FAIL, STOP: do not deploy code.
+-- -----------------------------------------------------------------------------
+SELECT CASE WHEN
+    (SELECT COUNT(*) FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tbl_device_tags') = 1
+    AND (SELECT COUNT(*) FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA=DATABASE() AND COLUMN_NAME='sale_no'
+        AND TABLE_NAME IN ('tbl_orders_table','tbl_running_order_tables','tbl_running_orders')
+        AND CHARACTER_MAXIMUM_LENGTH >= 50) = 3
+  THEN 'PASS' ELSE 'FAIL' END AS result;

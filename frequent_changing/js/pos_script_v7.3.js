@@ -901,7 +901,7 @@
  
   
                       order_list_left += '<span id="open_orders_order_status_' + sales_id + '" class="ir_display_none">' + rowData.order_status + '</span> <p><span title="' + customer_name + '" class="running_order_customer_name">'+lang_customer+': ' + customer_name + '</span></p> <i class="far fa-chevron-right running_order_right_arrow" id="running_order_right_arrow_' + sales_id + '"></i>';
-                      order_list_left += '<p class="oder_list_class">'+lang_order+': <span data-added_offline_status="'+orderData.added_offline_status+'" class="running_order_order_number">' + rowData.sale_no + "</span></p>";
+                      order_list_left += '<p class="oder_list_class">'+lang_order+': <span data-added_offline_status="'+orderData.added_offline_status+'" data-ir_version="'+(rowData.ir_version ? rowData.ir_version : '')+'" class="running_order_order_number">' + rowData.sale_no + "</span></p>";
                       order_list_left += '<p class="oder_list_class">'+lang_order_type+': <span class="running_order_order_number_">' + order_type + "</span></p>";
                       order_list_left += '<p>'+lang_table+': <span class="running_order_table_name">' + tables_booked + "</span></p>";
                       order_list_left += '<p>'+lang_waiter+': <span class="running_order_waiter_name">' + waiter_name + "</span></p>";
@@ -1700,10 +1700,14 @@
                 if(data.invoice_status){
                     if(data.sale_no_conflict){
                         irRecoverSaleNoConflict(sale_no, order_object, is_self_order, is_print);
+                    }else if(data.stale_version){
+                        irApplyServerCopy(data.sale_no, data.self_order_content, data.version, data.invoice_msg, true);
                     }else{
                         toastr['error']((data.invoice_msg), '');
                     }
                 }else{
+                    if(data.version){ irSetLocalVersion(sale_no, data.version); }
+                    irKitchenSynced(sale_no);
                     if(is_print){
                         let content_data_direct_print = data.content_data_direct_print;
                         for (let key in content_data_direct_print) {
@@ -7028,6 +7032,7 @@
 
                                   let sale_no = $(".holder .order_details .single_order[data-selected=selected]").find(".running_order_order_number").text();
                                   if(checkInternetConnection()){
+                                      irCheckBeforeCancel(sale_no, function(){
                                       $.ajax({
                                           url: base_url + "Kitchen/check_update_kitchen_status_ajax",
                                           method: "post",
@@ -7045,6 +7050,7 @@
                                               }
                                           },
                                           error: function () {},
+                                      });
                                       });
                                   }else {
                                       cancel_order_by_click(sale_no,inputValue);
@@ -8992,6 +8998,7 @@
                   order_info += '"counter_id":"' + counter_id + '",';
                   order_info += '"counter_name":"' + counter_name + '",';
                   order_info += '"random_code":"' + random_code + '",';
+                  order_info += '"ir_version":"' + (update_sale_id ? ($("#ir_version_hidden").val() || "") : "") + '",';
                   order_info += '"token_number":"' + token_number + '",';
                   order_info += '"customer_id":"' + customer_id + '",';
                   order_info += '"customer_address":"' + customer_address+ '",';
@@ -9502,6 +9509,7 @@
                   order_info += '"counter_id":"' + counter_id + '",';
                   order_info += '"counter_name":"' + counter_name + '",';
                   order_info += '"random_code":"' + random_code + '",';
+                  order_info += '"ir_version":"' + (update_sale_id ? ($("#ir_version_hidden").val() || "") : "") + '",';
                   order_info += '"token_number":"' + token_number + '",';
                   order_info += '"customer_id":"' + customer_id + '",';
                   order_info += '"customer_address":"' + customer_address + '",';
@@ -9883,6 +9891,14 @@
               },
               success: function (response) {
                 response = JSON.parse(response);
+                if(response && response.version && response.self_order_content){
+                    let held = irLocalVersionOf(sale_no);
+                    if(held !== "" && String(response.version) !== held){
+                        irApplyServerCopy(sale_no, response.self_order_content, response.version, null, false);
+                    }else if(held === ""){
+                        irSetLocalVersion(sale_no, response.version);
+                    }
+                }
                 $("#finalize_total_payable").html(response.total_payable);
                 $("#finalize_total_payable").attr('data-original_payable',response.total_payable);
                 $("#pay_amount_invoice_input").val(response.total_payable);
@@ -12417,6 +12433,11 @@
         }
     }
       function add_sale_table(table_info,table_id,persons){
+          if(window.ir_skip_table_push){
+              $("#table_id").val("");
+              $("#hidden_table_name").val("");
+              return;
+          }
           $.ajax({
               url: base_url + "Sale/put_table_content",
               method: "POST",
@@ -14441,6 +14462,7 @@
       $("#open_invoice_date_hidden").val(response.sale_date);
       $("#sale_no_new_hidden").val(response.sale_no);
       $("#random_code_hidden").val(response.random_code);
+      $("#ir_version_hidden").val(response.ir_version ? response.ir_version : "");
   
   
       $(".datepicker_custom")
@@ -17513,11 +17535,179 @@
             let render_finished = (window.ir_running_orders_rendered === true);
             if(render_finished || deep_link_attempts >= deep_link_max_attempts){
                 clearInterval(deep_link_timer);
-                let not_here_msg = $("#order_not_on_this_device").val();
-                toastr['error']((not_here_msg ? not_here_msg : "Order not available on this device") + " (" + target_sale_no + ")", '');
+                /* "Open here": the order is not on this till, so adopt the server copy
+                   (permission, outlet and invoiced checks are the server's) and then
+                   select it exactly as if it had been here all along. */
+                irAdoptOrder(target_sale_no, function(ok){
+                    if(!ok){ return; }
+                    let select_attempts = 0;
+                    let select_timer = setInterval(function(){
+                        select_attempts++;
+                        let card = $('.holder .order_details > .single_order[data-sale_no="' + target_sale_no + '"]');
+                        if(card.length){
+                            clearInterval(select_timer);
+                            card.trigger("click");
+                            if(card.get(0) && card.get(0).scrollIntoView){ card.get(0).scrollIntoView({block: "nearest"}); }
+                                        return;
+                        }
+                        if(select_attempts >= 40){ clearInterval(select_timer); }
+                    }, 150);
+                });
             }
         }, 150);
     })();
+    /* ---- Cross-till running orders (Step 2) ------------------------------------
+       A running order lives in the IndexedDB of the till that placed it, and the
+       server keeps a copy (tbl_kitchen_sales.self_order_content) with a version.
+       irAdoptOrder pulls that copy into THIS till so the ordinary Modify / KOT /
+       Bill / Invoice / Cancel code works on it. irApplyServerCopy replaces a local
+       copy with the server's when the server says the till is behind.
+       irPollSyncState runs in the 7 s loop and refreshes or removes local copies
+       that changed elsewhere. Offline, none of this runs; the till behaves as
+       before. */
+    function irMsg(id, fallback){
+        let v = $("#" + id).val();
+        return v ? v : fallback;
+    }
+    function irLocalVersionOf(sale_no){
+        let span = $('.holder .order_details > .single_order[data-sale_no="' + sale_no + '"] .running_order_order_number');
+        let v = span.length ? span.attr("data-ir_version") : "";
+        return v ? String(v) : "";
+    }
+    function irWithVersion(content, version){
+        try{
+            let obj = (typeof content === "string") ? JSON.parse(content) : content;
+            obj.ir_version = version;
+            return JSON.stringify(obj);
+        }catch(e){ return content; }
+    }
+    function irSetLocalVersion(sale_no, version){
+        if(typeof db === "undefined" || !db){ return; }
+        let objectStore = db.transaction(['sales'], "readwrite").objectStore("sales");
+        objectStore.openCursor().onsuccess = function(event){
+            let cursor = event.target.result;
+            if(cursor){
+                if(cursor.value.sale_no == sale_no){
+                    let rec = cursor.value;
+                    rec.order = irWithVersion(rec.order, version);
+                    cursor.update(rec);
+                    $('.holder .order_details > .single_order[data-sale_no="' + sale_no + '"] .running_order_order_number').attr("data-ir_version", version);
+                }
+                cursor.continue();
+            }
+        };
+    }
+    function irApplyServerCopy(sale_no, content, version, message, clear_cart){
+        updateOrderForWaiter(sale_no, irWithVersion(content, version));
+        if(clear_cart){
+            $(".order_table_holder .order_holder").empty();
+            $("#update_sale_id").val("");
+            $("#ir_version_hidden").val("");
+            if(typeof clearFooterCartCalculation === "function"){ clearFooterCartCalculation(); }
+        }
+        toastr['warning']((message ? message : irMsg("ir_msg_refreshed", "Order was changed on another till - refreshed")) + " (" + sale_no + ")", '', {timeOut: 6000, closeButton: true});
+    }
+    function irAdoptOrder(sale_no, done){
+        if(!checkInternetConnection()){
+            toastr['error'](irMsg("order_not_on_this_device", "Order not available on this device") + " (" + sale_no + ")", '');
+            if(done){ done(false); }
+            return;
+        }
+        $.ajax({
+            url: base_url + "Sale/getOrderForAdoption",
+            method: "POST",
+            dataType: "json",
+            timeout: 8000,
+            data: { sale_no: sale_no, csrf_irestoraplus: csrf_value_ },
+            success: function(res){
+                if(!res || !res.ok){
+                    let reason = res && res.reason ? res.reason : "missing";
+                    let key = { outlet: "ir_msg_adopt_outlet", permission: "ir_msg_adopt_permission", invoiced: "ir_msg_adopt_invoiced", missing: "ir_msg_adopt_missing" }[reason] || "ir_msg_adopt_missing";
+                    toastr['error'](irMsg(key, "Order cannot be opened on this till") + " (" + sale_no + ")", '');
+                    if(done){ done(false); }
+                    return;
+                }
+                let outlet_id_indexdb = $("#outlet_id_indexdb").val();
+                let company_id_indexdb = $("#company_id_indexdb").val();
+                window.ir_skip_table_push = true;
+                try{
+                    add_sale_by_ajax('', irWithVersion(res.self_order_content, res.version), outlet_id_indexdb, company_id_indexdb, res.sale_no, "", "", "");
+                }finally{
+                    setTimeout(function(){ window.ir_skip_table_push = false; }, 1500);
+                }
+                toastr['success'](irMsg("ir_msg_opened_here", "Order opened on this till") + " (" + sale_no + ")", '');
+                if(done){ done(true); }
+            },
+            error: function(){
+                toastr['error'](irMsg("ir_msg_adopt_missing", "Order cannot be opened on this till") + " (" + sale_no + ")", '');
+                if(done){ done(false); }
+            }
+        });
+    }
+    var ir_sync_state_busy = false;
+    function irPollSyncState(){
+        if(ir_sync_state_busy || !checkInternetConnection()){ return; }
+        let pairs = [];
+        $(".running_order_order_number").each(function(){
+            if(Number($(this).attr("data-added_offline_status")) === 2){
+                pairs.push($(this).text() + ":" + ($(this).attr("data-ir_version") || ""));
+            }
+        });
+        if(!pairs.length){ return; }
+        ir_sync_state_busy = true;
+        $.ajax({
+            url: base_url + "Sale/orderSyncState",
+            method: "POST",
+            dataType: "json",
+            timeout: 8000,
+            data: { versions: pairs.join(","), csrf_irestoraplus: csrf_value_ },
+            success: function(res){
+                let changed = res && res.changed ? res.changed : [];
+                for(let i = 0; i < changed.length; i++){
+                    let c = changed[i];
+                    if(c.state === "stale"){
+                        let open_here = ($("#update_sale_id").val() && $("#sale_no_new_hidden").val() === c.sale_no);
+                        irApplyServerCopy(c.sale_no, c.self_order_content, c.version, null, open_here);
+                    }else if(c.state === "invoiced"){
+                        closeOrderForWaiter(c.sale_no);
+                        toastr['info'](irMsg("ir_msg_invoiced_elsewhere", "Order was invoiced on another till") + " (" + c.sale_no + ")", '', {timeOut: 6000});
+                    }else if(c.state === "gone"){
+                        deleteOrderForWaiter(c.sale_no);
+                        removeOrderTablesBySaleId(c.sale_no, '');
+                        toastr['info'](irMsg("ir_msg_gone", "Order was cancelled on another till") + " (" + c.sale_no + ")", '', {timeOut: 6000});
+                    }
+                }
+            },
+            complete: function(){ ir_sync_state_busy = false; }
+        });
+    }
+    /* Before Cancel: make sure this till's copy is current and the order still
+       exists. Runs only when online; offline cancels proceed as before. */
+    function irCheckBeforeCancel(sale_no, proceed){
+        $.ajax({
+            url: base_url + "Sale/orderSyncState",
+            method: "POST",
+            dataType: "json",
+            timeout: 8000,
+            data: { versions: sale_no + ":" + irLocalVersionOf(sale_no), csrf_irestoraplus: csrf_value_ },
+            success: function(res){
+                let changed = res && res.changed ? res.changed : [];
+                if(!changed.length){ proceed(); return; }
+                let c = changed[0];
+                if(c.state === "stale"){
+                    irApplyServerCopy(c.sale_no, c.self_order_content, c.version, irMsg("ir_msg_refreshed_recheck", "Order was changed on another till - refreshed, please check it again before cancelling"), false);
+                }else if(c.state === "invoiced"){
+                    closeOrderForWaiter(c.sale_no);
+                    toastr['error'](irMsg("ir_msg_invoiced_elsewhere", "Order was invoiced on another till") + " (" + c.sale_no + ")", '');
+                }else{
+                    deleteOrderForWaiter(c.sale_no);
+                    removeOrderTablesBySaleId(c.sale_no, '');
+                    toastr['info'](irMsg("ir_msg_gone", "Order was cancelled on another till") + " (" + c.sale_no + ")", '');
+                }
+            },
+            error: function(){ proceed(); }
+        });
+    }
     $(document).on("click", "#bill_show_details", function (e) {
       if (
         $(".holder .order_details > .single_order[data-selected=selected]")

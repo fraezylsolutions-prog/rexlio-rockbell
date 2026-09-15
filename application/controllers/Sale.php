@@ -1541,7 +1541,31 @@ class Sale extends Cl_Controller {
             }
             $this->db->trans_begin();
             $sale_id = isset($sale_d->id) && $sale_d->id?$sale_d->id:'';
+            $ir_new_version = 1;
             if($sale_id>0){
+                //Cross-till versioning. A till that opened this order ("Open here")
+                //or the till that placed it may each hold a copy. The copy carries the
+                //version it was taken at (ir_version); if the row has moved on since,
+                //this push would overwrite another till's work, so refuse it and hand
+                //back the current content. The POS replaces its copy and tells the
+                //operator to re-apply. Copies without a version (placed before this
+                //existed) are not checked; they pick the version up on this push.
+                $ir_posted_version = isset($order_details->ir_version) ? trim((string) $order_details->ir_version) : '';
+                $ir_row_version = isset($sale_d->version) ? (int) $sale_d->version : 1;
+                if($ir_posted_version !== '' && (int) $ir_posted_version !== $ir_row_version){
+                    $this->db->trans_rollback();
+                    $return_data = array();
+                    $return_data['invoice_status'] = '1';
+                    $return_data['stale_version'] = '1';
+                    $return_data['invoice_msg'] = lang('order_stale_modify_rejected');
+                    $return_data['sale_no'] = $sale_no;
+                    $return_data['self_order_content'] = $sale_d->self_order_content;
+                    $return_data['version'] = $ir_row_version;
+                    echo json_encode($return_data);
+                    return;
+                }
+                $ir_new_version = $ir_row_version + 1;
+                $data['version'] = $ir_new_version;
                 $data['user_id'] = $sale_d->user_id;
                 $data['modified'] = 'Yes';
                 $data['is_update_sender'] = 1;
@@ -1902,6 +1926,7 @@ class Sale extends Cl_Controller {
                             $return_data['status_message'] = $status_message;
                             $return_data['invoice_status'] = '';
                             $return_data['invoice_msg'] = '';
+                            $return_data['version'] = $ir_new_version;
                             echo json_encode($return_data);
                         }
                     }
@@ -4182,6 +4207,123 @@ We hope to see you again!";
      * @return object
      * @param no
      */
+    /**
+     * Whether the signed-in user may see (and therefore open) this running
+     * order. Same rule as the Running Order screen: your own order, or the
+     * view_all_running_orders permission. Not by role name.
+     * @access private
+     * @param object $row tbl_kitchen_sales row
+     * @return bool
+     */
+    private function irCanSeeRunningOrder($row){
+        $user_id = (int) $this->session->userdata('user_id');
+        if((int) $row->user_id === $user_id || (int) $row->waiter_id === $user_id){
+            return TRUE;
+        }
+        return checkAccess("372", "view_all_running_orders") ? TRUE : FALSE;
+    }
+
+    /**
+     * "Open here": hand the server copy of a running order to the till that
+     * asks, so it can adopt it into its own local storage and act on it with
+     * the ordinary Modify / KOT / Bill / Invoice / Cancel code. Refuses when the
+     * order is in another outlet (cross-outlet stays view-only: different
+     * register and stock), already invoiced, gone, or not visible to the caller.
+     * Bumps the version so the till that placed the order learns on its next
+     * poll that the order is now also open elsewhere.
+     * @access public
+     * @return void
+     */
+    public function getOrderForAdoption(){
+        $sale_no = trim((string) $this->input->post('sale_no'));
+        $out = array('ok' => 0, 'reason' => 'missing', 'sale_no' => $sale_no);
+        $row = $sale_no !== '' ? getKitchenSaleDetailsBySaleNo($sale_no) : FALSE;
+        if(!$row){
+            echo json_encode($out);
+            return;
+        }
+        if((int) $row->outlet_id !== (int) $this->session->userdata('outlet_id')){
+            $out['reason'] = 'outlet';
+            echo json_encode($out);
+            return;
+        }
+        if(!$this->irCanSeeRunningOrder($row)){
+            $out['reason'] = 'permission';
+            echo json_encode($out);
+            return;
+        }
+        if(getSaleDetailsBySaleNo($sale_no)){
+            $out['reason'] = 'invoiced';
+            echo json_encode($out);
+            return;
+        }
+        $version = (isset($row->version) ? (int) $row->version : 1) + 1;
+        $this->db->where('id', $row->id);
+        $this->db->update('tbl_kitchen_sales', array(
+            'version' => $version,
+            'adopted_by' => (int) $this->session->userdata('user_id'),
+            'adopted_at' => date('Y-m-d H:i:s'),
+        ));
+        putAuditLog($this->session->userdata('user_id'), 'Opened running order '.$sale_no.' on another till (version '.$version.')', 'Open Here', date('Y-m-d H:i:s'));
+        $out = array(
+            'ok' => 1,
+            'sale_no' => $sale_no,
+            'self_order_content' => $row->self_order_content,
+            'version' => $version,
+            'random_code' => $row->random_code,
+        );
+        echo json_encode($out);
+    }
+
+    /**
+     * Sync state of the running orders a till holds. The till posts
+     * "sale_no:version" pairs for its online-placed orders; the answer lists
+     * only the ones that changed: 'stale' (row moved on - current content and
+     * version returned), 'invoiced' (completed elsewhere) or 'gone' (cancelled
+     * elsewhere). Own-outlet rows only; rows the caller may not see are simply
+     * not reported. Called from the POS 7-second loop and before Cancel.
+     * @access public
+     * @return void
+     */
+    public function orderSyncState(){
+        $pairs = trim((string) $this->input->post('versions'));
+        $outlet_id = (int) $this->session->userdata('outlet_id');
+        $changed = array();
+        if($pairs !== ''){
+            foreach(explode(',', $pairs) as $pair){
+                $pair = trim($pair);
+                if($pair === ''){ continue; }
+                $parts = explode(':', $pair);
+                $sale_no = trim($parts[0]);
+                $local_version = isset($parts[1]) && trim($parts[1]) !== '' ? (int) $parts[1] : NULL;
+                if($sale_no === ''){ continue; }
+                //A completed sale wins even if the kitchen row is still there
+                //(post-payment mode keeps it): the running copy is finished either way.
+                if(getSaleDetailsBySaleNo($sale_no)){
+                    $changed[] = array('sale_no' => $sale_no, 'state' => 'invoiced');
+                    continue;
+                }
+                $row = getKitchenSaleDetailsBySaleNo($sale_no);
+                if(!$row){
+                    $changed[] = array('sale_no' => $sale_no, 'state' => 'gone');
+                    continue;
+                }
+                if((int) $row->outlet_id !== $outlet_id || !$this->irCanSeeRunningOrder($row)){
+                    continue;
+                }
+                $row_version = isset($row->version) ? (int) $row->version : 1;
+                if($local_version !== NULL && $row_version !== $local_version){
+                    $changed[] = array(
+                        'sale_no' => $sale_no,
+                        'state' => 'stale',
+                        'self_order_content' => $row->self_order_content,
+                        'version' => $row_version,
+                    );
+                }
+            }
+        }
+        echo json_encode(array('changed' => $changed));
+    }
     /**
      * Liveness ping for the POS online/offline indicator (every 2 s per till).
      * Goes through the normal constructor, so it proves PHP, the session store

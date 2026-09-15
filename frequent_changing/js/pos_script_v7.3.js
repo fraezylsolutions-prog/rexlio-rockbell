@@ -1497,7 +1497,11 @@
               },
               success: function (data) {
                 if(data.invoice_status){
-                    toastr['error']((data.invoice_msg), ''); 
+                    if(data.sale_no_conflict){
+                        irRecoverSaleNoConflict(sale_no, order_object, is_self_order, is_print);
+                    }else{
+                        toastr['error']((data.invoice_msg), '');
+                    }
                 }else{
                     if(is_print){
                         let content_data_direct_print = data.content_data_direct_print;
@@ -1588,6 +1592,10 @@
                           csrf_name_: csrf_value_
                       },
                       success:function(response) {
+                          if(typeof response === "string" && response.indexOf("SALE_NO_CONFLICT") === 0){
+                              irNoteCompletionConflict(sale_no);
+                              return;
+                          }
                           if(!is_offline_system){
                               notify_online(sale_no);
                           }
@@ -1866,11 +1874,124 @@
           if (t_s < 10) {
               t_s = "0" + t_s;
           }
-          let username_short = $("#username_short").val();
+          /* Prefix = first letter of the user's name + this browser's DEVICE TAG.
+             The vendor build used two random capitals drawn on every page load
+             (#username_short), so two tills used by the same person on the same
+             day collided 1 time in 676 - and then on EVERY order that day. The tag
+             is issued once per browser by the server (Sale/issueDeviceTag) from an
+             auto-increment id, so two tills can never share one. Counter and date
+             parts are unchanged. */
+          let username_short = String($("#username_short").val() || "");
+          let user_letter = username_short.charAt(0) || "x";
           let invoice_counter_value = Number(localStorage['invoice_counter_value'])+1;
           localStorage['invoice_counter_value'] = invoice_counter_value;
-          let sale_no = username_short+twoDigitYear+mm+dd+"-"+getPadTwo(invoice_counter_value);
+          let sale_no = user_letter+irDeviceTag()+twoDigitYear+mm+dd+"-"+getPadTwo(invoice_counter_value);
           return sale_no;
+      }
+      /* Device tag helpers. The tag lives in localStorage so it survives reloads
+         and logouts on this browser. If the server cannot be reached when a tag
+         is first needed, a random one is used (the old odds, no worse) and a
+         server-issued one is fetched on the next page load. */
+      function irRandomDeviceTag(){
+          let alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+          let out = "";
+          for(let i=0;i<3;i++){ out += alphabet.charAt(Math.floor(Math.random()*alphabet.length)); }
+          return out;
+      }
+      function irDeviceTag(){
+          let tag = "";
+          try{ tag = String(localStorage['ir_device_tag'] || ""); }catch(e){}
+          if(!/^[A-Z2-9]{3,}$/.test(tag)){
+              tag = irRandomDeviceTag();
+              try{ localStorage['ir_device_tag'] = tag; localStorage['ir_device_tag_source'] = "random"; }catch(e){}
+          }
+          return tag;
+      }
+      function irFetchDeviceTag(done){
+          $.ajax({
+              url: base_url + "Sale/issueDeviceTag",
+              method: "POST",
+              dataType: "json",
+              timeout: 8000,
+              data: { csrf_irestoraplus: csrf_value_ },
+              success: function(res){
+                  let tag = res && res.tag ? String(res.tag) : "";
+                  if(/^[A-Z2-9]{3,}$/.test(tag)){
+                      try{ localStorage['ir_device_tag'] = tag; localStorage['ir_device_tag_source'] = "server"; }catch(e){}
+                      if(done){ done(tag); }
+                      return;
+                  }
+                  if(done){ done(irDeviceTag()); }
+              },
+              error: function(){ if(done){ done(irDeviceTag()); } }
+          });
+      }
+      /* Ask for a server-issued tag when this browser has none, or only a random
+         fallback one. Runs once at load; the POS page itself needs the server, so
+         a brand-new browser always gets a real tag before its first order. */
+      (function irEnsureDeviceTag(){
+          let source = "";
+          try{ source = String(localStorage['ir_device_tag_source'] || ""); }catch(e){}
+          let have = "";
+          try{ have = String(localStorage['ir_device_tag'] || ""); }catch(e){}
+          if(source === "server" && /^[A-Z2-9]{3,}$/.test(have)){ return; }
+          irFetchDeviceTag(null);
+      })();
+      /* Placement was refused because another till already holds an order with
+         this number. Take a fresh tag, give the local order a new number (the
+         sales record, its JSON and its table bookings), redraw, and send again.
+         Self/online orders keep no local record, so they are only re-sent. */
+      function irRecoverSaleNoConflict(old_sale_no, order_object, is_self_order, is_print){
+          irFetchDeviceTag(function(){
+              let new_sale_no = generateSaleNo();
+              let new_order_object = String(order_object).replace('"sale_no":"' + old_sale_no + '"', '"sale_no":"' + new_sale_no + '"');
+              let notice = $("#sale_no_renumbered_notice").val() || "Order number was already in use on another till - renumbered to";
+              if(is_self_order === "Yes" || typeof db === "undefined" || !db){
+                  toastr['warning'](notice + " " + new_sale_no, '');
+                  push_online_for_kitchen(new_order_object, is_self_order, new_sale_no, is_print);
+                  return;
+              }
+              let sales_store = db.transaction(['sales'], "readwrite").objectStore("sales");
+              sales_store.openCursor().onsuccess = function(event){
+                  let cursor = event.target.result;
+                  if(cursor){
+                      if(cursor.value.sale_no == old_sale_no){
+                          let rec = cursor.value;
+                          rec.sale_no = new_sale_no;
+                          rec.order = new_order_object;
+                          cursor.update(rec);
+                      }
+                      cursor.continue();
+                      return;
+                  }
+                  let tables_store = db.transaction(['order_tables'], "readwrite").objectStore("order_tables");
+                  tables_store.openCursor().onsuccess = function(ev2){
+                      let c2 = ev2.target.result;
+                      if(c2){
+                          if(c2.value.sale_no == old_sale_no){
+                              let t = c2.value;
+                              t.sale_no = new_sale_no;
+                              c2.update(t);
+                          }
+                          c2.continue();
+                          return;
+                      }
+                      toastr['warning'](notice + " " + new_sale_no, '');
+                      displayOrderList();
+                      push_online_for_kitchen(new_order_object, '', new_sale_no, is_print);
+                  };
+              };
+          });
+      }
+      /* Completion was refused because a DIFFERENT completed sale already holds
+         this number. The sale stays queued locally (money was taken - never drop
+         it); tell the operator once per order so it can be sorted out. */
+      var ir_completion_conflicts = {};
+      function irNoteCompletionConflict(sale_no){
+          if(ir_completion_conflicts[sale_no]){ return; }
+          ir_completion_conflicts[sale_no] = 1;
+          let msg = $("#sale_no_completion_conflict").val() || "Sale number already used by another completed sale - this sale could not be synced";
+          toastr['error'](msg + " (" + sale_no + ")", '', {timeOut: 0, extendedTimeOut: 0, closeButton: true});
       }
       function getRandomCode(length) {
           let result           = '';

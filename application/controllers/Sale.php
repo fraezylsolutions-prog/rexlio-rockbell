@@ -1419,6 +1419,21 @@ class Sale extends Cl_Controller {
             //on previous order
             $sale_no = $order_details->sale_no;
             $sale_d = getKitchenSaleDetailsBySaleNo($sale_no);
+            //Order-number clash guard. Numbers are generated in the browser, so two
+            //tills can produce the same one. Without this check the second till's
+            //NEW order fell into the update branch below and overwrote the first
+            //till's order. random_code is per order and never changes, so a row with
+            //this number and a different code is a different order. Refuse; the
+            //browser renumbers and re-sends (irRecoverSaleNoConflict in the POS JS).
+            $posted_random_code = isset($order_details->random_code) ? $order_details->random_code : '';
+            if(irIsSaleNoConflict($sale_d, $posted_random_code)){
+                $return_data = array();
+                $return_data['invoice_status'] = '1';
+                $return_data['sale_no_conflict'] = '1';
+                $return_data['invoice_msg'] = lang('sale_no_conflict');
+                echo json_encode($return_data);
+                return;
+            }
             $data = array();
             $data['customer_id'] = trim_checker($order_details->customer_id);
             $data['counter_id'] = trim_checker($order_details->counter_id);
@@ -2292,6 +2307,17 @@ class Sale extends Cl_Controller {
         $sale_id = '';
         $check_existing = getSaleDetailsBySaleNo($sale_no);
         $select_kitchen_row = getKitchenSaleDetailsBySaleNo($sale_no);
+
+        //Same clash guard as add_kitchen_sale_by_ajax, for the completion path:
+        //a completed sale already exists under this number and it is a different
+        //order (different random_code). Never overwrite a taken payment. The
+        //browser keeps the sale queued and shows one error for it; see
+        //update_online_push() / irNoteCompletionConflict() in the POS JS.
+        $posted_random_code = isset($order_details->random_code) ? $order_details->random_code : '';
+        if(irIsSaleNoConflict($check_existing, $posted_random_code)){
+            echo 'SALE_NO_CONFLICT';
+            return;
+        }
 
         if(isset($check_existing) && $check_existing){
             $sale_id = $check_existing->id;
@@ -4140,6 +4166,32 @@ We hope to see you again!";
      * @return object
      * @param no
      */
+    /**
+     * Issue a device tag for the browser that asks. The browser stores it in
+     * localStorage and builds every sale number from it, so two tills can never
+     * generate the same number. The tag is the auto-increment id of the row
+     * inserted here, base-32 encoded (irDeviceTagFromId), hence unique by
+     * construction. Called once per browser (or again after a clash).
+     * @access public
+     * @return void
+     */
+    public function issueDeviceTag(){
+        $row = array(
+            'user_id' => (int) $this->session->userdata('user_id'),
+            'outlet_id' => (int) $this->session->userdata('outlet_id'),
+            'issued_at' => date('Y-m-d H:i:s'),
+        );
+        $this->db->insert('tbl_device_tags', $row);
+        $id = $this->db->insert_id();
+        if(!$id){
+            echo json_encode(array('tag' => ''));
+            return;
+        }
+        $tag = irDeviceTagFromId($id);
+        $this->db->where('id', $id);
+        $this->db->update('tbl_device_tags', array('tag' => $tag));
+        echo json_encode(array('tag' => $tag));
+    }
     public function getWaiterOrders(){
         $return_data = array();
         $get_waiter_orders = $this->Common_model->getWaiterOrders();

@@ -4835,3 +4835,50 @@ if (!function_exists('isSalesEnabledOutlet')) {
         return (int) $outlet->is_sales_enabled === 1;
     }
 }
+
+if (!function_exists('irDeviceTagFromId')) {
+    /**
+     * Encode a tbl_device_tags auto-increment id as a short, unambiguous tag.
+     * Base-32, alphabet without 0/O/1/I so the tag survives being read off a
+     * receipt. Left-padded to 3 characters; grows past 3 only after 32768
+     * devices. Used by Sale::issueDeviceTag(); the browser keeps the tag in
+     * localStorage and puts it in every sale number it generates.
+     * @param int $id
+     * @return string
+     */
+    function irDeviceTagFromId($id) {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $id = (int) $id;
+        $tag = '';
+        do {
+            $tag = $alphabet[$id % 32] . $tag;
+            $id = intdiv($id, 32);
+        } while ($id > 0);
+        return str_pad($tag, 3, 'A', STR_PAD_LEFT);
+    }
+}
+
+if (!function_exists('irIsSaleNoConflict')) {
+    /**
+     * TRUE when an existing row carries this sale number but belongs to a
+     * DIFFERENT order. Every order carries a 15-character random_code from the
+     * moment it is created, so two rows with the same number and different
+     * codes are two orders that collided on numbering (two tills, same tag).
+     * Rows without a random_code (very old data) are never treated as a
+     * conflict, so nothing that works today stops working.
+     * @param object|null $existing_row
+     * @param string $posted_random_code
+     * @return bool
+     */
+    function irIsSaleNoConflict($existing_row, $posted_random_code) {
+        if (!$existing_row || !isset($existing_row->random_code)) {
+            return FALSE;
+        }
+        $existing_code = trim((string) $existing_row->random_code);
+        $posted_code = trim((string) $posted_random_code);
+        if ($existing_code === '' || $posted_code === '') {
+            return FALSE;
+        }
+        return $existing_code !== $posted_code;
+    }
+}

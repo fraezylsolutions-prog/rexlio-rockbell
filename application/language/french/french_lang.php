@@ -1949,3 +1949,6 @@ $lang['opened_at']='Opened At';
 $lang['no_data_found']='No data found';
 
 $lang["view_all_running_orders"]="View All Users Running Orders";
+$lang['sale_no_conflict'] = 'This order number is already in use on another till. The order is being renumbered and sent again.';
+$lang['sale_no_renumbered_notice'] = 'Order number was already in use on another till - renumbered to';
+$lang['sale_no_completion_conflict'] = 'Sale number already used by another completed sale - this sale could not be synced. Contact the manager.';

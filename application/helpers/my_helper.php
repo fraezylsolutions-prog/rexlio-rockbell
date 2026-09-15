@@ -753,6 +753,31 @@ function getCustomURL() {
  * @return object
  * @param no
  */
+/* PERF: the company row is read by dozens of formatting helpers (getAmtP,
+   precision, currency, tax...), several times per menu item. The POS page
+   called it 1,247 times for 193 items. It is static for the life of a
+   request, so read each id once and hand back the same object. Writers to
+   tbl_companies must call irForgetCompanyInfo() if they re-read in the same
+   request (the only writer, Authentication::checkInn, does not re-read). */
+function irCompanyInfoCached($company_id){
+    static $cache = array();
+    $CI = & get_instance();
+    $key = (string) $company_id;
+    if(func_num_args() > 1){
+        $cache = array();
+        return NULL;
+    }
+    if(!array_key_exists($key, $cache)){
+        $CI->db->select("*");
+        $CI->db->from("tbl_companies");
+        $CI->db->where("id", $company_id);
+        $cache[$key] = $CI->db->get()->row();
+    }
+    return $cache[$key];
+}
+function irForgetCompanyInfo(){
+    irCompanyInfoCached(0, TRUE);
+}
 function getCompanyInfo($company_id = '') {
     $CI = & get_instance();
     if(!$company_id){
@@ -761,10 +786,7 @@ function getCompanyInfo($company_id = '') {
             $company_id = 1;
         }
     }
-    $CI->db->select("*");
-    $CI->db->from("tbl_companies");
-    $CI->db->where("id", $company_id);
-    return $CI->db->get()->row();
+    return irCompanyInfoCached($company_id);
 }
 
 /**
@@ -813,10 +835,7 @@ function getCompanyInfoById($company_id='') {
     if($company_id==''){
         $company_id = $CI->session->userdata('company_id');
     }
-    $CI->db->select("*");
-    $CI->db->from("tbl_companies");
-    $CI->db->where("id", $company_id);
-    return $CI->db->get()->row();
+    return irCompanyInfoCached($company_id);
 }
 /**
  * get first outlet Info
@@ -1004,11 +1023,7 @@ function sendEmailOnlyOld($txt,$to_email,$attached='',$sender_email='',$subject=
  * @param no
  */
 function getMainCompany() {
-    $CI = & get_instance();
-    $CI->db->select("*");
-    $CI->db->from("tbl_companies");
-    $CI->db->where("id", 1);
-    return $CI->db->get()->row();
+    return irCompanyInfoCached(1);
 }
 
 if(! function_exists('product_name')) {
@@ -2739,22 +2754,33 @@ function getTotalLoyaltyPoint($id,$outlet_id) {
 
 }
 function getKitchenNameAndId($cat_id) {
+    /* PERF: called once per menu item while the POS page is built (193 times
+       locally). Load the outlet's category->kitchen map once per request. The
+       first matching row per category is kept, which is what ->row() returned. */
+    static $maps = array();
     $CI = & get_instance();
     $outlet_id = $CI->session->userdata('outlet_id');
-    $CI->db->select('tbl_kitchens.id as kitchen_id, tbl_kitchens.name as kitchen_name');
-    $CI->db->from('tbl_kitchen_categories');
-    $CI->db->join('tbl_kitchens', 'tbl_kitchens.id = tbl_kitchen_categories.kitchen_id', 'left');
-    $CI->db->where('tbl_kitchen_categories.outlet_id', $outlet_id);
-    $CI->db->where('tbl_kitchen_categories.cat_id', $cat_id);
-    $CI->db->where('tbl_kitchen_categories.del_status', 'Live');
-        $query_result = $CI->db->get();
-    $row = $query_result->row();
-
-    if($row){
-    return [$row->kitchen_id,$row->kitchen_name];
-    }else{
-        return ['',''];
+    $okey = (string) $outlet_id;
+    if(!isset($maps[$okey])){
+        $maps[$okey] = array();
+        $CI->db->select('tbl_kitchen_categories.cat_id, tbl_kitchens.id as kitchen_id, tbl_kitchens.name as kitchen_name');
+        $CI->db->from('tbl_kitchen_categories');
+        $CI->db->join('tbl_kitchens', 'tbl_kitchens.id = tbl_kitchen_categories.kitchen_id', 'left');
+        $CI->db->where('tbl_kitchen_categories.outlet_id', $outlet_id);
+        $CI->db->where('tbl_kitchen_categories.del_status', 'Live');
+        $CI->db->order_by('tbl_kitchen_categories.id', 'ASC');
+        foreach($CI->db->get()->result() as $r){
+            $ckey = (string) $r->cat_id;
+            if(!isset($maps[$okey][$ckey])){
+                $maps[$okey][$ckey] = array($r->kitchen_id, $r->kitchen_name);
+            }
+        }
     }
+    $ckey = (string) $cat_id;
+    if(isset($maps[$okey][$ckey])){
+        return $maps[$okey][$ckey];
+    }
+    return ['',''];
 }
 function checkDeliveryPartner() {
     $CI = & get_instance();
@@ -3314,17 +3340,31 @@ function checkPromotionWithinDatePOS($start_date,$food_menu_id) {
     $CI = & get_instance();
     $outlet_id = $CI->session->userdata('outlet_id');
 
-    $CI->db->select('*');
-    $CI->db->from('tbl_promotions');
-    if ($start_date != '') {
-        $CI->db->where('start_date<=', $start_date);
-        $CI->db->where('end_date>=', $start_date);
+    /* PERF: called once per menu item from main_screen.php. Load every live
+       promotion for this outlet and date once per request; the first row per
+       food_menu_id (lowest id) is what ->row() returned before. */
+    static $promo_maps = array();
+    $pkey = $outlet_id . '|' . $start_date;
+    if(!isset($promo_maps[$pkey])){
+        $promo_maps[$pkey] = array();
+        $CI->db->select('*');
+        $CI->db->from('tbl_promotions');
+        if ($start_date != '') {
+            $CI->db->where('start_date<=', $start_date);
+            $CI->db->where('end_date>=', $start_date);
+        }
+        $CI->db->where('outlet_id', $outlet_id);
+        $CI->db->where('del_status', 'Live');
+        $CI->db->order_by('id', 'ASC');
+        foreach($CI->db->get()->result() as $pr){
+            $fkey = (string) $pr->food_menu_id;
+            if(!isset($promo_maps[$pkey][$fkey])){
+                $promo_maps[$pkey][$fkey] = $pr;
+            }
+        }
     }
-    $CI->db->where('food_menu_id', $food_menu_id);
-    $CI->db->where('outlet_id', $outlet_id);
-    $CI->db->where('del_status', 'Live');
-    $query_result = $CI->db->get();
-    $result = $query_result->row();
+    $fkey = (string) $food_menu_id;
+    $result = isset($promo_maps[$pkey][$fkey]) ? $promo_maps[$pkey][$fkey] : NULL;
     $return_data['status'] = false;
 
     $return_data['type'] = '';

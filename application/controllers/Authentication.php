@@ -231,9 +231,22 @@ class Authentication extends Cl_Controller {
                                     }
                                 }else{
                                     if (isset($getAccess)) {
-                                        //pre($getAccess);exit;
+                                        //PERF: one lookup for every access row instead of one query per row
+                                        //(44 for Cashier, 208 for Owner Admin, all by primary key). Same rows,
+                                        //same order as the role_access list, same Live filter as
+                                        //getAllByCustomRowId() applied.
+                                        $access_rows_by_id = array();
+                                        $child_ids = array();
+                                        foreach ($getAccess as $value) { $child_ids[] = (int) $value->access_child_id; }
+                                        if($child_ids){
+                                            $this->db->select('*');
+                                            $this->db->from('tbl_access');
+                                            $this->db->where_in('id', $child_ids);
+                                            $this->db->where('del_status', 'Live');
+                                            foreach($this->db->get()->result() as $ar){ $access_rows_by_id[(string) $ar->id] = $ar; }
+                                        }
                                         foreach ($getAccess as $value) {
-                                            $getAccesRow = $this->Common_model->getAllByCustomRowId($value->access_child_id,"id",'tbl_access');
+                                            $getAccesRow = isset($access_rows_by_id[(string) $value->access_child_id]) ? $access_rows_by_id[(string) $value->access_child_id] : FALSE;
                                             if($getAccesRow){
                                                 array_push($menu_access_container, $getAccesRow->function_name."-".$getAccesRow->parent_id);
                                             }

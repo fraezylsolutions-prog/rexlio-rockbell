@@ -1207,10 +1207,18 @@
   
    
       function checkInternetConnectionNew(){
+          /* PERF: this runs every 2 seconds on every till for as long as the POS
+             is open. It used to GET base_url - the full public front page, ~45 KB
+             and a PHP render with its own queries - just to learn whether the
+             server answers. Now it is Sale/ping, a two-byte reply that still
+             goes through the app (PHP, session, database) so "online" keeps
+             meaning "the app can take orders", not just "a web server is up".
+             The interval and the online/offline handling are unchanged. */
           $.ajax({
-              url: base_url,  
+              url: base_url + "Sale/ping",
               method: 'GET',
               cache: false,
+              timeout: 4000,
               success: function() {
                   $("#online_status").removeClass("bg__red");
                   $("#online_status").addClass("bg__green");

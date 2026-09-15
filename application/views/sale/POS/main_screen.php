@@ -171,31 +171,13 @@ foreach($food_menus as $single_menus){
         $image_path = base_url().'images/'.$single_menus->photo;
     } else {
         $ir_is_bev = (isset($single_menus->beverage_item) && $single_menus->beverage_item == 'Bev Yes');
-        $ir_bg   = $ir_is_bev ? '#4F46E5' : '#EA580C';
-        $ir_bg2  = $ir_is_bev ? '#818CF8' : '#FDBA74';
-        $ir_art  = $ir_is_bev
-            /* bottle */
-            ? '<rect x="60" y="26" width="20" height="20" rx="4" fill="white" opacity=".95"/>'
-              .'<path d="M56 46h28c4 0 8 6 8 14v38c0 6-4 10-10 10H58c-6 0-10-4-10-10V60c0-8 4-14 8-14z"'
-              .' fill="white" opacity=".95"/>'
-            /* plate with cutlery */
-            : '<circle cx="70" cy="70" r="30" fill="none" stroke="white" stroke-width="6" opacity=".95"/>'
-              .'<circle cx="70" cy="70" r="15" fill="white" opacity=".85"/>'
-              .'<rect x="24" y="38" width="5" height="64" rx="2" fill="white" opacity=".95"/>'
-              .'<rect x="111" y="38" width="5" height="64" rx="2" fill="white" opacity=".95"/>';
-        /* URL-encoded, not raw. The SVG uses double quotes for its own attributes,
-           and this value lands BOTH inside an HTML src="..." attribute and inside a
-           single-quoted JS string in the window.items array. Raw, the quotes closed
-           the src attribute early and produced malformed markup; percent-encoding
-           carries safely through both. */
-        $ir_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140">'
-            .'<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
-            .'<stop offset="0" stop-color="'.$ir_bg.'"/>'
-            .'<stop offset="1" stop-color="'.$ir_bg2.'"/></linearGradient></defs>'
-            .'<rect width="140" height="140" fill="url(#g)"/>'
-            .$ir_art
-            .'</svg>';
-        $image_path = 'data:image/svg+xml;charset=UTF-8,'.rawurlencode($ir_svg);
+        /* PERF: the drawn placeholder used to be an inline data: URI (about 1 KB)
+           written TWICE per item - in this <img src> and again in window.items -
+           which was ~400 KB of an 800 KB page for 193 items, all the same picture.
+           Now it is one of two static SVG files: a 60-byte URL, fetched once and
+           cached, decoded once. Same drawing, same colours (orange dish, indigo
+           drink) - see assets/POS/img/ir_placeholder_*.svg. */
+        $image_path = base_url().'assets/POS/img/'.($ir_is_bev ? 'ir_placeholder_drink.svg' : 'ir_placeholder_dish.svg').'?v=1';
     }
 
     $food_menu_tooltip = $this->session->userdata('food_menu_tooltip');
@@ -559,7 +541,7 @@ foreach ($notifications as $single_notification){
     <link rel="stylesheet" type="text/css" href="<?php echo base_url(); ?>assets/POS/css/style.css?v=7.5">
     <link rel="stylesheet" type="text/css" href="<?php echo base_url(); ?>assets/POS/css/style2.css?v=7.7">
     <link rel="stylesheet" type="text/css" href="<?php echo base_url(); ?>assets/POS/css/customModal.css?v=7.5">
-    <script src="<?php echo base_url(); ?>assets/graph/go.js?v=7.5"></script>
+    <?php /* PERF: assets/graph/go.js (921 KB, GoJS) removed - nothing in the app references it. */ ?>
     <script src="<?php echo base_url(); ?>assets/graph/dom-to-image.min.js?v=7.5"></script>
     <!-- font awesome -->
     <link rel="stylesheet" href="<?php echo base_url(); ?>assets/plugins/fontawesome-free-6.5.1-web/css/all.min.css?var=1.6">
@@ -4694,7 +4676,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=4.4"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=4.5"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">

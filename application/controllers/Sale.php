@@ -542,8 +542,24 @@ class Sale extends Cl_Controller {
         $data['customers'] = $this->Common_model->getAllByCompanyIdForDropdown($company_id, 'tbl_customers');
         $data['food_menus'] = $this->Sale_model->getAllFoodMenus();
         if(isset($data['food_menus']) && $data['food_menus']){
+            //PERF: one query for every item's variations instead of one per item
+            //(193 queries locally). Same rows, same order (by id) as
+            //getAllByCustomId() returned, grouped by parent.
+            $parent_ids = array();
+            foreach ($data['food_menus'] as $fm){ $parent_ids[] = (int) $fm->id; }
+            $variations_by_parent = array();
+            if($parent_ids){
+                $this->db->select('*');
+                $this->db->from('tbl_food_menus');
+                $this->db->where_in('parent_id', $parent_ids);
+                $this->db->where('del_status', 'Live');
+                $this->db->order_by('id', 'ASC');
+                foreach($this->db->get()->result() as $vr){
+                    $variations_by_parent[(string) $vr->parent_id][] = $vr;
+                }
+            }
             foreach ($data['food_menus'] as $key=>$value){
-                $variations = $this->Common_model->getAllByCustomId($value->id,"parent_id","tbl_food_menus",$order='');
+                $variations = isset($variations_by_parent[(string) $value->id]) ? $variations_by_parent[(string) $value->id] : array();
                 $data['food_menus'][$key]->is_variation = isset($variations) && $variations?'Yes':'No';
                 $data['food_menus'][$key]->variations = $variations;
                     $kitchen = getKitchenNameAndId($value->category_id);
@@ -4166,6 +4182,19 @@ We hope to see you again!";
      * @return object
      * @param no
      */
+    /**
+     * Liveness ping for the POS online/offline indicator (every 2 s per till).
+     * Goes through the normal constructor, so it proves PHP, the session store
+     * and the database answer - the same thing the old check proved by
+     * rendering the whole front page - but returns two bytes.
+     * @access public
+     * @return void
+     */
+    public function ping(){
+        header('Cache-Control: no-store');
+        echo 'ok';
+    }
+
     /**
      * Issue a device tag for the browser that asks. The browser stores it in
      * localStorage and builds every sale number from it, so two tills can never

@@ -5010,3 +5010,85 @@ if (!function_exists('irIsSaleNoConflict')) {
         return $existing_code !== $posted_code;
     }
 }
+
+if (!function_exists('irReleaseAutoTables')) {
+    /**
+     * Table-first flow: a table created by "+ New Table" lives only as long as
+     * its order. Called when an order is completed (Sale::push_online),
+     * cancelled (Sale::add_cancel_audit_report) or absorbed by a merge
+     * (Sale::setMergeDelete). Every table the sale referenced is checked; an
+     * auto-created one is soft-deleted when no OTHER live running order still
+     * references it (a merge can leave two tables on one order). Admin-created
+     * tables (auto_created = 0) are never touched. Soft delete on purpose: the
+     * completed sale still resolves its table name in bills and reports.
+     * @param string $sale_no
+     * @param int|null $kitchen_sale_id the sale's tbl_kitchen_sales id if still known
+     * @return int number of tables released
+     */
+    function irReleaseAutoTables($sale_no, $kitchen_sale_id = NULL) {
+        $CI = &get_instance();
+        $sale_no = trim((string) $sale_no);
+        if ($sale_no === '') {
+            return 0;
+        }
+        $table_ids = array();
+        $rows = $CI->db->select('table_id')->from('tbl_orders_table')
+                       ->where('sale_no', $sale_no)->get()->result();
+        foreach ($rows as $r) {
+            if ((int) $r->table_id) { $table_ids[(int) $r->table_id] = 1; }
+        }
+        if ($kitchen_sale_id) {
+            $k = $CI->db->select('table_id')->from('tbl_kitchen_sales')->where('id', (int) $kitchen_sale_id)->get()->row();
+            if ($k && (int) $k->table_id) { $table_ids[(int) $k->table_id] = 1; }
+        }
+        $s = $CI->db->select('table_id')->from('tbl_sales')->where('sale_no', $sale_no)->where('del_status', 'Live')->get()->row();
+        if ($s && (int) $s->table_id) { $table_ids[(int) $s->table_id] = 1; }
+        $released = 0;
+        foreach (array_keys($table_ids) as $table_id) {
+            $t = $CI->db->select('id, auto_created')->from('tbl_tables')
+                        ->where('id', $table_id)->where('del_status', 'Live')->get()->row();
+            if (!$t || (int) $t->auto_created !== 1) {
+                continue;
+            }
+            //another LIVE running order still on this table? (merge, or a
+            //second order booked on it) - then it stays
+            $others = $CI->db->query(
+                "SELECT COUNT(*) AS c FROM tbl_orders_table ot
+                   JOIN tbl_kitchen_sales ks ON ks.id = ot.sale_id AND ks.del_status = 'Live'
+                  WHERE ot.table_id = ? AND ot.del_status = 'Live' AND ot.sale_no <> ?",
+                array($table_id, $sale_no))->row();
+            $others_k = $CI->db->query(
+                "SELECT COUNT(*) AS c FROM tbl_kitchen_sales
+                  WHERE table_id = ? AND del_status = 'Live' AND sale_no <> ?",
+                array($table_id, $sale_no))->row();
+            if ((int) $others->c > 0 || (int) $others_k->c > 0) {
+                continue;
+            }
+            $CI->db->where('id', $table_id);
+            $CI->db->update('tbl_tables', array('del_status' => 'Deleted'));
+            $released++;
+        }
+        return $released;
+    }
+}
+
+if (!function_exists('irWaiterTableName')) {
+    /**
+     * "<first name>-0001": lowercase first word of the full name, letters and
+     * digits only (fallback "w<id>"), then the per-waiter sequence, four digits,
+     * wrapping 9999 -> 0001. A wrapped name can only coexist with a DELETED table.
+     * @param string $full_name
+     * @param int $user_id
+     * @param int $seq raw sequence value (1-based, may exceed 9999)
+     * @return string
+     */
+    function irWaiterTableName($full_name, $user_id, $seq) {
+        $first = strtolower(trim(strtok(trim((string) $full_name), ' ')));
+        $first = preg_replace('/[^a-z0-9]/', '', $first);
+        if ($first === '') {
+            $first = 'w' . (int) $user_id;
+        }
+        $n = (((int) $seq - 1) % 9999) + 1;
+        return sprintf('%s-%04d', $first, $n);
+    }
+}

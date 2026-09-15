@@ -2002,6 +2002,8 @@ class Sale extends Cl_Controller {
             $this->db->delete("tbl_kitchen_sales_details_modifiers", array("sales_id" => $select_kitchen_row->id));
             $this->db->delete("tbl_kitchen_sales", array("id" => $select_kitchen_row->id));
         }
+        //table-first flow: cancelled, free its auto-created table(s)
+        irReleaseAutoTables($order_details->sale_no, isset($select_kitchen_row->id) ? $select_kitchen_row->id : NULL);
 
         $txt = '<b>Reason: '.$reason."</b>";
         $txt .= '<br>';
@@ -2747,6 +2749,8 @@ We hope to see you again!";
                     $this->db->delete("tbl_kitchen_sales", array("id" => $select_kitchen_row->id));
                 }
             }
+            //table-first flow: the sale is complete, free its auto-created table(s)
+            irReleaseAutoTables($sale_no, isset($select_kitchen_row->id) ? $select_kitchen_row->id : NULL);
             echo escape_output($sale_id_offline);
             $this->db->trans_commit();
         }
@@ -4324,6 +4328,118 @@ We hope to see you again!";
         }
         echo json_encode(array('changed' => $changed));
     }
+
+    /**
+     * "+ New Table" (table-first waiter flow). Creates one auto-named table for
+     * the signed-in user in the session outlet and returns it. The name is
+     * "<first name>-0001" from a per-user sequence advanced ATOMICALLY on the
+     * server (UPDATE ... LAST_INSERT_ID), so two tills used by the same waiter
+     * can never mint the same number - the same reasoning as the device tags
+     * behind order numbers. The table goes into the outlet's live area with the
+     * lowest id (one area per outlet is the rule going forward); an outlet with
+     * no live area gets a "Main" area created. auto_created = 1 marks it for
+     * automatic release when its order completes (irReleaseAutoTables).
+     * @access public
+     * @return void
+     */
+    public function createWaiterTable(){
+        $user_id = (int) $this->session->userdata('user_id');
+        $outlet_id = (int) $this->session->userdata('outlet_id');
+        $company_id = (int) $this->session->userdata('company_id');
+        if(!$user_id || !$outlet_id){
+            echo json_encode(array('ok' => 0, 'reason' => 'session'));
+            return;
+        }
+        //area: lowest-id live area for the outlet, or create one
+        $area = $this->db->select('id')->from('tbl_areas')
+                         ->where('outlet_id', $outlet_id)->where('del_status', 'Live')
+                         ->order_by('id', 'ASC')->limit(1)->get()->row();
+        if($area){
+            $area_id = (int) $area->id;
+        }else{
+            $this->db->insert('tbl_areas', array('outlet_id' => $outlet_id, 'area_name' => 'Main', 'company_id' => $company_id, 'del_status' => 'Live'));
+            $area_id = (int) $this->db->insert_id();
+        }
+        //atomic per-user sequence
+        $this->db->query("UPDATE tbl_users SET ir_table_seq = LAST_INSERT_ID(ir_table_seq + 1) WHERE id = ?", array($user_id));
+        $seq_row = $this->db->query("SELECT LAST_INSERT_ID() AS seq")->row();
+        $seq = isset($seq_row->seq) ? (int) $seq_row->seq : 0;
+        if(!$seq){
+            echo json_encode(array('ok' => 0, 'reason' => 'sequence'));
+            return;
+        }
+        $name = irWaiterTableName($this->session->userdata('full_name'), $user_id, $seq);
+        $row = array(
+            'area' => $area_id,
+            'name' => $name,
+            'sit_capacity' => '',
+            'position' => '',
+            'description' => 'auto',
+            'user_id' => $user_id,
+            'outlet_id' => $outlet_id,
+            'company_id' => $company_id,
+            'del_status' => 'Live',
+            'is_setting' => 0,
+            'auto_created' => 1,
+            'created_at' => date('Y-m-d H:i:s'),
+        );
+        $this->db->insert('tbl_tables', $row);
+        $table_id = (int) $this->db->insert_id();
+        putAuditLog($user_id, 'New table '.$name.' (id '.$table_id.') created from the POS', 'New Table', date('Y-m-d H:i:s'));
+        echo json_encode(array('ok' => 1, 'id' => $table_id, 'name' => $name, 'area_id' => $area_id, 'seq' => $seq));
+    }
+    /**
+     * The tables panel data (table-first flow). Own live running orders with the
+     * table(s) they sit on and the order value, plus own auto-created tables that
+     * have no order yet. A caller holding view_all_running_orders gets every
+     * user's orders in the session outlet instead. One query for the orders, one
+     * for the empty tables; nothing else. Also releases own empty auto tables
+     * older than four hours ("+ New Table" tapped and walked away from).
+     * @access public
+     * @return void
+     */
+    public function myTablesAjax(){
+        $user_id = (int) $this->session->userdata('user_id');
+        $outlet_id = (int) $this->session->userdata('outlet_id');
+        $see_all = checkAccess("372", "view_all_running_orders") ? TRUE : FALSE;
+        //orders
+        $sql = "SELECT ks.id AS sale_id, ks.sale_no, ks.total_payable, ks.date_time, ks.user_id, ks.waiter_id,
+                       IFNULL(ks.version, 1) AS version, ks.random_code,
+                       (SELECT COUNT(*) FROM tbl_kitchen_sales_details d WHERE d.sales_id = ks.id AND d.del_status = 'Live') AS items_total,
+                       (SELECT COUNT(*) FROM tbl_kitchen_sales_details d WHERE d.sales_id = ks.id AND d.del_status = 'Live' AND d.cooking_status = 'Done') AS items_done,
+                       (SELECT GROUP_CONCAT(DISTINCT t.id ORDER BY t.id) FROM tbl_orders_table ot JOIN tbl_tables t ON t.id = ot.table_id
+                          WHERE ot.sale_id = ks.id AND ot.del_status = 'Live' AND t.del_status = 'Live') AS table_ids,
+                       (SELECT GROUP_CONCAT(DISTINCT t.name ORDER BY t.id SEPARATOR ', ') FROM tbl_orders_table ot JOIN tbl_tables t ON t.id = ot.table_id
+                          WHERE ot.sale_id = ks.id AND ot.del_status = 'Live' AND t.del_status = 'Live') AS table_names,
+                       ks.table_id AS first_table_id
+                  FROM tbl_kitchen_sales ks
+                 WHERE ks.outlet_id = ? AND ks.del_status = 'Live'
+                   AND (ks.order_status = '1' OR ks.order_status = '2')
+                   AND (ks.future_sale_status = '1' OR ks.future_sale_status = '3')";
+        $bind = array($outlet_id);
+        if(!$see_all){
+            $sql .= " AND (ks.user_id = ? OR ks.waiter_id = ?)";
+            $bind[] = $user_id; $bind[] = $user_id;
+        }
+        $sql .= " ORDER BY ks.id DESC";
+        $orders = $this->db->query($sql, $bind)->result();
+        //sweep: own empty auto tables older than 4 h ("+ New Table" tapped, then abandoned)
+        $this->db->query("UPDATE tbl_tables t SET t.del_status = 'Deleted'
+                           WHERE t.auto_created = 1 AND t.del_status = 'Live' AND t.user_id = ? AND t.outlet_id = ?
+                             AND t.created_at IS NOT NULL AND t.created_at < DATE_SUB(NOW(), INTERVAL 4 HOUR)
+                             AND t.id NOT IN (SELECT ot.table_id FROM tbl_orders_table ot JOIN tbl_kitchen_sales ks ON ks.id = ot.sale_id AND ks.del_status = 'Live' WHERE ot.del_status = 'Live')
+                             AND t.id NOT IN (SELECT ks2.table_id FROM tbl_kitchen_sales ks2 WHERE ks2.del_status = 'Live' AND ks2.table_id IS NOT NULL)", array($user_id, $outlet_id));
+        //empty auto tables (own; or everyone's for a see-all caller)
+        $sql2 = "SELECT t.id, t.name, t.user_id FROM tbl_tables t
+                  WHERE t.auto_created = 1 AND t.del_status = 'Live' AND t.outlet_id = ?
+                    AND t.id NOT IN (SELECT ot.table_id FROM tbl_orders_table ot JOIN tbl_kitchen_sales ks ON ks.id = ot.sale_id AND ks.del_status = 'Live' WHERE ot.del_status = 'Live')";
+        $bind2 = array($outlet_id);
+        if(!$see_all){ $sql2 .= " AND t.user_id = ?"; $bind2[] = $user_id; }
+        $sql2 .= " ORDER BY t.id DESC";
+        $empty = $this->db->query($sql2, $bind2)->result();
+        echo json_encode(array('ok' => 1, 'see_all' => $see_all ? 1 : 0, 'orders' => $orders, 'empty_tables' => $empty, 'server_time' => date('Y-m-d H:i:s')));
+    }
+
     /**
      * Liveness ping for the POS online/offline indicator (every 2 s per till).
      * Goes through the normal constructor, so it proves PHP, the session store
@@ -4514,6 +4630,9 @@ We hope to see you again!";
                 $this->db->delete("tbl_kitchen_sales_details_modifiers", array("sales_id" => $select_kitchen_row->id));
                 $this->db->delete("tbl_kitchen_sales", array("id" => $select_kitchen_row->id));
             }
+            //table-first flow: absorbed by a merge - free its auto table if the
+            //surviving order does not sit on it
+            irReleaseAutoTables($sale_no, isset($select_kitchen_row->id) ? $select_kitchen_row->id : NULL);
 
             echo 'success';
         }

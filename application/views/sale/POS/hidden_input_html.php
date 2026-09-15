@@ -263,7 +263,9 @@ foreach ($waiters as $waiter){
 <input type="hidden" id="ir_msg_gone" value="<?php echo lang('ir_msg_gone'); ?>">
 <input type="hidden" id="ir_msg_invoiced_elsewhere" value="<?php echo lang('ir_msg_invoiced_elsewhere'); ?>">
 <input type="hidden" id="ir_msg_kitchen_synced" value="<?php echo lang('ir_msg_kitchen_synced'); ?>">
-<input type="hidden" id="ir_tables_panel_on_load" value="<?php echo isWaiterUser() ? '1' : '0'; ?>">
+<?php /* Stage 5c (one tables screen): the panel opens on load for EVERY staff role - it is the
+         POS landing now. Never for a customer session (self order / online order). */ ?>
+<input type="hidden" id="ir_tables_panel_on_load" value="<?php echo ($is_self_order != "Yes" && $this->session->userdata('is_online_order') != "Yes") ? '1' : '0'; ?>">
 <input type="hidden" id="ir_tp_first_name" value="<?php echo escape_output(strtolower(strtok(trim((string) $this->session->userdata('full_name')), ' '))); ?>">
 <input type="hidden" id="ir_msg_table_ready" value="<?php echo lang('ir_msg_table_ready'); ?>">
 <input type="hidden" id="ir_msg_table_create_failed" value="<?php echo lang('ir_msg_table_create_failed'); ?>">

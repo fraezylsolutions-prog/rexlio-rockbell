@@ -875,8 +875,10 @@ foreach ($notifications as $single_notification){
                                 <i class="fal fa-bags-shopping"></i>
                             </a>
                         </li>
-                        <li>
-                            <a href="<?php echo base_url()?>table-status" class="header_menu_icon  <?php echo escape_output($is_self_order_class) ?>" target="_blank" rel="opener"  data-tippy-content="<?php
+                        <?php /* Stage 5c (one tables screen): Table Status IS the tables panel on this
+                                 page, for every role. Opens it in place (was a new tab of Monitor/tables). */ ?>
+                        <li class="<?php echo escape_output($is_self_order_class) ?>">
+                            <a href="#" id="ir_tables_open" class="header_menu_icon bg__green" data-tippy-content="<?php
                             echo lang('table_status');
                             ?>">
                                 <i class="fal fa-chair"></i>
@@ -916,11 +918,6 @@ foreach ($notifications as $single_notification){
                     <li class="<?php echo escape_output($is_self_order_class) ?>">
                         <a href="#" id="pull_others_device_orders" data-tippy-content="<?php echo lang('pull_others_device_orders'); ?>" class="header_menu_icon bg__green"><i class="fas fa-exchange-alt"></i></a>
                     </li>
-                    <?php if (isWaiterUser()): ?>
-                    <li>
-                        <a href="#" id="ir_tables_open" data-tippy-content="<?php echo lang('my_tables'); ?>" class="header_menu_icon bg__green"><i class="fas fa-th-large"></i></a>
-                    </li>
-                    <?php endif; ?>
                     <li class="<?php echo escape_output($is_self_order_class) ?>">
                         <a href="#" id="online_status" class="bg__green"><span class="online_status_counter display_none">(0)</span><span class="online_status_text"><?php echo lang('online'); ?></span></a>
                     </li>

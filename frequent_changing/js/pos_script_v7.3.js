@@ -18001,7 +18001,8 @@
        never turns up we say so instead of leaving the operator on a blank POS.
        Selection only, on purpose: firing Invoice or Cancel automatically from a
        URL would run a financial action without the operator confirming it. */
-    /* Stage 4: the Table Status screen's action buttons arrive as
+    /* Stage 4 (kept after Stage 5c retired the Monitor Table Status page - any
+       link may still use it): an action arrives as
        ?open_sale_no=X&ir_action=modify|invoice|split|bill|cancel|merge. Once the
        card is selected (above), run that action through the same code the tables
        panel's sheet uses; merge opens the panel's sheet so the operator picks the

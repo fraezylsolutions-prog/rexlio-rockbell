@@ -531,7 +531,8 @@
                                          Monitor controller gates on (372 running orders, 374 tables). */ ?>
                                 <li data-access="view-372" class="menu_assign_class" data-menu__cid="irp_4"><a class="child-menu" href="<?php echo base_url()?>Monitor/runningOrders">
                                         <?php echo lang('running_order'); ?></a></li>
-                                <li data-access="view-374" class="menu_assign_class" data-menu__cid="irp_4"><a class="child-menu" href="<?php echo base_url()?>Monitor/tables">
+                                <?php /* Stage 5c: Table Status is the POS tables panel now (opens on load) */ ?>
+                                <li data-access="view-374" class="menu_assign_class" data-menu__cid="irp_4"><a class="child-menu" href="<?php echo base_url()?>Sale/POS">
                                         <?php echo lang('table_status'); ?></a></li>
                                 <li data-access="view-378" class="menu_assign_class" data-menu__cid="irp_4"><a class="child-menu" href="<?php echo base_url()?>Monitor/orderLookup">
                                         <?php echo lang('order_lookup'); ?></a></li>

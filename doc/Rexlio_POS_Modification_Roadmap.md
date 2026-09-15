@@ -213,6 +213,93 @@ Test Coke, conversion rate 24, 110 consumption units: 4 whole + remainder 14 →
 
 ---
 
+## Live Launch Batch (2026-09-03 → 09-08) — DONE
+*(Everything in this section was driven by the run-up to real business use on `rockbell.fraezyl.app`. It is grouped by date rather than by phase because it was reactive work, not planned scope.)*
+
+### Live deployment — the installer is not optional
+Standing up the Rockbell host by copying files and importing a database dump produced a blank page / 501. Two theories were chased and **both were wrong**: a `base_url` fallback problem (plausible, since `config.php:27` derives it from `$_SERVER['HTTP_HOST']`) and a missing `index.php`. The real cause is that this product **requires the vendor's own `/install` process**, which generates state a raw copy cannot produce. It fails looking like a server fault rather than a missing-installation fault, which is what made it expensive.
+
+**Established from the deployment:** manual copy failed, `/install` fixed it. **Reported but not confirmed:** that the generated state is files under `assets/bluezimp/`. That directory is absent from the working tree and untracked (consistent with being generated), but a search found **no reference to `bluezimp` anywhere in the application code** — controllers, models, helpers, libraries, config, `system/`, `third_party/` and `install/` all clean. Treat the path as plausible but unverified; the conclusion (run the installer) does not depend on it.
+
+Resolved by a fresh deploy through the installer. **Written up as a standing procedure for all future client deployments in `DEPLOYMENT.md`** — never manually copy-and-configure a raw dump; always run `/install` first, then import data.
+
+### Waiter "Place Order" completely non-functional — two rounds, two different root causes
+The most serious defect of the batch: waiters could not place orders **at all**, on **any** order type. Initially scoped to Club only; that scoping was wrong — Regular, Outlet, Delivery, VIP and Club were all affected.
+
+- **Round 1 (v3.6, commit `a968d3e1`).** 29 unguarded `op1`/`op2` `close()`/`open()` calls against `#select_waiter`. For the Waiter role the view renders that element as a **hidden input, not a select2**, so the calls threw a TypeError that killed the handler before any order request was built. Fixed by guarding all 29 sites.
+- **Round 2 (v3.7 → v3.8, commits `48936b4e`, `9a34e4a7`).** Three *further* unguarded calls — `.select2('data')`, a different API on the same element — sitting **earlier in the same handler**, so the click died before it ever reached the code Round 1 had guarded.
+
+  The real defect underneath was **two independent flags that disagree**: the view decides to render a hidden input from `isWaiterUser()` (session `designation=='Waiter'` OR `is_waiter=='Yes'`), while the JS decided which API to call from `waiter_app_status`, sourced from session `is_waiter` alone. A waiter with `designation='Waiter'` but `is_waiter='No'` — which is what production waiters actually are — got the hidden input *and* took the select2 path.
+
+  **Why Round 1's testing missed it:** the test session was built with `is_waiter='Yes'`, which took the safe branch. The fixture had been built to satisfy the feature's happy path rather than to match production, so it validated the wrong shape. Fixed with a new `irWaiterName()` helper that tests **the element**, not a flag.
+
+  **A self-introduced regression was caught before deploy, by a line-by-line diff audit rather than by a test:** the v3.7 replacement removed a six-line block that also contained a `customer_name` declaration. Restored in `9a34e4a7`.
+
+Deployed and verified live. Current asset version: `pos_script_v7.3.js?v=3.8`.
+
+### Admin Register Management (force-close) — commits `84a0f165`, `ef75e0ec`
+An Admin/Manager screen listing every open register across accessible outlets, with a **two-step force-close** for registers abandoned by whoever opened them.
+
+**The central design decision:** the admin must **manually type the counted cash**, shown beside the system-computed figure — deliberately *not* a one-click accept of the computed number. A blind accept would destroy the entire discrepancy-catching purpose of closing a register.
+
+- New columns on `tbl_register`: `system_closing_balance`, `force_closed_by`, `force_close_reason` — dedicated columns rather than audit-log prose, given what they protect.
+- New permission `manage_registers` (tbl_access **381** on live), configurable per role like every other permission.
+- Full audit logging: who force-closed, when, whose register, and why.
+- **An admin cannot force-close their own register** — that is what a normal close is for.
+- Calculation reuses `Sale::closeRegister()`'s arithmetic via seven new **parameterised** `*ForRegister()` twins of the session-bound `Sale_model` methods. The originals were left untouched, so the normal per-user close path is unaffected.
+
+Three pre-existing bugs were found by actually running it, not by reading it: a query-builder accumulation bug in `getAccessibleOutletIds()` that fired for any non-Admin caller, a missing `Sale_model` load in the Register controller, and a call to `toastr` in a layout that never loads it.
+
+**It had its own saga, and both parts are worth remembering:**
+- The sidebar `<li>` existed in the view but the item never appeared. Cause: menu visibility is filtered client-side against `window.menu_objects`, built from the session's `function_access` — which is snapshotted from `tbl_access` **at login**. With no permission row in the production database, the entry was stripped from the DOM for everyone, Admin included, and no amount of re-login could fix it.
+- **The permission was "verified" against a test session whose grants differed from the real Admin account**, which masked that it had never actually been granted in production. The lesson recorded at the time: *"verified" must name the database it was verified against; a component proof on scratch is not evidence about production.*
+- An **interim topbar shortcut** was added to `userHome.php` as a same-day workaround — deliberately **role-gated rather than permission-gated**, copying the existing `todays_summary` button, so it works without the migration and without a re-login. It is still in place.
+
+### Cashier Running Order visibility — commit `60f8813f`
+A Cashier holding the running-orders permission saw an **empty list**. Two causes, and the second was the real one:
+
+1. The screen-level gate (`view-372`) controls access to the screen.
+2. The list itself was scoped by a **hardcoded role-name list** — `'Admin'`, `'Leader'`, `'Sales Supervisor'` — in `Monitor::canViewAllUsers()`, with the same rule repeated as `$role!="Admin"` in `Sale_model::getRunningKitchenOrders()`. **Neither 'Leader' nor 'Sales Supervisor' exists in this database**, so only Admin ever saw the full list; every other role silently saw only orders it had personally created, and a cashier therefore never saw a waiter's order.
+
+Fixed to be **permission-driven and role-agnostic**: `canViewAllUsers()` is now a single `checkAccess("372","view_all_running_orders")` containing no role name at all, and the duplicate test in the model is gone. New permission `view_all_running_orders` (tbl_access **382** on live). Outlet scoping was deliberately left alone — it was already role-agnostic, and widening it would let a cashier bill another venue's order.
+
+Verified with the role held constant and the permission toggled: 0 orders without it, 9 with it, 0 again once revoked. Confirmed in a real browser on a real Cashier login against an outlet-matched order.
+
+### Category rail redesign — commit `f76a2106`
+Client comparison against the approved reference design: the POS category buttons read as flat and small. Variant 2 adopted after a side-by-side preview.
+
+- Raised depth built as three parts — a solid inset bottom edge reading as the button's thickness, an outer shadow lifting it off the rail, and a lit top face — so `:active` can collapse the edge and read as a physical press.
+- **56px minimum height**, which clears the 44px minimum normally recommended for a touch target; the previous 30px rail did not.
+- Labels 15px/600 → **17px/800**, wrapping freely with **no line-clamp and no ellipsis**, so a button grows to fit its name rather than the name being cut to fit the button.
+- **The requested weight had to be loaded.** The app's base Montserrat `@import` stops at 700, so `font-weight:800` would have rendered as a synthesised fake-bold. An explicit 800 link was added to `main_screen.php`.
+- **Width deliberately unchanged** at a fixed 130px, so nothing outside the rail moves.
+
+Knowingly supersedes the height decision recorded in theme section 16 (which had kept the rail short so more categories fit before scrolling). The trade was accepted explicitly: roughly 11–12 of 23 categories visible instead of 22.
+
+### Report enhancements — commits `0a536351`, `7d5ade0e`
+- **Sales by Category — Waiter filter.** Distinct from the existing seller filter: the seller rang the sale up, the waiter took it, and they are usually different people. Verified by reconciliation — the two waiters' results sum exactly to the unfiltered totals, line by line.
+- **Detailed Sale Report — time-of-day filter** on `order_time`, independent of the date range (which filters `sale_date`, the business day). **A gate bug was found and fixed in the process:** the model returns nothing unless a date, user, sale number, due status or payment method is set, so a *time-only* search would have returned an empty report with no error — indistinguishable from "no sales in that window". The gate had already been widened once before for the same reason.
+
+Both verified over real HTTP against rendered output, reconciled against SQL, then confirmed in a real browser.
+
+### Live data reset for launch
+Performed on live per separate confirmation. **Cleared:** sales and all transaction data, registers, users. **Preserved exactly:** Food Menu (items, categories, pricing), Outlets, Settings, Roles and the full permission structure including the two permissions added in this batch.
+
+**Hard delete was chosen over soft delete on evidence, not preference.** Two of four reports checked — Sales by Category and Daily Summary — **do not filter `del_status` on sales**, so soft-deleted sales would have vanished from two reports while still counting as revenue in the other two. Six of the affected tables, including `tbl_register`, have no `del_status` column at all, so "soft delete" would have meant a mixed state regardless.
+
+**A pre-existing bug was surfaced by that analysis and is NOT yet fixed:** because those two reports ignore `del_status`, any sale voided through the UI still counts as revenue in them. Unrelated to the reset; queued.
+
+### Google Map on the frontend — configuration, not code
+Configured via the existing `tbl_companies.google_map` setting. **No code change was involved** — `contactus.php`, `index.php` and `reservations.php` have carried the embed since the baseline commit.
+
+**⚠️ Flagged as likely broken, unverified.** All three views render it as `<iframe src="<?= escape_output($company_info->google_map) ?>">`, i.e. they expect a **bare URL**. The stored value is a full HTML-escaped `<iframe …>` snippet, which cannot work as a `src` attribute. Needs checking on the live frontend; the fix is most likely to store only the `https://www.google.com/maps/embed?pb=…` URL rather than the whole embed code.
+
+### Deferred out of this batch
+- **Waiter's own order history on their profile/dashboard** — the third item of a three-item request. Not built. Needs a new screen, its own permission and therefore its own migration and re-login cycle; deferred rather than rushed into a launch window.
+- **Running Order inline actions** (Order Details, Modify, Re-print KOT, Invoice, Bill, Cancel executed on the Running Order screen instead of deep-linking to the POS). Only Order Details is inline today; the other five are `<a href>` links into the sale screen. Invoice and Bill are payment completion against device-bound IndexedDB state and were judged unsafe to build in the available window. Assessment recorded: Order Details and Re-print KOT are genuinely feasible inline (server-side reads), Cancel Order is borderline, and Modify/Invoice/Bill are the hard ones.
+
+---
+
 ## Phase G: Per-Counter Reporting — NOT STARTED
 *(Depends on Phase F)*
 16. Per-counter reporting: sale, usage, and stock balance per counter
@@ -261,5 +348,12 @@ Test Coke, conversion rate 24, 110 consumption units: 4 whole + remainder 14 →
 - Known dead code: `getCurrentStockById()` (my_helper.php) uses `$this->db` inside a plain function and would fatal if ever called. Never called.
 - Known pre-existing PHP 8 deprecation: `Report::printDailySummaryReport($selectedDate = '', $outlet_id)` declares an optional parameter before a required one. Vendor code, harmless, surfaced by the F2 syntax pass.
 - Known dead code: `setHeightInComponent()` in main_screen.php (POS view) — defined, never called; layout has no self-correcting mechanism for the order-type button row height. See Phase D notes.
-- **Asset cache-busting is manual and must not be skipped.** All POS assets are loaded with a hand-maintained `?v=` query string in main_screen.php (`pos_script_v7.3.js?v=`, `style2.css?v=`, `custom_pos.css?v=`, and the per-screen JS/CSS for the Monitor screens). Editing an asset without bumping its version means browsers keep serving the cached copy, and the change silently appears not to work. This caused real diagnostic confusion earlier in Phase C — a fix was applied, tested, and wrongly judged ineffective because a stale script was still loaded, and in one case a changed AJAX contract (client sending `sale_no` while the server expected `sale_id`) produced a blank result rather than an error. Current values at end of Phase D: pos_script_v7.3.js `?v=3.1`, style2.css `?v=7.6`, custom_pos.css `?v=7.7`. Always bump on edit, and always hard-refresh when verifying.
-- Pending operational item: "Leader"/"Sales Supervisor" roles referenced by the Running Order screen's privileged-user-selector do not yet exist in tbl_roles on this install — creating them is a manual admin task, not a code change, still outstanding.
+- **Asset cache-busting is manual and must not be skipped.** All POS assets are loaded with a hand-maintained `?v=` query string in main_screen.php (`pos_script_v7.3.js?v=`, `style2.css?v=`, `custom_pos.css?v=`, and the per-screen JS/CSS for the Monitor screens). Editing an asset without bumping its version means browsers keep serving the cached copy, and the change silently appears not to work. This caused real diagnostic confusion earlier in Phase C — a fix was applied, tested, and wrongly judged ineffective because a stale script was still loaded, and in one case a changed AJAX contract (client sending `sale_no` while the server expected `sale_id`) produced a blank result rather than an error. Current values at end of the Live Launch Batch: pos_script_v7.3.js `?v=3.8`, style2.css `?v=7.6`, custom_pos.css `?v=7.7`, rexlio_theme.css `?v=7.7.1` (loaded in **both** main_screen.php and userHome.php — bump both together). Always bump on edit, and always hard-refresh when verifying.
+- ~~Pending operational item: "Leader"/"Sales Supervisor" roles referenced by the Running Order screen's privileged-user-selector do not yet exist in tbl_roles.~~ **RESOLVED (Live Launch Batch).** Those role names were never going to exist, and the code should not have been asking for them. `Monitor::canViewAllUsers()` now consults the `view_all_running_orders` permission instead of any role name, so this is no longer a manual admin task and no roles need creating.
+- **Permissions added in the Live Launch Batch:** `manage_registers` (tbl_access **381**, parent 376) and `view_all_running_orders` (tbl_access **382**, parent 372). Both granted on live to Admin, Manager and Cashier. Ids are the live values; local may differ.
+- **Columns added to `tbl_register` in the Live Launch Batch:** `system_closing_balance`, `force_closed_by`, `force_close_reason` (all nullable).
+- **Menu visibility is client-side, and this is a recurring trap.** A sidebar `<li data-access="…">` is present in the server HTML for everyone, then **removed from the DOM** by `frequent_changing/js/user_home_buttom.js` if its token is absent from `window.menu_objects` — which is built from the session's `function_access`, snapshotted at login. Consequences that cost real time twice: (1) a menu item can be correct in the view and still invisible, with "view source" showing it present; (2) **this applies to Admin too** — `checkAccess()` short-circuits `TRUE` for Admin on the *server*, but the client-side filter knows nothing about roles and only string-matches, so an Admin still needs the `tbl_access` row to exist; (3) re-login cannot fix a missing row, only a migration can. When a new menu entry does not appear, check `tbl_access` on the database being used **before** touching the view.
+- **Two report models do not filter `del_status` on sales.** `foodMenuSaleByCategories()` and `dailySummaryReport()` have no `del_status` predicate, while `detailedSaleReport()` and `saleReportByDate()` do. Any sale soft-deleted through the UI therefore still counts as revenue in those two. Pre-existing, surfaced during the launch data reset, **not yet fixed** — and the reason hard delete was chosen for that reset.
+- **`Report_model::detailedSaleReport()` has an early-return gate** that returns nothing unless a date, user, sale number, due status, payment method **or time range** is set. Any new filter added to that report must be added to the gate as well, or filtering by it alone silently returns an empty report rather than results. This has now caught two batches of filters.
+- **Montserrat is loaded at weights 300–700 only** (`assets/POS/css/style.css:2`). Any rule asking for 800 renders a synthesised fake-bold unless the weight is explicitly loaded — the category rail redesign adds an 800 link in `main_screen.php` for exactly this reason.
+- **A new host cannot be stood up by copying files and importing a dump — the installer produces state a copy does not.** See the standing procedure in `DEPLOYMENT.md`. The state was reported as `assets/bluezimp/`; that directory is indeed absent and untracked, but **`bluezimp` appears nowhere in the application code**, so the specific path is unverified. The rule stands regardless of which files it actually is.

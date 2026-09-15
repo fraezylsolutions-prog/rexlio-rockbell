@@ -14,6 +14,86 @@ that has not already been tested locally.
 Claude prepares commits, migration scripts and the exact commands; the "go" on
 live is a human decision, every time.
 
+---
+
+## STANDING PROCEDURE — standing up a NEW host
+
+**Never stand up a new host by copying files and importing a database dump.
+Always run the vendor's own `/install` process first.**
+
+This is the single most expensive lesson of the project so far, and it applies
+to every future client deployment, not just Rockbell.
+
+### What went wrong (Rockbell, 2026-09-08)
+
+The first attempt at `rockbell.fraezyl.app` was a manual deployment: copy the
+application files up, import a database dump, edit `database.php`. The site
+returned a blank page / 501. Two theories were chased and both were wrong:
+
+- **`base_url` fallback** — plausible because `config.php:27` derives `base_url`
+  from `$_SERVER['HTTP_HOST']`, so a host-header difference looked like a
+  candidate. It was not.
+- **A missing or misplaced `index.php`** — also not the cause.
+
+Both were red herrings, and the time spent on them is the reason this section
+exists.
+
+### The actual cause
+
+This product is not a plain "copy the files and point it at a database"
+application. **The vendor's installer generates state that a raw file copy
+cannot produce**, and without it the application does not boot — failing in a
+way that looks like a server or routing fault rather than a missing
+installation, which is precisely what makes it so expensive to diagnose.
+
+**Established from the deployment itself:** the manual copy failed; running
+`/install` fixed it. That is the operative fact and the reason for this
+procedure.
+
+**Reported during that work, and worth recording even though it is not fully
+pinned down:** the generated state was identified as files under
+`assets/bluezimp/`. Two caveats on that specific, so nobody over-trusts it
+later — `assets/bluezimp/` does not exist in the local working tree and is not
+tracked in git (consistent with it being generated rather than shipped), but a
+search of the application code found **no reference to `bluezimp` anywhere** —
+not in controllers, models, helpers, libraries, config, `system/`,
+`third_party/` or `install/`. So the directory name is plausible but
+unconfirmed; the licence surface may sit elsewhere, or be constructed
+dynamically. **Do not build tooling that depends on that path** without
+verifying it first on a host that has actually been installed.
+
+Either way the conclusion is unchanged: the installer produces something a copy
+does not, so run the installer.
+
+### The procedure
+
+1. Upload the application files to the new host.
+2. **Run `/install` and complete the vendor's installation flow.** Let it create
+   its own database and activation state. Do not skip this because you already
+   have a database.
+3. Only then import the data you actually want to carry over, and re-point
+   `application/config/database.php`.
+4. Block or remove `install/` once the installation is complete — it is in the
+   repository because it is needed for exactly this step, but it must not stay
+   reachable on a live host.
+
+### Why a database export still works
+
+Exporting the local `rexlio` database and importing it after installation is
+fine, and is the normal way to carry a prepared menu and settings to a new
+host. What is *not* fine is treating that import as a substitute for running
+the installer. The database is data; the installer produces state that does not
+live in the database at all.
+
+Note also that a local export already contains every migration applied locally,
+so a freshly-installed host seeded this way needs no separate migration run.
+
+### What a database export never carries
+
+`images/` and `uploads/` are excluded from both the repository and any SQL
+export. Menu items arrive with their names, prices and categories intact but
+**without photographs**, which have to be re-uploaded on the new host.
+
 ## What the repository contains
 
 Tracked: application code, `system/`, `vendor/` (there is no `composer.json`,

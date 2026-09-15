@@ -275,6 +275,9 @@ foreach ($waiters as $waiter){
 <input type="hidden" id="ir_tp_status_offline" value="<?php echo lang('ir_tp_status_offline'); ?>">
 <input type="hidden" id="ir_tp_open_tables" value="<?php echo lang('ir_tp_open_tables'); ?>">
 <input type="hidden" id="ir_tp_tap_hint" value="<?php echo lang('ir_tp_tap_hint'); ?>">
+<input type="hidden" id="ir_as_no_merge_targets" value="<?php echo lang('ir_as_no_merge_targets'); ?>">
+<input type="hidden" id="ir_as_already_merged" value="<?php echo lang('ir_as_already_merged'); ?>">
+<input type="hidden" id="ir_as_open_min" value="<?php echo lang('ir_as_open_min'); ?>">
 <div class="modalOverlay"></div>
 <input type="hidden" id="base_url_customer" value="<?php echo base_url()?>">
 <input type="hidden" id="csrf_name_" value="<?php echo escape_output($this->security->get_csrf_token_name()); ?>">

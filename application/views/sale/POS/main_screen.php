@@ -688,7 +688,7 @@ foreach ($notifications as $single_notification){
          rather than the real cut. Same family and host as the existing import,
          so this adds a weight - not another typeface. */ ?>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap">
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.8.7">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.8.8">
 </head>
 
 <body>
@@ -1450,6 +1450,30 @@ foreach ($notifications as $single_notification){
                         </div>
                     </div>
                     <div class="ir-tp-grid" id="ir_tp_grid"></div>
+                </div>
+                <?php /* Stage 3: six-action sheet for a table card. Every button runs the POS's own
+                         handler for that action (the same ones the table modal's quick actions
+                         use); the order is adopted onto this till first when it lives elsewhere. */ ?>
+                <div id="ir_action_sheet" hidden>
+                    <div class="ir-as" role="dialog" aria-modal="true">
+                        <div class="ir-as-head">
+                            <div><b id="ir_as_title"></b><br><span id="ir_as_sub"></span></div>
+                            <button type="button" class="ir-as-close" id="ir_as_close" aria-label="<?php echo lang('close'); ?>">&times;</button>
+                        </div>
+                        <div class="ir-as-grid" id="ir_as_grid">
+                            <button type="button" class="ir-as-btn ir-as-primary" data-action="modify"><i class="fas fa-edit"></i><div><?php echo lang('modify_order_'); ?><small><?php echo lang('ir_as_hint_modify'); ?></small></div></button>
+                            <button type="button" class="ir-as-btn" data-action="invoice"><i class="fas fa-file-invoice"></i><div><?php echo lang('invoice'); ?><small><?php echo lang('ir_as_hint_invoice'); ?></small></div></button>
+                            <button type="button" class="ir-as-btn" data-action="split"><i class="fas fa-clone"></i><div><?php echo lang('split_bill'); ?><small><?php echo lang('ir_as_hint_split'); ?></small></div></button>
+                            <button type="button" class="ir-as-btn" data-action="merge"><i class="fas fa-code-branch"></i><div><?php echo lang('merge_table'); ?><small><?php echo lang('ir_as_hint_merge'); ?></small></div></button>
+                            <button type="button" class="ir-as-btn" data-action="bill"><i class="fas fa-print"></i><div><?php echo lang('bill'); ?><small><?php echo lang('ir_as_hint_bill'); ?></small></div></button>
+                            <button type="button" class="ir-as-btn ir-as-danger" data-action="cancel"><i class="fas fa-times"></i><div><?php echo lang('cancel_order'); ?><small><?php echo lang('ir_as_hint_cancel'); ?></small></div></button>
+                        </div>
+                        <div class="ir-as-merge" id="ir_as_merge" hidden>
+                            <p class="ir-as-merge-title"><?php echo lang('ir_as_merge_pick'); ?></p>
+                            <div class="ir-as-merge-list" id="ir_as_merge_list"></div>
+                            <button type="button" class="ir-as-btn ir-as-back" id="ir_as_merge_back"><i class="fas fa-arrow-left"></i><div><?php echo lang('back'); ?></div></button>
+                        </div>
+                    </div>
                 </div>
                 <form autocomplete="off" class="search-category-form" id="search_form">
                     <?php  if(isFoodCourt() && $this->session->userdata('role') != 'Admin'):?>
@@ -4699,7 +4723,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=4.9"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=5.0"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">

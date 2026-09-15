@@ -2459,8 +2459,117 @@
           e.preventDefault();
           let card = $(this);
           if(card.attr("data-kind") === "table"){ irTpSelectTable(card.attr("data-table_id"), card.attr("data-table_name")); return; }
-          irTpOpenOrder(card.attr("data-sale_no"), card.attr("data-local") === "1");
+          irSheetOpen(card.attr("data-sale_no"));
       });
+      /* ---- six-action sheet (Stage 3) ----------------------------------------------
+         Each action is the POS's own handler, reached the way the table modal's
+         quick actions reach it: make sure the order is on this till (adopt if not),
+         select its running-order card, click the existing button. Cancel keeps the
+         existing reason prompt as its confirmation. Merge shows a picker of the
+         other open tables and then calls the vendor's setMergeTableFinal with the
+         same four inputs the table modal gives it. */
+      var ir_sheet_sale_no = null;
+      function irSheetOpen(sale_no){
+          let it = ir_tp_items[sale_no]; if(!it){ return; }
+          ir_sheet_sale_no = sale_no;
+          $("#ir_as_title").text(it.tables ? it.tables : sale_no);
+          $("#ir_as_sub").text(sale_no + " " + String.fromCharCode(183) + " " + irTpMoney(it.value) + (it.date_time ? " " + String.fromCharCode(183) + " " + irTpMsg("ir_as_open_min", "open") + " " + irTpElapsed(it.date_time, ir_tp_server_now) : ""));
+          $("#ir_as_merge").prop("hidden", true); $("#ir_as_grid").prop("hidden", false);
+          $("#ir_action_sheet").prop("hidden", false);
+      }
+      function irSheetClose(){ $("#ir_action_sheet").prop("hidden", true); ir_sheet_sale_no = null; }
+      /* adopt if needed, then wait for the running-order card, then hand it over */
+      function irTpEnsureLocalCard(sale_no, done){
+          let it = ir_tp_items[sale_no];
+          let waitCard = function(){
+              let tries = 0;
+              let tm = setInterval(function(){
+                  tries++;
+                  let card = $('.holder .order_details > .single_order[data-sale_no="' + sale_no + '"]');
+                  if(card.length){ clearInterval(tm); done(card); return; }
+                  if(tries >= 40){ clearInterval(tm); done(null); }
+              }, 150);
+          };
+          if(it && !it.local){ irAdoptOrder(sale_no, function(ok){ if(ok){ waitCard(); } else { done(null); } }); return; }
+          waitCard();
+      }
+      function irSheetRun(action){
+          let sale_no = ir_sheet_sale_no; if(!sale_no){ return; }
+          if(action === "merge"){ irSheetMergePicker(sale_no); return; }
+          irSheetClose();
+          irRunOrderAction(sale_no, action);
+      }
+      /* run one of the five direct actions on an order (the sheet, and the Table
+         Status screen's deep links via ?ir_action=) */
+      function irRunOrderAction(sale_no, action){
+          irTpEnsureLocalCard(sale_no, function(card){
+              if(!card){ return; }
+              if(action === "modify"){
+                  irCloseTablesPanel();
+                  $("#update_sale_id").val(sale_no);
+                  get_details_of_a_particular_order(sale_no);
+                  setTimeout(function(){ update_kitchen_status(sale_no); }, 1000);
+              }else if(action === "invoice"){
+                  irCloseTablesPanel(); card.trigger("click"); $(".invoice_btn_class").eq(1).click();
+              }else if(action === "split"){
+                  irCloseTablesPanel(); card.trigger("click"); $(".invoice_btn_class").eq(0).click();
+              }else if(action === "bill"){
+                  card.trigger("click"); $("#create_bill_and_close").click();
+              }else if(action === "cancel"){
+                  card.trigger("click"); $("#cancel_order_button").click();
+                  setTimeout(irTpRefresh, 2500);
+              }
+          });
+      }
+      function irSheetMergePicker(sale_no){
+          let me = ir_tp_items[sale_no];
+          if(me && me.merged){ toastr['warning'](irTpMsg("ir_as_already_merged", "This order is already a merged bill"), ''); return; }
+          let html = "";
+          for(let k in ir_tp_items){
+              if(k === sale_no){ continue; }
+              let o = ir_tp_items[k]; if(o.merged){ continue; }
+              html += '<button type="button" class="ir-as-btn" data-merge_with="' + irTpEsc(k) + '"><i class="fas fa-code-branch"></i><div>' + irTpEsc(o.tables ? o.tables : k) + '<small>' + irTpEsc(irTpMoney(o.value)) + '</small></div></button>';
+          }
+          if(!html){ html = '<div class="ir-as-merge-empty">' + irTpEsc(irTpMsg("ir_as_no_merge_targets", "No other open table to merge with")) + '</div>'; }
+          $("#ir_as_merge_list").html(html);
+          $("#ir_as_grid").prop("hidden", true); $("#ir_as_merge").prop("hidden", false);
+      }
+      function irTpLocalRecord(sale_no, done){
+          if(typeof db === "undefined" || !db){ done(null); return; }
+          let found = null;
+          let store = db.transaction(['sales'], "readonly").objectStore("sales");
+          store.openCursor().onsuccess = function(event){
+              let cursor = event.target.result;
+              if(cursor){ if(cursor.value.sale_no == sale_no){ found = cursor.value; } cursor.continue(); return; }
+              done(found);
+          };
+      }
+      function irSheetMerge(a, b){
+          irSheetClose();
+          swal({ title: warning + "!", text: not_merge_yet, confirmButtonColor: "#3c8dbc", confirmButtonText: ok, showCancelButton: true }, function(){
+              irTpEnsureLocalCard(a, function(ca){
+                  if(!ca){ return; }
+                  irTpEnsureLocalCard(b, function(cb){
+                      if(!cb){ return; }
+                      irTpLocalRecord(a, function(ra){
+                          irTpLocalRecord(b, function(rb){
+                              if(!ra || !rb){ return; }
+                              let oa = null, ob = null; try{ oa = JSON.parse(ra.order); ob = JSON.parse(rb.order); }catch(e){}
+                              if(!oa || !ob){ return; }
+                              irCloseTablesPanel();
+                              setMergeTableFinal([oa, ob], [a, b], [oa.orders_table_text || a, ob.orders_table_text || b], [ra.sales_id, rb.sales_id]);
+                          });
+                      });
+                  });
+              });
+          });
+      }
+      $(document).on("click", "#ir_as_close", function(e){ e.preventDefault(); irSheetClose(); });
+      $(document).on("click", "#ir_action_sheet", function(e){ if(e.target && e.target.id === "ir_action_sheet"){ irSheetClose(); } });
+      $(document).on("click", "#ir_as_grid .ir-as-btn", function(e){ e.preventDefault(); irSheetRun($(this).attr("data-action")); });
+      $(document).on("click", "#ir_as_merge_back", function(e){ e.preventDefault(); $("#ir_as_merge").prop("hidden", true); $("#ir_as_grid").prop("hidden", false); });
+      $(document).on("click", "#ir_as_merge_list .ir-as-btn", function(e){ e.preventDefault(); let with_no = $(this).attr("data-merge_with"); if(with_no && ir_sheet_sale_no){ irSheetMerge(ir_sheet_sale_no, with_no); } });
+      if($("#ir_tables_panel_on_load").val() === "1"){ setTimeout(irOpenTablesPanel, 900); }
       function getRandomCode(length) {
           let result           = '';
           //this is random character pattern

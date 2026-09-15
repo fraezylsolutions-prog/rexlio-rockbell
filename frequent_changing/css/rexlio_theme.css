@@ -1482,3 +1482,29 @@ a.category_button.all_category{
     .ir-tcard .ir-tc-name{font-size:16px}
     .ir-tcard .ir-tc-value{font-size:18px}
 }
+
+/* 25b. six-action sheet over the tables panel (Stage 3) */
+#ir_action_sheet{position:absolute; inset:0; z-index:60; background:rgba(7,12,31,.62); display:flex; align-items:center; justify-content:center; padding:24px}
+#ir_action_sheet[hidden]{display:none !important}
+#ir_action_sheet .ir-as{background:var(--rx-surface); border:1px solid var(--rx-line); border-radius:var(--rx-radius); width:min(560px,100%); box-shadow:0 20px 60px rgba(0,0,0,.45); overflow:hidden}
+#ir_action_sheet .ir-as-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--rx-line)}
+#ir_action_sheet .ir-as-head b{font:800 18px/1.2 Montserrat,system-ui,sans-serif; color:var(--rx-ink)}
+#ir_action_sheet .ir-as-head span{color:var(--rx-muted); font-size:13px}
+#ir_action_sheet .ir-as-close{background:transparent; border:0; color:var(--rx-muted); font-size:26px; line-height:1; cursor:pointer; width:40px; height:40px}
+#ir_action_sheet .ir-as-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:16px 20px 20px}
+#ir_action_sheet .ir-as-grid[hidden]{display:none !important}
+#ir_action_sheet .ir-as-btn{display:flex; align-items:center; gap:12px; padding:16px; border-radius:var(--rx-radius-sm); border:1px solid var(--rx-line); background:var(--rx-raise); color:var(--rx-ink); font:700 16px/1.1 Montserrat,system-ui,sans-serif; cursor:pointer; text-align:left; width:100%}
+#ir_action_sheet .ir-as-btn i{width:26px; text-align:center; font-size:18px; color:var(--rx-accent)}
+#ir_action_sheet .ir-as-btn small{display:block; font:500 12px/1.2 system-ui,sans-serif; color:var(--rx-muted); margin-top:3px}
+#ir_action_sheet .ir-as-btn.ir-as-primary{background:var(--rx-accent); border-color:var(--rx-accent); color:#fff}
+#ir_action_sheet .ir-as-btn.ir-as-primary i, #ir_action_sheet .ir-as-btn.ir-as-primary small{color:#fff; opacity:.9}
+#ir_action_sheet .ir-as-btn.ir-as-danger{border-color:rgba(239,68,68,.45)}
+#ir_action_sheet .ir-as-btn.ir-as-danger i{color:var(--rx-bad)}
+#ir_action_sheet .ir-as-btn[disabled]{opacity:.5; cursor:not-allowed}
+#ir_action_sheet .ir-as-merge{padding:16px 20px 20px}
+#ir_action_sheet .ir-as-merge[hidden]{display:none !important}
+#ir_action_sheet .ir-as-merge-title{font:700 15px/1.2 Montserrat,system-ui,sans-serif; color:var(--rx-ink); margin:0 0 12px}
+#ir_action_sheet .ir-as-merge-list{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; max-height:40vh; overflow:auto}
+#ir_action_sheet .ir-as-merge-list .ir-as-btn{padding:12px 14px}
+#ir_action_sheet .ir-as-merge-empty{grid-column:1/-1; color:var(--rx-muted); font-size:14px; padding:8px 0}
+@media (max-width:767.98px){ #ir_action_sheet{padding:10px} #ir_action_sheet .ir-as-grid, #ir_action_sheet .ir-as-merge-list{grid-template-columns:1fr; gap:8px; padding:12px} #ir_action_sheet .ir-as-btn{padding:12px} }

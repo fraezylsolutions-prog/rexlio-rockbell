@@ -3,7 +3,7 @@
 --
 -- Run against live before a deploy:
 --     mysql -u <user> -p <livedb> < db/migrations/preflight_status.sql
--- Prints one row per migration: APPLIED or MISSING. Apply the MISSING ones in
+-- Prints one row per migration: APPLIED or MISSING (11 migrations as of 2026-09-17). Apply the MISSING ones in
 -- the listed order, each with its own script (each prints PASS at the end).
 -- Nothing here writes. Every check uses information_schema or tables that
 -- exist in every install (tbl_access, tbl_roles, tbl_role_access, tbl_food_menus).
@@ -53,6 +53,16 @@ UNION ALL
 SELECT '2026-09-16_02_hotel-schema', CASE WHEN
     (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()
        AND TABLE_NAME IN ('tbl_hotel_room_types','tbl_hotel_rooms','tbl_hotel_room_status_log','tbl_hotel_housekeeping_tasks','tbl_hotel_stays')) = 5
-    AND (SELECT COUNT(*) FROM tbl_access c JOIN tbl_access m ON m.id=c.parent_id WHERE m.module_name IN ('hotel_rooms','hotel_front_desk','hotel_housekeeping')) = 12
+    AND (SELECT COUNT(*) FROM tbl_access c JOIN tbl_access m ON m.id=c.parent_id WHERE m.module_name IN ('hotel_rooms','hotel_front_desk','hotel_housekeeping')) >= 12
     AND (SELECT COUNT(*) FROM tbl_roles WHERE role_name='Housekeeping' AND del_status='Live') >= 1
+  THEN 'APPLIED' ELSE 'MISSING' END
+UNION ALL
+SELECT '2026-09-17_01_hotel-stay-value', CASE WHEN
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tbl_hotel_stays'
+       AND COLUMN_NAME IN ('rate','nights','amount','actual_nights','value_note')) = 5
+    AND (SELECT COUNT(*) FROM tbl_access c JOIN tbl_access m ON m.id=c.parent_id WHERE m.module_name='hotel_front_desk' AND c.function_name='value') = 1
+  THEN 'APPLIED' ELSE 'MISSING' END
+UNION ALL
+SELECT '2026-09-17_02_hotel-reports-permission', CASE WHEN
+    (SELECT COUNT(*) FROM tbl_access c JOIN tbl_access m ON m.id=c.parent_id WHERE m.module_name='hotel_reports' AND c.function_name='view') = 1
   THEN 'APPLIED' ELSE 'MISSING' END;

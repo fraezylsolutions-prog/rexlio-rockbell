@@ -58,9 +58,14 @@
                     <div class="col-6 mb-2"><label><?php echo lang('phone'); ?></label><input type="text" id="hk_ci_phone" class="form-control" maxlength="50"></div>
                     <div class="col-3 mb-2"><label><?php echo lang('adults'); ?></label><input type="number" id="hk_ci_adults" class="form-control" value="1" min="1" max="20"></div>
                     <div class="col-3 mb-2"><label><?php echo lang('children'); ?></label><input type="number" id="hk_ci_children" class="form-control" value="0" min="0" max="20"></div>
-                    <div class="col-6 mb-2"><label><?php echo lang('expected_checkout'); ?></label><input type="date" id="hk_ci_expected" class="form-control"></div>
+                    <div class="col-6 mb-2"><label><?php echo lang('expected_checkout'); ?> <span class="required_star" id="hk_ci_expected_star">*</span></label><input type="date" id="hk_ci_expected" class="form-control"></div>
                     <div class="col-6 mb-2"><label><?php echo lang('reference'); ?></label><input type="text" id="hk_ci_reference" class="form-control" maxlength="100" placeholder="<?php echo lang('reference_hint'); ?>"></div>
                     <div class="col-12 mb-2"><label><?php echo lang('notes'); ?></label><input type="text" id="hk_ci_notes" class="form-control" maxlength="250"></div>
+                    <?php /* H5 - the stay's value: rate from the room type (only value holders may change it),
+                             nights from the expected check-out, amount = nights x rate, all live */ ?>
+                    <div class="col-4 mb-2"><label><?php echo lang('rate_per_night'); ?></label><input type="number" min="0" step="0.01" id="hk_ci_rate" class="form-control" <?php echo empty($can_value) ? 'readonly' : ''; ?>></div>
+                    <div class="col-4 mb-2"><label><?php echo lang('nights'); ?></label><input type="text" id="hk_ci_nights" class="form-control" readonly></div>
+                    <div class="col-4 mb-2"><label><?php echo lang('amount'); ?></label><input type="text" id="hk_ci_amount" class="form-control hk_amount_ro" readonly></div>
                 </div>
                 <div class="text-danger" id="hk_ci_error"></div>
             </div>
@@ -93,6 +98,60 @@
     </div>
 </div>
 
+<!-- H5: check-out variance (value holders only; option C) -->
+<div class="modal fade" id="hkVarianceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><?php echo lang('hotel_variance_title'); ?> &middot; <span id="hk_va_room"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="hk_va_room_id" value="">
+                <div class="hk_warn" id="hk_va_text"></div>
+                <div class="row">
+                    <div class="col-6 mb-2"><label><?php echo lang('hotel_recorded_value'); ?></label><input type="text" id="hk_va_old" class="form-control" readonly></div>
+                    <div class="col-6 mb-2"><label><?php echo lang('hotel_adjust_to'); ?></label><input type="number" min="0" step="0.01" id="hk_va_amount" class="form-control"></div>
+                    <div class="col-12 mb-2"><label><?php echo lang('hotel_value_note'); ?></label><input type="text" id="hk_va_note" class="form-control" maxlength="250"></div>
+                </div>
+                <div class="text-danger" id="hk_va_error"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="hk_va_keep"><?php echo lang('hotel_keep_value'); ?></button>
+                <button type="button" class="btn bg-blue-btn" id="hk_va_adjust"><?php echo lang('hotel_adjust_value'); ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- H5: edit a stay's value (value holders only) -->
+<div class="modal fade" id="hkValueModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><?php echo lang('hotel_value_edit'); ?> &middot; <span id="hk_ev_room"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="hk_ev_stay_id" value="">
+                <div class="row">
+                    <div class="col-6 mb-2"><label><?php echo lang('expected_checkout'); ?></label><input type="date" id="hk_ev_expected" class="form-control"></div>
+                    <div class="col-6 mb-2"><label><?php echo lang('rate_per_night'); ?></label><input type="number" min="0" step="0.01" id="hk_ev_rate" class="form-control"></div>
+                    <div class="col-6 mb-2"><label><?php echo lang('nights'); ?></label><input type="text" id="hk_ev_nights" class="form-control" readonly></div>
+                    <div class="col-6 mb-2"><label><?php echo lang('amount'); ?></label><input type="number" min="0" step="0.01" id="hk_ev_amount" class="form-control"></div>
+                    <div class="col-12 mb-2"><label><?php echo lang('hotel_value_note'); ?></label><input type="text" id="hk_ev_note" class="form-control" maxlength="250"></div>
+                </div>
+                <div class="text-muted" style="font-size:12px"><?php echo lang('hotel_value_hint'); ?></div>
+                <div class="text-danger" id="hk_ev_error"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo lang('cancel'); ?></button>
+                <button type="button" class="btn bg-blue-btn" id="hk_ev_submit"><?php echo lang('submit'); ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- room history -->
 <div class="modal fade" id="hkHistoryModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable">
@@ -110,9 +169,12 @@
 <input type="hidden" id="hk_can_checkin" value="<?php echo !empty($can_checkin) ? 1 : 0; ?>">
 <input type="hidden" id="hk_can_checkout" value="<?php echo !empty($can_checkout) ? 1 : 0; ?>">
 <input type="hidden" id="hk_can_status" value="<?php echo !empty($can_status) ? 1 : 0; ?>">
+<input type="hidden" id="hk_can_value" value="<?php echo !empty($can_value) ? 1 : 0; ?>">
+<input type="hidden" id="hk_today" value="<?php echo date('Y-m-d'); ?>">
 <?php foreach (array('check_in', 'check_out', 'room_vacant', 'room_occupied', 'room_out_of_order', 'room_clean', 'room_dirty', 'room_in_progress', 'room_inspected',
                      'hotel_set_out_of_order', 'hotel_back_in_service', 'history', 'hotel_no_rooms', 'hotel_since', 'hotel_confirm_checkout', 'hotel_check_in_anyway',
-                     'hotel_dirty_warn_text', 'guest', 'expected_checkout', 'hotel_task_open', 'no_data_found', 'hotel_toast_checked_in', 'hotel_toast_checked_out') as $k): ?>
+                     'hotel_dirty_warn_text', 'guest', 'expected_checkout', 'hotel_task_open', 'no_data_found', 'hotel_toast_checked_in', 'hotel_toast_checked_out',
+                     'nights', 'hotel_value_edit', 'hotel_variance_text', 'hotel_value_updated', 'hotel_log_value', 'hotel_err_amount') as $k): ?>
 <input type="hidden" id="hk_lang_<?php echo $k; ?>" value="<?php echo lang($k); ?>">
 <?php endforeach; ?>
-<script src="<?php echo base_url(); ?>frequent_changing/js/hotel_front_desk.js?v=1.1"></script>
+<script src="<?php echo base_url(); ?>frequent_changing/js/hotel_front_desk.js?v=1.2"></script>

@@ -89,7 +89,7 @@ class Hotel_model extends CI_Model {
      */
     public function getBoard($outlet_id) {
         return $this->db->select('r.id, r.number, r.floor, r.occupancy_status, r.housekeeping_status, r.notes, t.name AS type_name,
-                s.id AS stay_id, s.guest_name, s.guest_phone, s.adults, s.children, s.checkin_at, s.expected_checkout, s.reference,
+                s.id AS stay_id, s.guest_name, s.guest_phone, s.adults, s.children, s.checkin_at, s.expected_checkout, s.reference, s.rate, s.nights, s.amount, t.base_rate,
                 (SELECT MAX(l.created_at) FROM tbl_hotel_room_status_log l WHERE l.room_id = r.id AND l.status_kind = "occupancy") AS occupancy_since,
                 (SELECT MAX(l2.created_at) FROM tbl_hotel_room_status_log l2 WHERE l2.room_id = r.id AND l2.status_kind = "housekeeping") AS housekeeping_since,
                 (SELECT COUNT(*) FROM tbl_hotel_housekeeping_tasks k WHERE k.room_id = r.id AND k.status IN ("pending","in_progress","done") AND k.del_status = "Live") AS open_tasks', FALSE)
@@ -127,10 +127,17 @@ class Hotel_model extends CI_Model {
         return (int) $this->db->insert_id();
     }
 
-    public function closeStay($stay_id, $user_id) {
-        $this->db->where('id', (int) $stay_id)->where('status', 'in_house')
-                 ->update('tbl_hotel_stays', array('status' => 'checked_out', 'checkout_at' => date('Y-m-d H:i:s'), 'checked_out_by' => (int) $user_id));
+    public function closeStay($stay_id, $user_id, $actual_nights = NULL) {
+        $upd = array('status' => 'checked_out', 'checkout_at' => date('Y-m-d H:i:s'), 'checked_out_by' => (int) $user_id);
+        if ($actual_nights !== NULL) { $upd['actual_nights'] = (int) $actual_nights; }
+        $this->db->where('id', (int) $stay_id)->where('status', 'in_house')->update('tbl_hotel_stays', $upd);
         return $this->db->affected_rows() > 0;
+    }
+
+    /** H5: rate / nights / amount / expected check-out corrections */
+    public function updateStay($stay_id, $data) {
+        $this->db->where('id', (int) $stay_id)->update('tbl_hotel_stays', $data);
+        return $this->db->affected_rows() >= 0;
     }
 
     /** a housekeeping task (H3 works them); one open task of a type per room is enough */
@@ -157,9 +164,10 @@ class Hotel_model extends CI_Model {
      * date_from / date_to (on checkin_at), guest (name/phone/reference contains)
      */
     public function getStays($company_id, $filters) {
-        $this->db->select('s.*, r.number AS room_number, o.outlet_name, ui.full_name AS in_by, uo.full_name AS out_by')
+        $this->db->select('s.*, r.number AS room_number, t.name AS type_name, o.outlet_name, ui.full_name AS in_by, uo.full_name AS out_by')
                  ->from('tbl_hotel_stays s')
                  ->join('tbl_hotel_rooms r', 'r.id = s.room_id', 'left')
+                 ->join('tbl_hotel_room_types t', 't.id = r.room_type_id', 'left')
                  ->join('tbl_outlets o', 'o.id = s.outlet_id', 'left')
                  ->join('tbl_users ui', 'ui.id = s.checked_in_by', 'left')
                  ->join('tbl_users uo', 'uo.id = s.checked_out_by', 'left')

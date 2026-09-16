@@ -184,3 +184,29 @@ toggle end-to-end check, docs and the owner's checklist.
 
 **Not done here, by design:** nothing was applied to the live database. Going live is the owner's
 checklist in the guide (backup → migration 01 → 02 → deploy → Switch on).
+
+### U1 — flash banners (2026-09-16). Commit 95219084.
+The shared banner (139 screens) had green-on-green text (theme rule specificity) and never left; now white
+text on both banners, success fades after 6 s, danger stays; Front Desk actions show a 4 s toast.
+
+### H5 — stay value (2026-09-17). Local only; not on live.
+Migration `2026-09-17_01_hotel-stay-value.sql`: `rate`, `nights`, `amount`, `actual_nights`, `value_note` on
+`tbl_hotel_stays` (guarded ADD COLUMNs, re-runnable), index on (company, check-in), permission
+`hotel_front_desk › value` for Admin and Manager.
+- **Counted at check-in** (decision 2a): rate from the room type's base rate — only a `value` holder may type
+  another; nights = expected check-out − check-in date (min 1); amount = nights × rate. A rate above 0
+  requires the expected check-out (decision 4); a type without a rate is complimentary. Logged in the room
+  history as kind `value` (null → amount).
+- **Check-out, option C** (decision 1): actual nights recorded on every check-out. A `value` holder whose
+  actual ≠ expected gets a prompt — keep the recorded value or adjust it (reason optional) — logged old → new.
+  Staff without the permission check out unprompted; the variance (actual ≠ nights) shows as a badge in the
+  Stay Log for a manager to settle with **Edit value** (front desk card for in-house stays, Stay Log for any
+  stay). Every change logged with old / new and the reason; audit rows too.
+- Stay Log: Room type / Rate / Nights (+ actual badge) / Amount columns, amount total, CSV columns.
+- Still nothing in `tbl_sales`, registers, Today's Sale, no invoice — recorded value only.
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch: permission rows; board carries base_rate / stay value / can.value; page fields read-only vs editable; check-in: expected required when rate > 0, past date refused, Cashier's posted rate ignored (type rate wins), Manager's negotiated rate honoured, negative rate refused, day-use = 1 night, complimentary type; edit value: Cashier refused by the constructor, unknown stay, extend → recomputed + logged, typed amount + reason, no log on a no-op, bad date / amount; check-out: variance prompt with expected / actual / suggested, bad amount refused, adjust with reason (actual_nights, amount, log "4 / 2"), Cashier checks out unprompted with the variance recorded and the amount untouched, later settlement on a checked-out stay, same-day no prompt, early departure "keep"; Stay Log columns / badges / total / edit buttons per permission, CSV; sales tables untouched | **35/35** |
+| Node builders on a real `boardAjax` answer: money(), nightsBetween(), occupied card value line + Edit value button (permission-dependent), vacant card data-rate | 5/5 |
+| Real browser: check-in modal live nights/amount from the expected date (15,000 → 3 nights → 45,000, required star), variance prompt on check-out with the suggested figure → adjust posts `confirm_value=1`, amount, reason; Edit value modal recalculates on a new expected date and posts | PASS |

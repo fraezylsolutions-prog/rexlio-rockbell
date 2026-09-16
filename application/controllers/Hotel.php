@@ -65,6 +65,8 @@ class Hotel extends Cl_Controller {
             $module = 'hotel_front_desk'; $function = 'checkout';
         } elseif ($segment_2 == "setOutOfOrder") {
             $module = 'hotel_front_desk'; $function = 'status';
+        } elseif ($segment_2 == "editStayValue") {
+            $module = 'hotel_front_desk'; $function = 'value';
         } elseif ($segment_2 == "housekeeping" || $segment_2 == "tasksAjax") {
             $module = 'hotel_housekeeping'; $function = 'view';
         } elseif ($segment_2 == "taskStart" || $segment_2 == "taskDone") {
@@ -329,6 +331,7 @@ class Hotel extends Cl_Controller {
         $data['can_checkin'] = $this->can('hotel_front_desk', 'checkin');
         $data['can_checkout'] = $this->can('hotel_front_desk', 'checkout');
         $data['can_status'] = $this->can('hotel_front_desk', 'status');
+        $data['can_value'] = $this->can('hotel_front_desk', 'value');
         $data['main_content'] = $this->load->view('hotel/front_desk', $data, TRUE);
         $this->load->view('userHome', $data);
     }
@@ -347,7 +350,7 @@ class Hotel extends Cl_Controller {
             if ($r->housekeeping_status === 'dirty' || $r->housekeeping_status === 'in_progress') { $counts['dirty']++; }
         }
         $this->jsonOk(array('outlet_id' => $outlet_id, 'rooms' => $rooms, 'counts' => $counts, 'server_time' => date('Y-m-d H:i:s'),
-                            'can' => array('checkin' => $this->can('hotel_front_desk', 'checkin') ? 1 : 0, 'checkout' => $this->can('hotel_front_desk', 'checkout') ? 1 : 0, 'status' => $this->can('hotel_front_desk', 'status') ? 1 : 0)));
+                            'can' => array('checkin' => $this->can('hotel_front_desk', 'checkin') ? 1 : 0, 'checkout' => $this->can('hotel_front_desk', 'checkout') ? 1 : 0, 'status' => $this->can('hotel_front_desk', 'status') ? 1 : 0, 'value' => $this->can('hotel_front_desk', 'value') ? 1 : 0)));
     }
 
     /**
@@ -365,12 +368,25 @@ class Hotel extends Cl_Controller {
         if ($room->occupancy_status === 'occupied' || $this->Hotel_model->getInHouseStay($room->id)) { return $this->jsonFail('occupied'); }
         if ($room->occupancy_status === 'out_of_order') { return $this->jsonFail('out_of_order'); }
         $expected = trim((string) $this->input->post('expected_checkout'));
-        if ($expected !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $expected)) { return $this->jsonFail('date'); }
+        if ($expected !== '' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $expected) || $expected < date('Y-m-d'))) { return $this->jsonFail('date'); }
+        /* H5 - the stay's value, counted at check-in (business decision). The rate comes from the
+           room type; only a 'value' holder may type a different one. A rate above 0 needs the
+           expected check-out, because that is what the value is computed from. */
+        $type = $this->Hotel_model->getRoomType($room->room_type_id);
+        $rate = $type && $type->base_rate !== NULL ? (float) $type->base_rate : 0.0;
+        if ($this->can('hotel_front_desk', 'value') && trim((string) $this->input->post('rate')) !== '') {
+            if (!is_numeric($this->input->post('rate')) || (float) $this->input->post('rate') < 0) { return $this->jsonFail('rate'); }
+            $rate = round((float) $this->input->post('rate'), 2);
+        }
+        if ($rate > 0 && $expected === '') { return $this->jsonFail('expected_checkout'); }
+        $nights = $this->nightsBetween(date('Y-m-d'), $expected !== '' ? $expected : date('Y-m-d'));
+        $amount = round($nights * $rate, 2);
         if (!in_array($room->housekeeping_status, array('clean', 'inspected'), TRUE) && (int) $this->input->post('confirm_dirty') !== 1) {
             return $this->jsonFail('dirty', array('warn' => 1, 'housekeeping_status' => $room->housekeeping_status));
         }
         $user_id = (int) $this->session->userdata('user_id');
         $stay_id = $this->Hotel_model->insertStay(array(
+            'rate' => $rate, 'nights' => $nights, 'amount' => $amount,
             'company_id' => (int) $room->company_id, 'outlet_id' => (int) $room->outlet_id, 'room_id' => (int) $room->id,
             'guest_name' => $guest,
             'guest_phone' => htmlspecialcharscustom($this->input->post($this->security->xss_clean('guest_phone'))),
@@ -382,8 +398,9 @@ class Hotel extends Cl_Controller {
             'notes' => htmlspecialcharscustom($this->input->post($this->security->xss_clean('notes'))),
         ));
         $this->Hotel_model->setRoomStatus($room->id, 'occupancy', 'occupied', $user_id, lang('hotel_log_checkin') . ' ' . $guest);
-        putAuditLog($user_id, 'Check-in: room ' . $room->number . ', ' . $guest . ' (stay ' . $stay_id . ')', 'Hotel Check-in', date('Y-m-d H:i:s'));
-        $this->jsonOk(array('stay_id' => $stay_id));
+        $this->Hotel_model->logStatus($room->id, 'value', NULL, number_format($amount, 2, '.', ''), $user_id, lang('hotel_log_checkin') . ' ' . $nights . ' x ' . number_format($rate, 2, '.', '') . ' (stay ' . $stay_id . ')');
+        putAuditLog($user_id, 'Check-in: room ' . $room->number . ', ' . $guest . ' (stay ' . $stay_id . ', value ' . $amount . ')', 'Hotel Check-in', date('Y-m-d H:i:s'));
+        $this->jsonOk(array('stay_id' => $stay_id, 'rate' => $rate, 'nights' => $nights, 'amount' => $amount));
     }
 
     /**
@@ -398,12 +415,73 @@ class Hotel extends Cl_Controller {
         $stay = $this->Hotel_model->getInHouseStay($room->id);
         if (!$stay) { return $this->jsonFail('not_in_house'); }
         $user_id = (int) $this->session->userdata('user_id');
-        if (!$this->Hotel_model->closeStay($stay->id, $user_id)) { return $this->jsonFail('not_in_house'); }
+        /* H5 - actual nights vs the nights the value was computed from (option C, 2026-09-16):
+           a 'value' holder is asked to keep or adjust the recorded value; other staff check out
+           and the variance stays visible in the Stay Log and the reports for a manager. */
+        $actual = $this->nightsBetween(substr($stay->checkin_at, 0, 10), date('Y-m-d'));
+        $expected_n = $stay->nights !== NULL ? (int) $stay->nights : NULL;
+        $can_value = $this->can('hotel_front_desk', 'value');
+        if ($can_value && $expected_n !== NULL && $actual !== $expected_n && (int) $this->input->post('confirm_value') !== 1) {
+            return $this->jsonFail('variance', array('warn' => 1, 'expected_nights' => $expected_n, 'actual_nights' => $actual, 'rate' => (float) $stay->rate,
+                                                     'amount' => (float) $stay->amount, 'suggested_amount' => round($actual * (float) $stay->rate, 2), 'guest_name' => $stay->guest_name));
+        }
+        if ($can_value && (int) $this->input->post('confirm_value') === 1 && trim((string) $this->input->post('amount')) !== '') {
+            if (!is_numeric($this->input->post('amount')) || (float) $this->input->post('amount') < 0) { return $this->jsonFail('amount'); }
+            $new_amount = round((float) $this->input->post('amount'), 2);
+            if ($new_amount !== round((float) $stay->amount, 2)) {
+                $note = trim(htmlspecialcharscustom($this->input->post($this->security->xss_clean('value_note'))));
+                $this->Hotel_model->updateStay($stay->id, array('amount' => $new_amount, 'value_note' => $note !== '' ? $note : lang('hotel_log_checkout') . ': ' . $actual . ' ' . lang('nights')));
+                $this->Hotel_model->logStatus($room->id, 'value', number_format((float) $stay->amount, 2, '.', ''), number_format($new_amount, 2, '.', ''), $user_id, ($note !== '' ? $note . ' - ' : '') . lang('hotel_log_checkout') . ' ' . $actual . ' / ' . $expected_n . ' ' . lang('nights'));
+                putAuditLog($user_id, 'Stay value: room ' . $room->number . ' ' . $stay->amount . ' -> ' . $new_amount . ' at check-out (stay ' . $stay->id . ')', 'Hotel Stay Value', date('Y-m-d H:i:s'));
+            }
+        }
+        if (!$this->Hotel_model->closeStay($stay->id, $user_id, $actual)) { return $this->jsonFail('not_in_house'); }
         $this->Hotel_model->setRoomStatus($room->id, 'occupancy', 'vacant', $user_id, lang('hotel_log_checkout') . ' ' . $stay->guest_name);
         $this->Hotel_model->setRoomStatus($room->id, 'housekeeping', 'dirty', $user_id, lang('hotel_log_checkout'));
         $task_id = $this->Hotel_model->createTask($room->company_id, $room->outlet_id, $room->id, 'cleaning', $user_id, lang('hotel_task_after_checkout'));
         putAuditLog($user_id, 'Check-out: room ' . $room->number . ', ' . $stay->guest_name . ' (stay ' . $stay->id . ')', 'Hotel Check-out', date('Y-m-d H:i:s'));
-        $this->jsonOk(array('stay_id' => (int) $stay->id, 'task_id' => $task_id));
+        $this->jsonOk(array('stay_id' => (int) $stay->id, 'task_id' => $task_id, 'actual_nights' => $actual, 'variance' => ($expected_n !== NULL && $actual !== $expected_n) ? 1 : 0));
+    }
+
+    /**
+     * H5 - change a stay's expected check-out / rate / amount ('value' permission).
+     * Works on in-house and checked-out stays (a manager settling a variance later).
+     * The amount follows nights x rate unless one is typed; every change is logged
+     * as kind 'value' with the old and new figure.
+     * @access public
+     * @return void
+     */
+    public function editStayValue() {
+        $stay = $this->Hotel_model->getStay((int) $this->input->post('stay_id'));
+        if (!$stay || (int) $stay->company_id !== (int) $this->session->userdata('company_id') || !in_array((int) $stay->outlet_id, $this->outletIds(), TRUE) || $stay->status === 'cancelled') { return $this->jsonFail('stay'); }
+        $user_id = (int) $this->session->userdata('user_id');
+        $expected = trim((string) $this->input->post('expected_checkout'));
+        if ($expected !== '' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $expected) || $expected < substr($stay->checkin_at, 0, 10))) { return $this->jsonFail('date'); }
+        if ($expected === '') { $expected = $stay->expected_checkout; }
+        $rate = trim((string) $this->input->post('rate')) !== '' ? $this->input->post('rate') : $stay->rate;
+        if ($rate === NULL || !is_numeric($rate) || (float) $rate < 0) { return $this->jsonFail('rate'); }
+        $rate = round((float) $rate, 2);
+        if ($rate > 0 && ($expected === NULL || $expected === '')) { return $this->jsonFail('expected_checkout'); }
+        $nights = $this->nightsBetween(substr($stay->checkin_at, 0, 10), $expected ? $expected : substr($stay->checkin_at, 0, 10));
+        $amount = trim((string) $this->input->post('amount')) !== '' ? $this->input->post('amount') : round($nights * $rate, 2);
+        if (!is_numeric($amount) || (float) $amount < 0) { return $this->jsonFail('amount'); }
+        $amount = round((float) $amount, 2);
+        $note = trim(htmlspecialcharscustom($this->input->post($this->security->xss_clean('value_note'))));
+        $upd = array('expected_checkout' => $expected ? $expected : NULL, 'rate' => $rate, 'nights' => $nights, 'amount' => $amount);
+        if ($note !== '') { $upd['value_note'] = $note; }
+        $this->Hotel_model->updateStay($stay->id, $upd);
+        $old = $stay->amount === NULL ? NULL : number_format((float) $stay->amount, 2, '.', '');
+        if ($old !== number_format($amount, 2, '.', '') || (int) $stay->nights !== $nights || round((float) $stay->rate, 2) !== $rate) {
+            $this->Hotel_model->logStatus($stay->room_id, 'value', $old, number_format($amount, 2, '.', ''), $user_id, ($note !== '' ? $note . ' - ' : '') . $nights . ' x ' . number_format($rate, 2, '.', '') . ' (stay ' . $stay->id . ')');
+            putAuditLog($user_id, 'Stay value: stay ' . $stay->id . ' ' . $stay->amount . ' -> ' . $amount . ' (' . $nights . ' x ' . $rate . ')', 'Hotel Stay Value', date('Y-m-d H:i:s'));
+        }
+        $this->jsonOk(array('stay_id' => (int) $stay->id, 'expected_checkout' => $expected, 'rate' => $rate, 'nights' => $nights, 'amount' => $amount));
+    }
+
+    /** whole nights between two Y-m-d dates, never less than 1 (a same-day stay is one night's value) */
+    private function nightsBetween($from, $to) {
+        $d = (int) floor((strtotime($to) - strtotime($from)) / 86400);
+        return max(1, $d);
     }
 
     /**
@@ -464,15 +542,16 @@ class Hotel extends Cl_Controller {
             header('Content-Type: text/csv; charset=utf-8');
             header('Content-Disposition: attachment; filename="hotel_stays_' . date('Ymd_His') . '.csv"');
             $out = fopen('php://output', 'w');
-            fputcsv($out, array('Outlet', 'Room', 'Guest', 'Phone', 'Adults', 'Children', 'Check-in', 'Expected check-out', 'Check-out', 'Status', 'Reference', 'Checked in by', 'Checked out by', 'Notes'));
+            fputcsv($out, array('Outlet', 'Room', 'Room type', 'Guest', 'Phone', 'Adults', 'Children', 'Check-in', 'Expected check-out', 'Check-out', 'Status', 'Rate', 'Nights', 'Actual nights', 'Amount', 'Reference', 'Checked in by', 'Checked out by', 'Notes', 'Value note'));
             foreach ($stays as $s) {
-                fputcsv($out, array($s->outlet_name, $s->room_number, $s->guest_name, $s->guest_phone, $s->adults, $s->children, $s->checkin_at, $s->expected_checkout, $s->checkout_at, $s->status, $s->reference, $s->in_by, $s->out_by, $s->notes));
+                fputcsv($out, array($s->outlet_name, $s->room_number, $s->type_name, $s->guest_name, $s->guest_phone, $s->adults, $s->children, $s->checkin_at, $s->expected_checkout, $s->checkout_at, $s->status, $s->rate, $s->nights, $s->actual_nights, $s->amount, $s->reference, $s->in_by, $s->out_by, $s->notes, $s->value_note));
             }
             fclose($out);
             return;
         }
         $data = array();
         $data['filters'] = $filters;
+        $data['can_value'] = $this->can('hotel_front_desk', 'value');
         $data['outlets'] = $this->Hotel_model->getOutlets($ids);
         $data['rooms'] = $this->Hotel_model->getRooms($company_id, $ids);
         $data['stays'] = $stays;

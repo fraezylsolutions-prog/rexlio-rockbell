@@ -2144,3 +2144,22 @@ $lang['module_schema_missing_badge']='Tables missing';
 /* Hotel Operations add-on - U1: front desk toasts */
 $lang['hotel_toast_checked_in']='Checked in:';
 $lang['hotel_toast_checked_out']='Checked out: room';
+/* Hotel Operations add-on - H5: stay value */
+$lang['rate_per_night']='Rate / night';
+$lang['nights']='Nights';
+$lang['actual_nights']='Actual nights';
+$lang['hotel_value_edit']='Edit value';
+$lang['hotel_value_note']='Reason';
+$lang['hotel_value_updated']='Value updated:';
+$lang['hotel_value_hint']='The amount follows nights x rate unless you type one. Every change is kept in the room history with the old and new figure. This value is recorded for reporting only - it is not a sale.';
+$lang['hotel_recorded_value']='Recorded value';
+$lang['hotel_adjust_to']='Adjust to';
+$lang['hotel_keep_value']='Keep recorded value';
+$lang['hotel_adjust_value']='Adjust value';
+$lang['hotel_variance_title']='Stay differs from expected';
+$lang['hotel_variance_text']='{guest}: the value was recorded for {expected} night(s); the guest stayed {actual}. Keep the recorded value or adjust it.';
+$lang['hotel_log_value']='Value';
+$lang['hotel_err_rate']='The rate must be a number, 0 or more.';
+$lang['hotel_err_amount']='The amount must be a number, 0 or more.';
+$lang['hotel_err_expected_checkout']='An expected check-out date is needed when the rate is above 0 - it sets the value of the stay.';
+$lang['hotel_err_stay']='Stay not found or not in one of your outlets.';

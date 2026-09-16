@@ -667,6 +667,44 @@ class Hotel extends Cl_Controller {
         $this->load->view('userHome', $data);
     }
 
+    /**
+     * H8 - Stays: one row per stay checked in within the range, with its value; subtotals by
+     * period bucket, by room category and by the staff member who checked the guest in. Extra
+     * filters: category, staff, status. Variance (actual nights <> expected) is flagged per row.
+     * @access public
+     * @return void
+     */
+    public function reportStays() {
+        $company_id = (int) $this->session->userdata('company_id');
+        $f = $this->reportFilters();
+        $type_id = (int) $this->input->get_post('type_id'); $user_id = (int) $this->input->get_post('user_id');
+        $status = (string) $this->input->get_post('status'); if (!in_array($status, array('in_house', 'checked_out'), TRUE)) { $status = ''; }
+        $buckets = $this->reportBuckets($f['from'], $f['to'], $f['view']);
+        $stays = $this->Hotel_model->staysReport($company_id, $f['outlet_ids'], $f['from'], $f['to'], $type_id, $user_id, $status);
+        $zero = array('stays' => 0, 'nights' => 0, 'amount' => 0.0);
+        $by_bucket = array(); foreach ($buckets as $k => $label) { $by_bucket[$k] = array('label' => $label) + $zero; }
+        $by_type = array(); $by_staff = array(); $total = $zero; $variances = 0;
+        foreach ($stays as $st) {
+            $k = $this->bucketKey(substr($st->checkin_at, 0, 10), $f['view']);
+            $tn = $st->type_name ? $st->type_name : lang('hk_no_category'); $sn = $st->in_by ? $st->in_by : '-';
+            if (!isset($by_type[$tn])) { $by_type[$tn] = $zero; } if (!isset($by_staff[$sn])) { $by_staff[$sn] = $zero; }
+            foreach (array(array(&$total), array(&$by_type[$tn]), array(&$by_staff[$sn])) as $ref) { $ref[0]['stays']++; $ref[0]['nights'] += (int) $st->nights; $ref[0]['amount'] += (float) $st->amount; }
+            if (isset($by_bucket[$k])) { $by_bucket[$k]['stays']++; $by_bucket[$k]['nights'] += (int) $st->nights; $by_bucket[$k]['amount'] += (float) $st->amount; }
+            if ($st->actual_nights !== NULL && (int) $st->actual_nights !== (int) $st->nights) { $variances++; }
+        }
+        ksort($by_type); ksort($by_staff);
+        $types = array(); foreach ($this->Hotel_model->getRoomTypes($company_id) as $t) { $types[(int) $t->id] = $t->name; }
+        $staff = array(); foreach ($this->Hotel_model->checkinStaff($company_id) as $u) { $staff[(int) $u->id] = $u->full_name; }
+        $f['extra_filters'] = array(
+            array('name' => 'type_id', 'label' => lang('room_type'), 'options' => $types, 'selected' => $type_id ? $type_id : ''),
+            array('name' => 'user_id', 'label' => lang('hk_checked_in_by'), 'options' => $staff, 'selected' => $user_id ? $user_id : ''),
+            array('name' => 'status', 'label' => lang('status'), 'options' => array('in_house' => lang('stay_in_house'), 'checked_out' => lang('stay_checked_out')), 'selected' => $status),
+        );
+        $data = array('filters' => $f, 'stays' => $stays, 'by_bucket' => $by_bucket, 'by_type' => $by_type, 'by_staff' => $by_staff, 'total' => $total, 'variances' => $variances);
+        $data['main_content'] = $this->load->view('hotel/report_stays', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
+
     /** a real Y-m-d calendar date ("2020-13-45" matches the shape but would blow up in the query) */
     private function validDate($v) {
         return (bool) preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', (string) $v, $m) && checkdate((int) $m[2], (int) $m[3], (int) $m[1]);

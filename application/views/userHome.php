@@ -1010,6 +1010,7 @@
                                 <?php if (irModuleEnabled('hotel')): ?>
                                 <li data-access="view-<?php echo irAccessModuleId('hotel_reports'); ?>" class="menu_assign_class" data-menu__cid="irp_15"><a class="child-menu" href="<?php echo base_url()?>Hotel/reportValue"><?php echo lang('hk_report_value'); ?></a></li>
                                 <li data-access="view-<?php echo irAccessModuleId('hotel_reports'); ?>" class="menu_assign_class" data-menu__cid="irp_15"><a class="child-menu" href="<?php echo base_url()?>Hotel/reportOccupancy"><?php echo lang('hk_report_occupancy'); ?></a></li>
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_reports'); ?>" class="menu_assign_class" data-menu__cid="irp_15"><a class="child-menu" href="<?php echo base_url()?>Hotel/reportStays"><?php echo lang('hk_report_stays'); ?></a></li>
                                 <?php endif; ?>
                                 <li data-access="view-159" class="menu_assign_class" data-menu__cid="irp_15">
                                     <a class="child-menu" href="<?php echo base_url()?>Report/registerReport">

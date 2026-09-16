@@ -265,3 +265,16 @@ for every day of the range (rooms out of order or added mid-range are not netted
 | Node `statsHtml` on the real answer: cards, chips, category table, separate period block, empty state | 5/5 |
 | Real browser: Front Desk row above the board (NOW cards, category table, period block), main dashboard card "Rooms checked-in 2" in the Transactions slot with the chart toggle still below | PASS |
 | Regression: H2 47, H4 33, H5 35, 5c 28, Node 9 + 5 | green |
+
+### H8 — Stays report (2026-09-17). Local only; not on live.
+`Hotel/reportStays`: the shared filter bar plus **room category / checked-in-by / status** selects
+(the filter partial gained an extra-filters slot for later reports). One row per stay checked in within
+the range (cancelled excluded, in-house included with its recorded value): check-in / out, room,
+category, guest, status, rate, nights, actual nights with a **variance** badge, amount, staff,
+reference; totals. Three sub-tables — **by period** (the view's buckets), **by room category**, **by
+staff** — each with stays / nights / amount and a total; summary cards incl. the number of stays with a
+nights variance. DataTables export.
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch (two staff, two categories, a variance, a February stay, a cancelled one, another outlet, an in-house one): Cashier refused; menu; January rows newest-first with the right columns and the variance badge; summary 280 000 / 5 / 11 / 1 variance; by period / category / staff sub-tables; category filter; staff + status filters; all outlets week view sums; empty period | **13/13** |

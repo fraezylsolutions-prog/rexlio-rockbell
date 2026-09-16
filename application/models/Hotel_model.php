@@ -305,4 +305,29 @@ class Hotel_model extends CI_Model {
                           ->group_by('housekeeping_status')->get()->result() as $r) { if (isset($out[$r->housekeeping_status])) { $out[$r->housekeeping_status] = (int) $r->n; } }
         return $out;
     }
+
+    /**
+     * H8 - the stays of a period (by check-in date, cancelled excluded) with room, category and staff,
+     * optionally narrowed to one category / one check-in user / one status. Newest first.
+     */
+    public function staysReport($company_id, $outlet_ids, $from, $to, $type_id = 0, $user_id = 0, $status = '') {
+        if (!$outlet_ids) { return array(); }
+        $this->db->select('s.*, r.number AS room_number, r.room_type_id, t.name AS type_name, o.outlet_name, ui.full_name AS in_by, uo.full_name AS out_by')
+                 ->from('tbl_hotel_stays s')->join('tbl_hotel_rooms r', 'r.id = s.room_id')
+                 ->join('tbl_hotel_room_types t', 't.id = r.room_type_id', 'left')->join('tbl_outlets o', 'o.id = s.outlet_id', 'left')
+                 ->join('tbl_users ui', 'ui.id = s.checked_in_by', 'left')->join('tbl_users uo', 'uo.id = s.checked_out_by', 'left')
+                 ->where('s.company_id', (int) $company_id)->where('s.del_status', 'Live')->where('s.status !=', 'cancelled')
+                 ->where_in('s.outlet_id', $outlet_ids)
+                 ->where('s.checkin_at >=', $from . ' 00:00:00')->where('s.checkin_at <=', $to . ' 23:59:59');
+        if ($type_id) { $this->db->where('r.room_type_id', (int) $type_id); }
+        if ($user_id) { $this->db->where('s.checked_in_by', (int) $user_id); }
+        if (in_array($status, array('in_house', 'checked_out'), TRUE)) { $this->db->where('s.status', $status); }
+        return $this->db->order_by('s.checkin_at', 'DESC')->limit(5000)->get()->result();
+    }
+
+    /** H8 - the users who have ever checked a guest in (the staff filter's options) */
+    public function checkinStaff($company_id) {
+        return $this->db->select('u.id, u.full_name')->from('tbl_hotel_stays s')->join('tbl_users u', 'u.id = s.checked_in_by')
+                        ->where('s.company_id', (int) $company_id)->where('s.del_status', 'Live')->group_by(array('u.id', 'u.full_name'))->order_by('u.full_name', 'ASC')->get()->result();
+    }
 }

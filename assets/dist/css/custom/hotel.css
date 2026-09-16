@@ -125,3 +125,10 @@
 .hk_period_rows { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .hk_b_period { background: #fff; color: #1b1633; border: 1px solid #e0d8ff; }
 @media (max-width: 767.98px) { .hk_stats_table { display: block; overflow-x: auto; white-space: nowrap; } }
+
+/* ---- H8: report sub-tables ---- */
+.hk_rp_subs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.hk_rp_subbox { background: #fff; border: 1px solid #e4e6ef; border-radius: 12px; padding: 10px 12px; }
+.hk_rp_sub_table { margin: 6px 0 0; font-size: 12.5px; }
+.hk_rp_sub_table th, .hk_rp_sub_table td { padding: 4px 6px; }
+.hk_variance { font-size: 10px; vertical-align: middle; }

@@ -27,6 +27,16 @@
         <label class="form-label mb-1"><?php echo lang('end_date'); ?></label>
         <input type="date" name="end_date" id="hk_rp_to" class="form-control" value="<?php echo escape_output($filters['to']); ?>">
     </div>
+    <?php /* report-specific filters (H8+): each item is array(name, label, options[value => label], selected) */
+    if (!empty($extra_filters)): foreach ($extra_filters as $x): ?>
+    <div class="col-sm-6 col-md-3 col-lg-2">
+        <label class="form-label mb-1"><?php echo $x['label']; ?></label>
+        <select name="<?php echo $x['name']; ?>" class="form-control">
+            <option value=""><?php echo lang('all'); ?></option>
+            <?php foreach ($x['options'] as $v => $label): ?><option value="<?php echo escape_output($v); ?>" <?php echo (string) $x['selected'] === (string) $v && $x['selected'] !== '' ? 'selected' : ''; ?>><?php echo escape_output($label); ?></option><?php endforeach; ?>
+        </select>
+    </div>
+    <?php endforeach; endif; ?>
     <div class="col-sm-12 col-md-6 col-lg-3">
         <label class="form-label mb-1 d-block">&nbsp;</label>
         <div class="btn-group btn-group-sm" role="group">

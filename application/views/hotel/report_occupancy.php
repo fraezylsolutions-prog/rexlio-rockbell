@@ -4,7 +4,7 @@
 $report_action = 'reportOccupancy';
 $pct = function($occ, $avail) { return $avail > 0 ? number_format($occ * 100 / $avail, 1) . '%' : '–'; };
 $revpar = function($value, $avail) { return $avail > 0 ? getAmtP($value / $avail) : '–'; }; ?>
-<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.5">
+<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.6">
 <section class="main-content-wrapper">
     <section class="content-header">
         <h3 class="top-left-header"><?php echo lang('hk_report_occupancy'); ?></h3>

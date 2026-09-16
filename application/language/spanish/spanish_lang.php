@@ -2203,3 +2203,11 @@ $lang['hk_value_generated_period']='Value generated this period';
 $lang['hk_grand_total_value']='Grand total value';
 $lang['hk_now']='Now';
 $lang['hk_value_period']='Value period';
+/* Hotel Operations add-on - H8: stays report */
+$lang['hk_report_stays']='Hotel: Stays';
+$lang['hk_checked_in_by']='Checked in by';
+$lang['hk_by_period']='By period';
+$lang['hk_by_staff']='By staff';
+$lang['hk_variances']='Stays with a nights variance';
+$lang['hk_variance']='variance';
+$lang['hk_stays_report_note']='Stays are listed by their check-in date; cancelled stays are excluded; in-house stays show their recorded value. A variance badge marks a stay whose actual nights differ from the nights the value was recorded for. Recorded value only - not sales.';

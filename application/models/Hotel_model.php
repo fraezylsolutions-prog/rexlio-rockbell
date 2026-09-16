@@ -81,4 +81,98 @@ class Hotel_model extends CI_Model {
             'user_id' => (int) $user_id, 'note' => $note !== '' ? $note : NULL, 'created_at' => date('Y-m-d H:i:s'),
         ));
     }
+    /* ---------------------------------------------------------------- front desk (H2) */
+
+    /**
+     * the board: every live room of one outlet with its type, the guest in it,
+     * when its occupancy last changed and how many housekeeping tasks are open
+     */
+    public function getBoard($outlet_id) {
+        return $this->db->select('r.id, r.number, r.floor, r.occupancy_status, r.housekeeping_status, r.notes, t.name AS type_name,
+                s.id AS stay_id, s.guest_name, s.guest_phone, s.adults, s.children, s.checkin_at, s.expected_checkout, s.reference,
+                (SELECT MAX(l.created_at) FROM tbl_hotel_room_status_log l WHERE l.room_id = r.id AND l.status_kind = "occupancy") AS occupancy_since,
+                (SELECT MAX(l2.created_at) FROM tbl_hotel_room_status_log l2 WHERE l2.room_id = r.id AND l2.status_kind = "housekeeping") AS housekeeping_since,
+                (SELECT COUNT(*) FROM tbl_hotel_housekeeping_tasks k WHERE k.room_id = r.id AND k.status IN ("pending","in_progress","done") AND k.del_status = "Live") AS open_tasks', FALSE)
+                 ->from('tbl_hotel_rooms r')
+                 ->join('tbl_hotel_room_types t', 't.id = r.room_type_id', 'left')
+                 ->join('tbl_hotel_stays s', 's.room_id = r.id AND s.status = "in_house" AND s.del_status = "Live"', 'left', FALSE)
+                 ->where('r.outlet_id', (int) $outlet_id)->where('r.del_status', 'Live')
+                 ->order_by('r.floor', 'ASC')->order_by('r.number', 'ASC')->get()->result();
+    }
+
+    public function getInHouseStay($room_id) {
+        return $this->db->get_where('tbl_hotel_stays', array('room_id' => (int) $room_id, 'status' => 'in_house', 'del_status' => 'Live'))->row();
+    }
+
+    public function getStay($id) {
+        return $this->db->get_where('tbl_hotel_stays', array('id' => (int) $id, 'del_status' => 'Live'))->row();
+    }
+
+    /**
+     * change one of a room's two states and write the log row for it. The
+     * whole state machine lives in the controller; this only records.
+     */
+    public function setRoomStatus($room_id, $kind, $to, $user_id, $note = '') {
+        $room = $this->getRoom($room_id);
+        if (!$room) { return FALSE; }
+        $column = $kind === 'occupancy' ? 'occupancy_status' : 'housekeeping_status';
+        $from = $room->$column;
+        $this->db->where('id', (int) $room_id)->update('tbl_hotel_rooms', array($column => $to, 'updated_at' => date('Y-m-d H:i:s')));
+        $this->logStatus($room_id, $kind, $from, $to, $user_id, $note);
+        return TRUE;
+    }
+
+    public function insertStay($data) {
+        $this->db->insert('tbl_hotel_stays', $data);
+        return (int) $this->db->insert_id();
+    }
+
+    public function closeStay($stay_id, $user_id) {
+        $this->db->where('id', (int) $stay_id)->where('status', 'in_house')
+                 ->update('tbl_hotel_stays', array('status' => 'checked_out', 'checkout_at' => date('Y-m-d H:i:s'), 'checked_out_by' => (int) $user_id));
+        return $this->db->affected_rows() > 0;
+    }
+
+    /** a housekeeping task (H3 works them); one open task of a type per room is enough */
+    public function createTask($company_id, $outlet_id, $room_id, $type, $created_by, $note = '') {
+        $open = $this->db->where('room_id', (int) $room_id)->where('task_type', $type)->where_in('status', array('pending', 'in_progress'))
+                         ->where('del_status', 'Live')->count_all_results('tbl_hotel_housekeeping_tasks');
+        if ($open > 0) { return 0; }
+        $this->db->insert('tbl_hotel_housekeeping_tasks', array(
+            'company_id' => (int) $company_id, 'outlet_id' => (int) $outlet_id, 'room_id' => (int) $room_id, 'task_type' => $type,
+            'status' => 'pending', 'created_by' => (int) $created_by, 'created_at' => date('Y-m-d H:i:s'), 'note' => $note !== '' ? $note : NULL,
+        ));
+        return (int) $this->db->insert_id();
+    }
+
+    /** the last status changes of one room, newest first */
+    public function getRoomHistory($room_id, $limit = 20) {
+        return $this->db->select('l.*, u.full_name AS user_name')->from('tbl_hotel_room_status_log l')
+                        ->join('tbl_users u', 'u.id = l.user_id', 'left')
+                        ->where('l.room_id', (int) $room_id)->order_by('l.id', 'DESC')->limit((int) $limit)->get()->result();
+    }
+
+    /**
+     * the stay log. $filters: outlet_ids (array, required scope), status, room_id,
+     * date_from / date_to (on checkin_at), guest (name/phone/reference contains)
+     */
+    public function getStays($company_id, $filters) {
+        $this->db->select('s.*, r.number AS room_number, o.outlet_name, ui.full_name AS in_by, uo.full_name AS out_by')
+                 ->from('tbl_hotel_stays s')
+                 ->join('tbl_hotel_rooms r', 'r.id = s.room_id', 'left')
+                 ->join('tbl_outlets o', 'o.id = s.outlet_id', 'left')
+                 ->join('tbl_users ui', 'ui.id = s.checked_in_by', 'left')
+                 ->join('tbl_users uo', 'uo.id = s.checked_out_by', 'left')
+                 ->where('s.company_id', (int) $company_id)->where('s.del_status', 'Live');
+        if (!empty($filters['outlet_ids'])) { $this->db->where_in('s.outlet_id', $filters['outlet_ids']); } else { $this->db->where('1', '0', FALSE); }
+        if (!empty($filters['status'])) { $this->db->where('s.status', $filters['status']); }
+        if (!empty($filters['room_id'])) { $this->db->where('s.room_id', (int) $filters['room_id']); }
+        if (!empty($filters['date_from'])) { $this->db->where('s.checkin_at >=', $filters['date_from'] . ' 00:00:00'); }
+        if (!empty($filters['date_to'])) { $this->db->where('s.checkin_at <=', $filters['date_to'] . ' 23:59:59'); }
+        if (!empty($filters['guest'])) {
+            $g = $this->db->escape_like_str($filters['guest']);
+            $this->db->where("(s.guest_name LIKE '%$g%' OR s.guest_phone LIKE '%$g%' OR s.reference LIKE '%$g%')", NULL, FALSE);
+        }
+        return $this->db->order_by('s.checkin_at', 'DESC')->limit(1000)->get()->result();
+    }
 }

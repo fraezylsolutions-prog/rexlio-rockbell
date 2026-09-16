@@ -1,0 +1,42 @@
+/* Hotel Operations add-on - Front Desk board (H2) and Housekeeping board (H3).
+   Follows running_orders.css / table_status.css: plain classes, prefix hk_. */
+.hk_chip { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: #eef0f6; color: #4b4b63; margin-left: 4px; }
+.hk_chip b { margin-left: 3px; }
+.hk_chip_occ b { color: #b42318; }
+.hk_chip_vac b { color: #067647; }
+.hk_chip_dirty b { color: #b54708; }
+.hk_chip_ooo b { color: #344054; }
+.hk_offline_banner { margin: 0 0 12px; padding: 10px 14px; border-radius: 8px; background: #fff4e5; color: #8a5a00; font-size: 13px; }
+.hk_board { min-height: 200px; }
+.hk_floor { margin-bottom: 18px; }
+.hk_floor_title { font-size: 14px; font-weight: 700; color: #716e8c; margin: 0 0 10px; }
+.hk_grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.hk_card { background: #fff; border: 1px solid #e4e6ef; border-radius: 12px; padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,.05); border-top: 5px solid #9aa0b4; display: flex; flex-direction: column; gap: 8px; }
+.hk_card.hk_occ_vacant { border-top-color: #12b76a; }
+.hk_card.hk_occ_occupied { border-top-color: #f04438; }
+.hk_card.hk_occ_out_of_order { border-top-color: #344054; background: #f7f7fa; }
+.hk_card_head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.hk_room_no { font-size: 22px; font-weight: 800; color: #1b1633; }
+.hk_type { font-size: 12px; color: #716e8c; text-align: right; }
+.hk_badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.hk_badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #eef0f6; color: #4b4b63; }
+.hk_card.hk_occ_occupied .hk_b_occ { background: #fee4e2; color: #b42318; }
+.hk_card.hk_occ_vacant .hk_b_occ { background: #dcfae6; color: #067647; }
+.hk_card.hk_occ_out_of_order .hk_b_occ { background: #344054; color: #fff; }
+.hk_card.hk_hk_dirty .hk_b_hk { background: #fef0c7; color: #b54708; }
+.hk_card.hk_hk_in_progress .hk_b_hk { background: #e0f2fe; color: #026aa2; }
+.hk_card.hk_hk_clean .hk_b_hk { background: #dcfae6; color: #067647; }
+.hk_card.hk_hk_inspected .hk_b_hk { background: #e9d7fe; color: #6941c6; }
+.hk_b_task { background: #e0f2fe; color: #026aa2; }
+.hk_guest { font-size: 13.5px; color: #1b1633; min-height: 34px; }
+.hk_muted { font-size: 12px; color: #716e8c; }
+.hk_actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.hk_btn { flex: 1 1 auto; border: 1px solid #e4e6ef; background: #f4f5fa; color: #1b1633; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.hk_btn:hover { filter: brightness(.97); }
+.hk_btn_primary { background: #6c4bf4; border-color: #6c4bf4; color: #fff; }
+.hk_btn_danger { background: #fee4e2; border-color: #fecdca; color: #b42318; }
+.hk_btn_ghost { flex: 0 0 auto; background: transparent; }
+.hk_warn { background: #fef0c7; color: #7a2e0e; border: 1px solid #fedf89; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
+.hk_warn[hidden] { display: none !important; }
+.hk_empty { text-align: center; color: #8f8f8f; padding: 30px 0; }
+@media (max-width: 767.98px) { .hk_grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; } .hk_card { padding: 10px; } .hk_room_no { font-size: 18px; } }

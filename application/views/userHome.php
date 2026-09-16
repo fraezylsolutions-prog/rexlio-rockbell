@@ -520,8 +520,10 @@
                             </a>
                             <ul class="treeview-menu">
                                 <?php /* tokens = <function>-<id of the hotel_* access row>, ids looked up by name (H1) */ ?>
-                                <li data-access="view-<?php echo irAccessModuleId('hotel_front_desk'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/index">
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_front_desk'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/frontDesk">
                                         <?php echo lang('front_desk'); ?></a></li>
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_front_desk'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/stays">
+                                        <?php echo lang('stay_log'); ?></a></li>
                                 <li data-access="view-<?php echo irAccessModuleId('hotel_housekeeping'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/index">
                                         <?php echo lang('housekeeping_board'); ?></a></li>
                                 <li data-access="view-<?php echo irAccessModuleId('hotel_rooms'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/rooms">

@@ -99,3 +99,29 @@ still assigned to rooms cannot be deleted; statuses are shown on the list but on
 
 Found while verifying: `Custom::encrypt_decrypt('')` answers FALSE, not "" — the CRUD normalises the
 id (Table.php survives on a loose `==`); the Save button used an undefined `save` key → `submit`.
+
+### H2 — Front Desk (2026-09-16). Local only; not on live.
+`Hotel/frontDesk`: the room board for one outlet (accessible outlets selectable), server-rendered
+once and then polled every 15 s and after every action through `Hotel/boardAjax` (`hotel_front_desk.js`,
+`hotel.css`; card builders are pure functions). Cards show room, type, the two states as badges,
+the guest and "since", open-task count, and per-permission actions. `Hotel/index` now goes to the
+board for anyone holding `hotel_front_desk` view; others keep the landing tiles.
+- **Check-in** (`checkIn`, permission `checkin`): guest name required; room must be `vacant` — occupied
+  and out-of-order are refused; a room not `clean` / `inspected` answers a **warning** (`reason dirty,
+  warn 1`) and the same modal button becomes "Check in anyway" (re-post with `confirm_dirty=1`) — warn,
+  not block, by decision. Writes the stay (`in_house`), sets `occupied`, logs, audit row.
+- **Check-out** (`checkOut`, `checkout`): closes the stay (who / when), room → `vacant` **and** `dirty`
+  (two log rows), and a `cleaning` task goes to the housekeeping pool — deduplicated while one is open.
+- **Out of order** (`setOutOfOrder`, `status`): only while vacant; back in service → `vacant`; both logged
+  with the reason.
+- **History** (`roomHistoryAjax`): the room's last status changes with user names.
+- **Stay log** (`Hotel/stays`): outlet / status / room / check-in date range / guest-phone-reference
+  filters, DataTable, and `?export=csv` streaming the same filtered rows.
+- 38 language keys (5 already existed) × 4; sidebar: Front Desk → board, Stay Log.
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch: board page + JSON (counts, outlet switch and fallback, permission flags), Housekeeping role refused; check-in validation (name, room, date), success row + room state + log + audit, occupied refused, **dirty → warn → confirm**, inspected without warning, clamps; out of order (Cashier refused by the constructor, Manager ok + log, check-in on OOO refused, OOO on occupied refused, back in service); check-out (stay closed, vacant + dirty, two logs, pool task, repeat refused, **no duplicate task**), history, counts; stay log filters (status, guest/reference, outlet, date range) and the CSV export (headers, rows, attachment); everything refused while OFF | **47/47** |
+| Board builders (Node, real script, real `boardAjax` answer): occupied / vacant-dirty / out-of-order cards, permission-dependent buttons, escaping, floor grouping, empty state, `since()` | 9/9 |
+| Real browser (real page + CSS + JS, `boardAjax` answered from the captured JSON): 3 cards on 2 floors, chips, buttons per state; **check-in modal → warning → "Check In Anyway" → second post carries `confirm_dirty=1`, modal closes**; out-of-order modal; history modal | PASS |
+| Regression: H1 35/35 and H0 16/16 (both updated for the index → board redirect), Part B 18/18, tables panel 55 / 22 / 28 / 16 | green |

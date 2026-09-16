@@ -11,7 +11,7 @@
   # of it is reachable by URL or bookmark when it is off.
   #   H0  module gate + landing
   #   H1  Room Types + Rooms (this file's CRUD; Table.php pattern)
-  #   H2  Front Desk board, check-in / check-out, status log
+  #   H2  Front Desk board, check-in / check-out / out of order, status log, stay log
   #   H3  Housekeeping board
   # Permissions are tbl_access rows looked up BY NAME
   # (irAccessModuleId), never by a fixed id.
@@ -57,6 +57,14 @@ class Hotel extends Cl_Controller {
             $module = 'hotel_rooms'; $function = 'add';
         } elseif ($segment_2 == "deleteRoomType" || $segment_2 == "deleteRoom") {
             $module = 'hotel_rooms'; $function = 'delete';
+        } elseif ($segment_2 == "frontDesk" || $segment_2 == "boardAjax" || $segment_2 == "roomHistoryAjax" || $segment_2 == "stays") {
+            $module = 'hotel_front_desk'; $function = 'view';
+        } elseif ($segment_2 == "checkIn") {
+            $module = 'hotel_front_desk'; $function = 'checkin';
+        } elseif ($segment_2 == "checkOut") {
+            $module = 'hotel_front_desk'; $function = 'checkout';
+        } elseif ($segment_2 == "setOutOfOrder") {
+            $module = 'hotel_front_desk'; $function = 'status';
         } else {
             $this->refuse();
         }
@@ -95,6 +103,7 @@ class Hotel extends Cl_Controller {
      * @return void
      */
     public function index() {
+        if ($this->can('hotel_front_desk', 'view')) { redirect('Hotel/frontDesk'); }
         $data = array();
         $data['can_rooms'] = $this->can('hotel_rooms', 'view');
         $data['can_front_desk'] = $this->can('hotel_front_desk', 'view');
@@ -256,5 +265,200 @@ class Hotel extends Cl_Controller {
             $this->session->set_flashdata('exception', lang('delete_success'));
         }
         redirect('Hotel/rooms');
+    }
+
+    /* ================================================================ front desk (H2) */
+
+    /**
+     * which outlet the board shows: the posted one when it is accessible, else
+     * the session outlet
+     */
+    private function boardOutlet() {
+        $ids = $this->outletIds();
+        $posted = (int) $this->input->get_post('outlet_id');
+        if ($posted && in_array($posted, $ids, TRUE)) { return $posted; }
+        return (int) $this->session->userdata('outlet_id');
+    }
+
+    /** JSON helpers for the board's actions */
+    private function jsonOk($extra = array()) {
+        header('Content-Type: application/json');
+        echo json_encode(array_merge(array('ok' => 1), $extra));
+    }
+    private function jsonFail($reason, $extra = array()) {
+        header('Content-Type: application/json');
+        echo json_encode(array_merge(array('ok' => 0, 'reason' => $reason, 'message' => lang('hotel_err_' . $reason)), $extra));
+    }
+    /** a room this user may act on: live, in the company, in an accessible outlet */
+    private function actionableRoom($room_id) {
+        $room = $this->Hotel_model->getRoom($room_id);
+        if (!$room || (int) $room->company_id !== (int) $this->session->userdata('company_id')) { return NULL; }
+        if (!in_array((int) $room->outlet_id, $this->outletIds(), TRUE)) { return NULL; }
+        return $room;
+    }
+
+    /**
+     * the Front Desk board (server-rendered once, then polled through boardAjax)
+     * @access public
+     * @return void
+     */
+    public function frontDesk() {
+        $outlet_id = $this->boardOutlet();
+        $data = array();
+        $data['outlet_id'] = $outlet_id;
+        $data['outlets'] = $this->Hotel_model->getOutlets($this->outletIds());
+        $data['rooms'] = $this->Hotel_model->getBoard($outlet_id);
+        $data['can_checkin'] = $this->can('hotel_front_desk', 'checkin');
+        $data['can_checkout'] = $this->can('hotel_front_desk', 'checkout');
+        $data['can_status'] = $this->can('hotel_front_desk', 'status');
+        $data['main_content'] = $this->load->view('hotel/front_desk', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
+
+    /**
+     * the board as JSON, polled every 15 s and after every action
+     * @access public
+     * @return void
+     */
+    public function boardAjax() {
+        $outlet_id = $this->boardOutlet();
+        $rooms = $this->Hotel_model->getBoard($outlet_id);
+        $counts = array('rooms' => count($rooms), 'occupied' => 0, 'vacant' => 0, 'out_of_order' => 0, 'dirty' => 0);
+        foreach ($rooms as $r) {
+            if (isset($counts[$r->occupancy_status])) { $counts[$r->occupancy_status]++; }
+            if ($r->housekeeping_status === 'dirty' || $r->housekeeping_status === 'in_progress') { $counts['dirty']++; }
+        }
+        $this->jsonOk(array('outlet_id' => $outlet_id, 'rooms' => $rooms, 'counts' => $counts, 'server_time' => date('Y-m-d H:i:s'),
+                            'can' => array('checkin' => $this->can('hotel_front_desk', 'checkin') ? 1 : 0, 'checkout' => $this->can('hotel_front_desk', 'checkout') ? 1 : 0, 'status' => $this->can('hotel_front_desk', 'status') ? 1 : 0)));
+    }
+
+    /**
+     * check a guest in. Rules: the room must be vacant (occupied / out of order
+     * refused) and hold no in-house stay; a room that is not clean / inspected
+     * is WARNED about, not blocked - the caller re-posts with confirm_dirty=1.
+     * @access public
+     * @return void
+     */
+    public function checkIn() {
+        $room = $this->actionableRoom((int) $this->input->post('room_id'));
+        if (!$room) { return $this->jsonFail('room'); }
+        $guest = trim(htmlspecialcharscustom($this->input->post($this->security->xss_clean('guest_name'))));
+        if ($guest === '' || mb_strlen($guest) > 150) { return $this->jsonFail('guest_name'); }
+        if ($room->occupancy_status === 'occupied' || $this->Hotel_model->getInHouseStay($room->id)) { return $this->jsonFail('occupied'); }
+        if ($room->occupancy_status === 'out_of_order') { return $this->jsonFail('out_of_order'); }
+        $expected = trim((string) $this->input->post('expected_checkout'));
+        if ($expected !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $expected)) { return $this->jsonFail('date'); }
+        if (!in_array($room->housekeeping_status, array('clean', 'inspected'), TRUE) && (int) $this->input->post('confirm_dirty') !== 1) {
+            return $this->jsonFail('dirty', array('warn' => 1, 'housekeeping_status' => $room->housekeeping_status));
+        }
+        $user_id = (int) $this->session->userdata('user_id');
+        $stay_id = $this->Hotel_model->insertStay(array(
+            'company_id' => (int) $room->company_id, 'outlet_id' => (int) $room->outlet_id, 'room_id' => (int) $room->id,
+            'guest_name' => $guest,
+            'guest_phone' => htmlspecialcharscustom($this->input->post($this->security->xss_clean('guest_phone'))),
+            'adults' => max(1, min(20, (int) $this->input->post('adults'))),
+            'children' => max(0, min(20, (int) $this->input->post('children'))),
+            'checkin_at' => date('Y-m-d H:i:s'), 'expected_checkout' => $expected !== '' ? $expected : NULL,
+            'checked_in_by' => $user_id, 'status' => 'in_house',
+            'reference' => htmlspecialcharscustom($this->input->post($this->security->xss_clean('reference'))),
+            'notes' => htmlspecialcharscustom($this->input->post($this->security->xss_clean('notes'))),
+        ));
+        $this->Hotel_model->setRoomStatus($room->id, 'occupancy', 'occupied', $user_id, lang('hotel_log_checkin') . ' ' . $guest);
+        putAuditLog($user_id, 'Check-in: room ' . $room->number . ', ' . $guest . ' (stay ' . $stay_id . ')', 'Hotel Check-in', date('Y-m-d H:i:s'));
+        $this->jsonOk(array('stay_id' => $stay_id));
+    }
+
+    /**
+     * check the guest out: closes the stay, the room becomes vacant AND dirty,
+     * and a cleaning task goes to the housekeeping pool
+     * @access public
+     * @return void
+     */
+    public function checkOut() {
+        $room = $this->actionableRoom((int) $this->input->post('room_id'));
+        if (!$room) { return $this->jsonFail('room'); }
+        $stay = $this->Hotel_model->getInHouseStay($room->id);
+        if (!$stay) { return $this->jsonFail('not_in_house'); }
+        $user_id = (int) $this->session->userdata('user_id');
+        if (!$this->Hotel_model->closeStay($stay->id, $user_id)) { return $this->jsonFail('not_in_house'); }
+        $this->Hotel_model->setRoomStatus($room->id, 'occupancy', 'vacant', $user_id, lang('hotel_log_checkout') . ' ' . $stay->guest_name);
+        $this->Hotel_model->setRoomStatus($room->id, 'housekeeping', 'dirty', $user_id, lang('hotel_log_checkout'));
+        $task_id = $this->Hotel_model->createTask($room->company_id, $room->outlet_id, $room->id, 'cleaning', $user_id, lang('hotel_task_after_checkout'));
+        putAuditLog($user_id, 'Check-out: room ' . $room->number . ', ' . $stay->guest_name . ' (stay ' . $stay->id . ')', 'Hotel Check-out', date('Y-m-d H:i:s'));
+        $this->jsonOk(array('stay_id' => (int) $stay->id, 'task_id' => $task_id));
+    }
+
+    /**
+     * take a room out of order (only while vacant) or bring it back
+     * @access public
+     * @return void
+     */
+    public function setOutOfOrder() {
+        $room = $this->actionableRoom((int) $this->input->post('room_id'));
+        if (!$room) { return $this->jsonFail('room'); }
+        $on = (int) $this->input->post('out_of_order') === 1;
+        $note = htmlspecialcharscustom($this->input->post($this->security->xss_clean('note')));
+        $user_id = (int) $this->session->userdata('user_id');
+        if ($on) {
+            if ($room->occupancy_status === 'occupied' || $this->Hotel_model->getInHouseStay($room->id)) { return $this->jsonFail('occupied'); }
+            if ($room->occupancy_status === 'out_of_order') { return $this->jsonOk(); }
+            $this->Hotel_model->setRoomStatus($room->id, 'occupancy', 'out_of_order', $user_id, $note);
+        } else {
+            if ($room->occupancy_status !== 'out_of_order') { return $this->jsonOk(); }
+            $this->Hotel_model->setRoomStatus($room->id, 'occupancy', 'vacant', $user_id, $note);
+        }
+        $this->jsonOk();
+    }
+
+    /**
+     * the last status changes of one room (the card's history modal)
+     * @access public
+     * @return void
+     */
+    public function roomHistoryAjax() {
+        $room = $this->actionableRoom((int) $this->input->get_post('room_id'));
+        if (!$room) { return $this->jsonFail('room'); }
+        $this->jsonOk(array('room' => array('id' => (int) $room->id, 'number' => $room->number), 'history' => $this->Hotel_model->getRoomHistory($room->id)));
+    }
+
+    /**
+     * the stay log with filters; ?export=csv streams the same rows as a file
+     * @access public
+     * @return void
+     */
+    public function stays() {
+        $company_id = (int) $this->session->userdata('company_id');
+        $ids = $this->outletIds();
+        $filters = array('outlet_ids' => $ids, 'status' => '', 'room_id' => 0, 'date_from' => '', 'date_to' => '', 'guest' => '');
+        $posted_outlet = (int) $this->input->get_post('outlet_id');
+        if ($posted_outlet && in_array($posted_outlet, $ids, TRUE)) { $filters['outlet_ids'] = array($posted_outlet); $filters['outlet_id'] = $posted_outlet; } else { $filters['outlet_id'] = ''; }
+        $status = (string) $this->input->get_post('status');
+        $filters['status'] = in_array($status, array('in_house', 'checked_out'), TRUE) ? $status : '';
+        foreach (array('date_from', 'date_to') as $k) {
+            $v = trim((string) $this->input->get_post($k));
+            $filters[$k] = preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : '';
+        }
+        $filters['room_id'] = (int) $this->input->get_post('room_id');
+        $filters['guest'] = trim(htmlspecialcharscustom($this->input->get_post($this->security->xss_clean('guest'))));
+        $stays = $this->Hotel_model->getStays($company_id, $filters);
+
+        if ((string) $this->input->get_post('export') === 'csv') {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="hotel_stays_' . date('Ymd_His') . '.csv"');
+            $out = fopen('php://output', 'w');
+            fputcsv($out, array('Outlet', 'Room', 'Guest', 'Phone', 'Adults', 'Children', 'Check-in', 'Expected check-out', 'Check-out', 'Status', 'Reference', 'Checked in by', 'Checked out by', 'Notes'));
+            foreach ($stays as $s) {
+                fputcsv($out, array($s->outlet_name, $s->room_number, $s->guest_name, $s->guest_phone, $s->adults, $s->children, $s->checkin_at, $s->expected_checkout, $s->checkout_at, $s->status, $s->reference, $s->in_by, $s->out_by, $s->notes));
+            }
+            fclose($out);
+            return;
+        }
+        $data = array();
+        $data['filters'] = $filters;
+        $data['outlets'] = $this->Hotel_model->getOutlets($ids);
+        $data['rooms'] = $this->Hotel_model->getRooms($company_id, $ids);
+        $data['stays'] = $stays;
+        $data['main_content'] = $this->load->view('hotel/stays', $data, TRUE);
+        $this->load->view('userHome', $data);
     }
 }

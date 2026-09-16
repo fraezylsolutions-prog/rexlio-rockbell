@@ -8,7 +8,7 @@
         <div class="table-box" id="ir_hotel_landing">
             <div class="row">
                 <?php if (!empty($can_front_desk)): ?>
-                <div class="col-sm-12 col-md-4 mb-3"><a class="btn bg-blue-btn w-100" href="<?php echo base_url() ?>Hotel/index"><i class="fas fa-concierge-bell"></i> <?php echo lang('front_desk'); ?></a><div class="text-muted mt-1" style="font-size:12.5px"><?php echo lang('front_desk_soon'); ?></div></div>
+                <div class="col-sm-12 col-md-4 mb-3"><a class="btn bg-blue-btn w-100" href="<?php echo base_url() ?>Hotel/frontDesk"><i class="fas fa-concierge-bell"></i> <?php echo lang('front_desk'); ?></a><div class="text-muted mt-1" style="font-size:12.5px"><?php echo lang('front_desk_desc'); ?></div></div>
                 <?php endif; ?>
                 <?php if (!empty($can_housekeeping)): ?>
                 <div class="col-sm-12 col-md-4 mb-3"><a class="btn bg-blue-btn w-100" href="<?php echo base_url() ?>Hotel/index"><i class="fas fa-broom"></i> <?php echo lang('housekeeping_board'); ?></a><div class="text-muted mt-1" style="font-size:12.5px"><?php echo lang('housekeeping_soon'); ?></div></div>

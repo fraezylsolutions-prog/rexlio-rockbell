@@ -262,4 +262,25 @@ class Hotel_model extends CI_Model {
                         ->where('s.checkin_at >=', $from . ' 00:00:00')->where('s.checkin_at <=', $to . ' 23:59:59')
                         ->group_by(array('r.room_type_id', 't.name', 'bucket'))->order_by('t.name', 'ASC')->get()->result();
     }
+
+    /** H7 - live rooms per room type in the outlet scope: the "rooms available" base */
+    public function roomCountsByType($company_id, $outlet_ids) {
+        if (!$outlet_ids) { return array(); }
+        return $this->db->select('r.room_type_id, t.name AS type_name, COUNT(*) AS rooms')
+                        ->from('tbl_hotel_rooms r')->join('tbl_hotel_room_types t', 't.id = r.room_type_id', 'left')
+                        ->where('r.company_id', (int) $company_id)->where('r.del_status', 'Live')->where_in('r.outlet_id', $outlet_ids)
+                        ->group_by(array('r.room_type_id', 't.name'))->order_by('t.name', 'ASC')->get()->result();
+    }
+
+    /** H7 - every non-cancelled stay that touches the range (checked in before its end, not out before its start) */
+    public function staysOverlapping($company_id, $outlet_ids, $from, $to) {
+        if (!$outlet_ids) { return array(); }
+        return $this->db->select('s.id, s.room_id, r.room_type_id, s.status, s.checkin_at, s.checkout_at, s.expected_checkout, s.nights, s.actual_nights, s.amount')
+                        ->from('tbl_hotel_stays s')->join('tbl_hotel_rooms r', 'r.id = s.room_id')
+                        ->where('s.company_id', (int) $company_id)->where('s.del_status', 'Live')->where('s.status !=', 'cancelled')
+                        ->where_in('s.outlet_id', $outlet_ids)
+                        ->where('s.checkin_at <=', $to . ' 23:59:59')
+                        ->where("(s.checkout_at IS NULL OR s.checkout_at >= '" . $this->db->escape_str($from) . " 00:00:00')", NULL, FALSE)
+                        ->get()->result();
+    }
 }

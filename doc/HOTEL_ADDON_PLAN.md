@@ -229,3 +229,18 @@ Excel / CSV / PDF) like every other report.
 | HTTP on rexlio_scratch with stays across Jan–Mar in two categories, a third category with none, an in-house stay, a cancelled stay and one at another outlet: Cashier refused, `Hotel/reports` → the report, both menu links with the looked-up token; **year view** (every category as a row incl. the empty one, per-category and grand totals 290 000 / 6 stays / 13 nights, cancelled excluded, summary card); **month view** outlet 1 (three ordered columns, cells, in-house counted, other outlet excluded, column and grand totals); **day view** (one column per day, cells on the right days); **week view** (Monday buckets); defaults (this month, month view), span cap with notice, reversed dates swapped, bad view / date / outlet fall back; module OFF hides and refuses | **20/20** |
 | Node: the preset date maths (today / week from a Wednesday and a Sunday / Feb / year) | 5/5 |
 | Real browser: filter bar, summary cards, pivot with sub-counts, totals row, DataTables export buttons, alphabetical categories | PASS |
+
+### H7 — Occupancy report (2026-09-17). Local only; not on live.
+`Hotel/reportOccupancy`, same filter bar. **Per period bucket**: days, rooms, available room-nights
+(live rooms × days), occupied room-nights, occupancy %, arrivals, departures, value booked, **RevPAR**
+(value ÷ available room-nights); totals. **Per room category** for the whole range: rooms, available,
+occupied, occupancy %, arrivals, departures, value, RevPAR. Definitions (in the footnote): a stay occupies
+its room each night from check-in to the night before check-out — a same-day stay counts one; an in-house
+stay counts up to **today**, never into the future; arrivals and value on the check-in day, departures on
+the check-out day; cancelled stays ignored. Known simplification: "available" is today's live room count
+for every day of the range (rooms out of order or added mid-range are not netted per day).
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch with hand-computable January fixtures (3-night stay, a same-day stay, a stay straddling into February, one straddling in from December, a cancelled one, one at another outlet, one in-house since yesterday): month view outlet 1 (31 days, 4 rooms, 124 available, 8 occupied, 6.5 %, 3 arrivals, 3 departures, 180 000, RevPAR 1 451.61; per-category rows); day view 5–8 Jan (per-day occupied / arrivals / departures incl. the same-day stay, 25 % → 50 %, totals); in-house counts yesterday and today but not tomorrow; all outlets adds the fifth room and its stay; week view days add to 14; an empty month shows zeros without a division error; Cashier refused; menu link | **18/18** |
+| Real browser: filter bar, five summary cards, weekly rows (ISO weeks from Monday), category table | PASS |

@@ -2274,3 +2274,16 @@ $lang['hk_this_week']='This week';
 $lang['hk_this_year']='This year';
 $lang['hk_range_capped']='The range was shortened to what this view can show; pick a wider view for longer periods.';
 $lang['hk_value_report_note']='Stays are counted on their check-in date, the day the value is recorded; in-house stays are included, cancelled stays are not. Recorded value only - not sales.';
+/* Hotel Operations add-on - H7: occupancy report */
+$lang['hk_report_occupancy']='Hotel: Occupancy';
+$lang['hk_occupancy_rate']='Occupancy';
+$lang['hk_room_nights']='Room-nights';
+$lang['hk_occupied']='Occupied';
+$lang['hk_available']='Available';
+$lang['hk_arrivals']='Arrivals';
+$lang['hk_departures']='Departures';
+$lang['hk_revpar']='Value / available room (RevPAR)';
+$lang['hk_period']='Period';
+$lang['hk_days']='Days';
+$lang['hk_by_category']='By room category';
+$lang['hk_occupancy_note']='Available = live rooms x days in the period. Occupied = room-nights: a stay counts each night from check-in to the night before check-out (a same-day stay counts one); in-house stays count up to today. Arrivals and value are on the check-in day, departures on the check-out day. RevPAR = value / available room-nights. Recorded value only - not sales.';

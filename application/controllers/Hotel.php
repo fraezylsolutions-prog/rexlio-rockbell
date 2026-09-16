@@ -561,6 +561,71 @@ class Hotel extends Cl_Controller {
         $this->load->view('userHome', $data);
     }
 
+    /** the bucket key (Y-m-d start) a day belongs to, for a view - the same keys reportBuckets() emits */
+    private function bucketKey($day, $view) {
+        $t = strtotime($day);
+        switch ($view) {
+            case 'day':   return $day;
+            case 'week':  return date('Y-m-d', strtotime('monday this week', $t));
+            case 'year':  return date('Y-01-01', $t);
+            default:      return date('Y-m-01', $t);
+        }
+    }
+
+    /**
+     * H7 - Occupancy: per period bucket, rooms available (live rooms x days), occupied
+     * room-nights, occupancy %, arrivals, departures, value booked (on check-in days) and
+     * RevPAR = value / available room-nights; then the same for the whole range per room
+     * category. A stay occupies its room from the check-in date up to the day before
+     * check-out (a same-day stay counts one night); an in-house stay counts up to today -
+     * nothing in the future is counted as occupied.
+     * @access public
+     * @return void
+     */
+    public function reportOccupancy() {
+        $company_id = (int) $this->session->userdata('company_id');
+        $f = $this->reportFilters();
+        $buckets = $this->reportBuckets($f['from'], $f['to'], $f['view']);
+        $today = date('Y-m-d');
+        $types = array(); $rooms_total = 0;
+        foreach ($this->Hotel_model->roomCountsByType($company_id, $f['outlet_ids']) as $t) {
+            $types[(int) $t->room_type_id] = array('name' => $t->type_name ? $t->type_name : lang('hk_no_category'), 'rooms' => (int) $t->rooms, 'available' => 0, 'occupied' => 0, 'arrivals' => 0, 'departures' => 0, 'value' => 0.0);
+            $rooms_total += (int) $t->rooms;
+        }
+        $per = array(); foreach ($buckets as $k => $label) { $per[$k] = array('label' => $label, 'days' => 0, 'available' => 0, 'occupied' => 0, 'arrivals' => 0, 'departures' => 0, 'value' => 0.0); }
+        /* days in range -> bucket, available room-nights */
+        $days_in_range = 0;
+        for ($d = strtotime($f['from']); $d <= strtotime($f['to']); $d = strtotime('+1 day', $d)) {
+            $k = $this->bucketKey(date('Y-m-d', $d), $f['view']);
+            if (!isset($per[$k])) { continue; }
+            $per[$k]['days']++; $per[$k]['available'] += $rooms_total; $days_in_range++;
+        }
+        foreach ($types as $tid => $t) { $types[$tid]['available'] = $t['rooms'] * $days_in_range; }
+        /* stays -> occupied room-nights, arrivals, departures, value */
+        foreach ($this->Hotel_model->staysOverlapping($company_id, $f['outlet_ids'], $f['from'], $f['to']) as $s) {
+            $tid = (int) $s->room_type_id;
+            if (!isset($types[$tid])) { $types[$tid] = array('name' => lang('hk_no_category'), 'rooms' => 0, 'available' => 0, 'occupied' => 0, 'arrivals' => 0, 'departures' => 0, 'value' => 0.0); }
+            $in = substr($s->checkin_at, 0, 10);
+            if ($s->status === 'checked_out' && $s->checkout_at) { $out = substr($s->checkout_at, 0, 10); $last = max($in, date('Y-m-d', strtotime($out . ' -1 day'))); }
+            else { $out = NULL; $last = max($in, $today); }
+            /* arrivals / value on the check-in day, departures on the check-out day */
+            if ($in >= $f['from'] && $in <= $f['to']) { $k = $this->bucketKey($in, $f['view']); if (isset($per[$k])) { $per[$k]['arrivals']++; $per[$k]['value'] += (float) $s->amount; } $types[$tid]['arrivals']++; $types[$tid]['value'] += (float) $s->amount; }
+            if ($out !== NULL && $out >= $f['from'] && $out <= $f['to']) { $k = $this->bucketKey($out, $f['view']); if (isset($per[$k])) { $per[$k]['departures']++; } $types[$tid]['departures']++; }
+            /* occupied room-nights: each day from check-in to the last night, clipped to the range */
+            $from_d = max($in, $f['from']); $to_d = min($last, $f['to']);
+            for ($d = strtotime($from_d); $d <= strtotime($to_d); $d = strtotime('+1 day', $d)) {
+                $k = $this->bucketKey(date('Y-m-d', $d), $f['view']);
+                if (isset($per[$k])) { $per[$k]['occupied']++; }
+                $types[$tid]['occupied']++;
+            }
+        }
+        $total = array('days' => $days_in_range, 'rooms' => $rooms_total, 'available' => 0, 'occupied' => 0, 'arrivals' => 0, 'departures' => 0, 'value' => 0.0);
+        foreach ($per as $k => $b) { foreach (array('available', 'occupied', 'arrivals', 'departures', 'value') as $m) { $total[$m] += $b[$m]; } }
+        $data = array('filters' => $f, 'per' => $per, 'types' => $types, 'total' => $total);
+        $data['main_content'] = $this->load->view('hotel/report_occupancy', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
+
     /** whole nights between two Y-m-d dates, never less than 1 (a same-day stay is one night's value) */
     private function nightsBetween($from, $to) {
         $d = (int) floor((strtotime($to) - strtotime($from)) / 86400);

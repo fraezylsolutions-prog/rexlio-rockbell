@@ -2207,3 +2207,17 @@ $lang['hk_by_staff']='By staff';
 $lang['hk_variances']='Stays with a nights variance';
 $lang['hk_variance']='variance';
 $lang['hk_stays_report_note']='Stays are listed by their check-in date; cancelled stays are excluded; in-house stays show their recorded value. A variance badge marks a stay whose actual nights differ from the nights the value was recorded for. Recorded value only - not sales.';
+/* Hotel Operations add-on - H9: housekeeping productivity */
+$lang['hk_report_housekeeping']='Hotel: Housekeeping Productivity';
+$lang['hk_attendant']='Attendant';
+$lang['hk_by_attendant']='By attendant';
+$lang['hk_by_task_type']='By task type';
+$lang['hk_created']='Created';
+$lang['hk_cancelled']='Cancelled';
+$lang['hk_open']='Open';
+$lang['hk_tasks_done']='Tasks done';
+$lang['hk_avg_wait']='Avg wait (created → started)';
+$lang['hk_avg_work']='Avg work (started → done)';
+$lang['hk_avg_check']='Avg check (done → verified)';
+$lang['hk_housekeeping_report_note']='Tasks are counted by the day they were created. Done includes verified. Averages are over the tasks that have both timestamps; a task that was never assigned is listed under Unassigned. A cancelled task counts for nobody\'s work.';
+$lang['hk_done_count']='Done';

@@ -705,6 +705,54 @@ class Hotel extends Cl_Controller {
         $this->load->view('userHome', $data);
     }
 
+    /**
+     * H9 - Housekeeping productivity: the tasks CREATED in the range, grouped by the attendant who
+     * held them (pool = never assigned), by task type and by room category. For each group: created,
+     * done (done or verified), verified, cancelled, still open, and the average minutes from
+     * creation to start (waiting), start to done (working) and done to verify (checking).
+     * Extra filters: task type, attendant.
+     * @access public
+     * @return void
+     */
+    public function reportHousekeeping() {
+        $company_id = (int) $this->session->userdata('company_id');
+        $f = $this->reportFilters();
+        $task_type = (string) $this->input->get_post('task_type'); if (!in_array($task_type, array('cleaning', 'turndown', 'inspection', 'maintenance'), TRUE)) { $task_type = ''; }
+        $user_id = (int) $this->input->get_post('user_id');
+        $tasks = $this->Hotel_model->tasksReport($company_id, $f['outlet_ids'], $f['from'], $f['to'], $task_type, $user_id);
+        $blank = array('created' => 0, 'done' => 0, 'verified' => 0, 'cancelled' => 0, 'open' => 0, 'wait' => array(), 'work' => array(), 'check' => array());
+        $by_staff = array(); $by_type = array(); $by_cat = array(); $by_bucket = array(); $total = $blank;
+        foreach ($this->reportBuckets($f['from'], $f['to'], $f['view']) as $k => $label) { $by_bucket[$k] = array('label' => $label) + $blank; }
+        $mins = function($a, $b) { return ($a && $b) ? max(0, (strtotime($b) - strtotime($a)) / 60) : NULL; };
+        foreach ($tasks as $t) {
+            $sn = $t->assigned_name ? $t->assigned_name : lang('hk_pool'); $tn = lang('hotel_task_' . $t->task_type); $cn = $t->type_name ? $t->type_name : lang('hk_no_category');
+            $bk = $this->bucketKey(substr($t->created_at, 0, 10), $f['view']);
+            foreach (array('by_staff' => $sn, 'by_type' => $tn, 'by_cat' => $cn) as $var => $key) { if (!isset($$var[$key])) { $$var[$key] = $blank; } }
+            $groups = array(&$total, &$by_staff[$sn], &$by_type[$tn], &$by_cat[$cn]); if (isset($by_bucket[$bk])) { $groups[] = &$by_bucket[$bk]; }
+            $w = $mins($t->created_at, $t->started_at); $k2 = $mins($t->started_at, $t->done_at); $c = $mins($t->done_at, $t->verified_at);
+            foreach ($groups as &$g) {
+                $g['created']++;
+                if ($t->status === 'done' || $t->status === 'verified') { $g['done']++; }
+                if ($t->status === 'verified') { $g['verified']++; }
+                if ($t->status === 'cancelled') { $g['cancelled']++; }
+                if ($t->status === 'pending' || $t->status === 'in_progress') { $g['open']++; }
+                if ($w !== NULL) { $g['wait'][] = $w; } if ($k2 !== NULL) { $g['work'][] = $k2; } if ($c !== NULL) { $g['check'][] = $c; }
+            }
+            unset($g);
+        }
+        $avg = function(&$rows) { foreach ($rows as &$g) { foreach (array('wait', 'work', 'check') as $m) { $g[$m . '_avg'] = $g[$m] ? round(array_sum($g[$m]) / count($g[$m])) : NULL; $g[$m . '_n'] = count($g[$m]); unset($g[$m]); } } unset($g); };
+        $avg($by_staff); $avg($by_type); $avg($by_cat); $avg($by_bucket); $one = array($total); $avg($one); $total = $one[0];
+        ksort($by_staff); ksort($by_type); ksort($by_cat);
+        $staff = array(); foreach ($this->Hotel_model->taskStaff($company_id) as $u) { $staff[(int) $u->id] = $u->full_name; }
+        $f['extra_filters'] = array(
+            array('name' => 'task_type', 'label' => lang('hk_task_type'), 'options' => array('cleaning' => lang('hotel_task_cleaning'), 'turndown' => lang('hotel_task_turndown'), 'inspection' => lang('hotel_task_inspection'), 'maintenance' => lang('hotel_task_maintenance')), 'selected' => $task_type),
+            array('name' => 'user_id', 'label' => lang('hk_attendant'), 'options' => $staff, 'selected' => $user_id ? $user_id : ''),
+        );
+        $data = array('filters' => $f, 'tasks' => $tasks, 'by_staff' => $by_staff, 'by_type' => $by_type, 'by_cat' => $by_cat, 'by_bucket' => $by_bucket, 'total' => $total);
+        $data['main_content'] = $this->load->view('hotel/report_housekeeping', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
+
     /** a real Y-m-d calendar date ("2020-13-45" matches the shape but would blow up in the query) */
     private function validDate($v) {
         return (bool) preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', (string) $v, $m) && checkdate((int) $m[2], (int) $m[3], (int) $m[1]);

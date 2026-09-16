@@ -330,4 +330,24 @@ class Hotel_model extends CI_Model {
         return $this->db->select('u.id, u.full_name')->from('tbl_hotel_stays s')->join('tbl_users u', 'u.id = s.checked_in_by')
                         ->where('s.company_id', (int) $company_id)->where('s.del_status', 'Live')->group_by(array('u.id', 'u.full_name'))->order_by('u.full_name', 'ASC')->get()->result();
     }
+
+    /** H9 - the tasks created in a period with their room category and the people involved */
+    public function tasksReport($company_id, $outlet_ids, $from, $to, $task_type = '', $user_id = 0) {
+        if (!$outlet_ids) { return array(); }
+        $this->db->select('k.*, r.number AS room_number, r.room_type_id, t.name AS type_name, ua.full_name AS assigned_name, uv.full_name AS verified_name')
+                 ->from('tbl_hotel_housekeeping_tasks k')->join('tbl_hotel_rooms r', 'r.id = k.room_id')
+                 ->join('tbl_hotel_room_types t', 't.id = r.room_type_id', 'left')
+                 ->join('tbl_users ua', 'ua.id = k.assigned_to', 'left')->join('tbl_users uv', 'uv.id = k.verified_by', 'left')
+                 ->where('k.company_id', (int) $company_id)->where('k.del_status', 'Live')->where_in('k.outlet_id', $outlet_ids)
+                 ->where('k.created_at >=', $from . ' 00:00:00')->where('k.created_at <=', $to . ' 23:59:59');
+        if (in_array($task_type, array('cleaning', 'turndown', 'inspection', 'maintenance'), TRUE)) { $this->db->where('k.task_type', $task_type); }
+        if ($user_id) { $this->db->where('k.assigned_to', (int) $user_id); }
+        return $this->db->order_by('k.created_at', 'DESC')->limit(10000)->get()->result();
+    }
+
+    /** H9 - everyone who has ever held a task (the attendant filter's options) */
+    public function taskStaff($company_id) {
+        return $this->db->select('u.id, u.full_name')->from('tbl_hotel_housekeeping_tasks k')->join('tbl_users u', 'u.id = k.assigned_to')
+                        ->where('k.company_id', (int) $company_id)->where('k.del_status', 'Live')->group_by(array('u.id', 'u.full_name'))->order_by('u.full_name', 'ASC')->get()->result();
+    }
 }

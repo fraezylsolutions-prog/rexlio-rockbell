@@ -278,3 +278,14 @@ nights variance. DataTables export.
 | Test | Result |
 |---|---|
 | HTTP on rexlio_scratch (two staff, two categories, a variance, a February stay, a cancelled one, another outlet, an in-house one): Cashier refused; menu; January rows newest-first with the right columns and the variance badge; summary 280 000 / 5 / 11 / 1 variance; by period / category / staff sub-tables; category filter; staff + status filters; all outlets week view sums; empty period | **13/13** |
+
+### H9 — Housekeeping productivity (2026-09-17). Local only; not on live.
+`Hotel/reportHousekeeping`: the tasks **created** in the range, with task-type and attendant filters.
+Per **attendant** (the export table; never-assigned tasks under *Unassigned*), per **task type**, per
+**room category** and per **period**: created, done (done + verified), verified, cancelled, still open,
+and the average minutes **created → started** (waiting), **started → done** (working), **done →
+verified** (checking), each over the tasks that have both timestamps; summary cards.
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch with fixed timestamps (Stella: verified / done / pending; GM: verified maintenance + cancelled inspection; a pool task; one at another outlet; one last year): Cashier refused; menu; per-attendant counts and averages (15m / 40m / 1h 00m; 1h 00m / 2h 00m / 30m; pool dashes); totals 6 / 3 / 2 / 1 / 2 with 30m / 1h 07m / 45m; by task type, by category, by period; task-type and attendant filters; all-outlets day view; empty period | **15/15** |

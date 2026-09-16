@@ -2558,6 +2558,13 @@
       $(document).on("click", "#ir_tp_new", function(e){ e.preventDefault(); irTpNewTable(); });
       $(document).on("click", "#ir_tp_close", function(e){ e.preventDefault(); irCloseTablesPanel(); });
       $(document).on("click", "#ir_tables_open", function(e){ e.preventDefault(); irOpenTablesPanel(); });
+      //the Tables buttons that replaced the old table-picker button (rail, waiter blocks, tablet and
+      //phone strips). On a phone the panel lives in the item area, so bring that forward first.
+      $(document).on("click", ".ir_tables_open_btn", function(e){
+          e.preventDefault();
+          if($(".for-mobile-mode").is(":visible")){ $(".main_right").slideDown(300); $(".main_middle").slideUp(100); }
+          irOpenTablesPanel();
+      });
       $(document).on("click", "#ir_tp_grid .ir-tcard", function(e){
           e.preventDefault();
           let card = $(this);

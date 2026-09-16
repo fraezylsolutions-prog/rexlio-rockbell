@@ -1022,6 +1022,9 @@ foreach ($notifications as $single_notification){
                 ?>
                 
                 <!-- End Customer -->
+                <?php /* tables panel on tablets (the header chair icon is hidden below 1300px) */ ?>
+                <button type="button" class="ir_tables_open_btn bg__green <?php echo escape_output($is_self_order_class) ?>">
+                    <i class="fal fa-chair"></i> <span><?php echo lang('tables'); ?></span></button>
                 <button type="button" class="show_all_menu bg__green">
                     <i class="fal fa-bars"></i> <span><?php echo lang('Others'); ?></span></button>
                 <!-- End Others -->
@@ -1038,6 +1041,8 @@ foreach ($notifications as $single_notification){
 
                 <button type="button" class="show_cart_list bg__purple"><span><?php echo lang('Cart'); ?></span></button>
                 <button type="button" class="show_product bg__grey"> <span><?php echo lang('Products'); ?></span></button>
+                <?php /* tables panel on phones: brings the item area forward, then opens the panel */ ?>
+                <button type="button" class="ir_tables_open_btn bg__green <?php echo escape_output($is_self_order_class) ?>"> <span><?php echo lang('tables'); ?></span></button>
                 <?php if($is_self_order!="Yes" && $is_online_order=="Yes"):?>
                     <button type="button" class="online_my_order bg__green"> <span><?php echo lang('My_Orders'); ?></span></button>
                 <?php else:?>
@@ -1268,7 +1273,8 @@ foreach ($notifications as $single_notification){
                             <button class="selected__btn_c <?php echo escape_output($is_self_order_class) ?> club_button" data-id="club_button" data-selected="<?php echo escape_output($is_tier_locked && $locked_tier == 5 ? 'selected' : '') ?>" data-tier_key="5"<?php echo $lock_attr ?>><i class="fal fa-gem"></i>
                                 <?php echo lang('club'); ?></button>
 
-                            <button class="<?php echo escape_output($is_self_order_class) ?>" id="table_button"><i class="fal fa-table"></i> <?php echo lang('table'); ?></button>
+                            <?php /* Stage 5 tables panel replaces the old table-picker modal here (same action as the header chair icon) */ ?>
+                            <button type="button" class="<?php echo escape_output($is_self_order_class) ?> ir_tables_open_btn"><i class="fal fa-chair"></i> <?php echo lang('tables'); ?></button>
 
                         </div>
                         <?php
@@ -1316,8 +1322,8 @@ foreach ($notifications as $single_notification){
                                 <input type="hidden" value="<?php echo escape_output($this->session->userdata('full_name'))?>" id="select_waiter_name">
                                 <div class="fixed_waiter_label ir_w92_ml"><i class="fal fa-user"></i>
                                     <?php echo escape_output($this->session->userdata('full_name')) ?></div>
-                                <button id="table_button" class="half-width-98"><i class="fal fa-table"></i>
-                                    <?php echo lang('table'); ?></button>
+                                <button type="button" class="half-width-98 ir_tables_open_btn"><i class="fal fa-chair"></i>
+                                    <?php echo lang('tables'); ?></button>
                                 <?php
                                 else:
                                     if($waiter_app_status=="Yes"):
@@ -1333,8 +1339,8 @@ foreach ($notifications as $single_notification){
                                         </select>
                                     <?php endif;?>
 
-                                <button id="table_button" class="half-width-98"><i class="fal fa-table"></i>
-                                    <?php echo lang('table'); ?></button>
+                                <button type="button" class="half-width-98 ir_tables_open_btn"><i class="fal fa-chair"></i>
+                                    <?php echo lang('tables'); ?></button>
                                 <?php
                                 else:
                                     if(!isFoodCourt()):
@@ -1753,8 +1759,8 @@ foreach ($notifications as $single_notification){
                     <input type="hidden"
                         value="<?php echo escape_output($this->session->userdata('user_id'))?>"
                         id="select_waiter">
-                    <button id="table_button" class="half-width-98"><i class="fal fa-table"></i>
-                        <?php echo lang('table'); ?></button>
+                    <button type="button" class="half-width-98 ir_tables_open_btn"><i class="fal fa-chair"></i>
+                        <?php echo lang('tables'); ?></button>
                     <?php else:
                             ?>
                     <select id="select_waiter1" class="select2 select_waiter ir_w92_ml">
@@ -4752,7 +4758,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=5.3"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=5.4"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">

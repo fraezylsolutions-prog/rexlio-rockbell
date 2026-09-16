@@ -283,6 +283,14 @@
                                         <i data-feather="shopping-cart"> <?php echo lang('pos'); ?></i> 
                                     </a>
                                 </li>
+                                <?php /* Hotel add-on: Front Desk quick link, same gate as its sidebar item (module ON + view permission) */ ?>
+                                <?php if (irModuleEnabled('hotel')): ?>
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_front_desk'); ?>" style="display: <?php echo escape_output($display_for_f_court_header)?>" class="dropdown user user-menu menu_assign_class">
+                                    <a href="<?php echo base_url(); ?>Hotel/frontDesk" class="new-btn" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-original-title="<?php echo lang('front_desk'); ?>">
+                                        <i data-feather="key"> <?php echo lang('front_desk'); ?></i>
+                                    </a>
+                                </li>
+                                <?php endif; ?>
                                 <li data-access="add-106"  style="display: <?php echo escape_output($display_for_f_court_header)?>" class="dropdown user user-menu menu_assign_class">
                                     <a href="<?php echo base_url(); ?>Purchase/addEditPurchase" class="new-btn" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-original-title="<?php echo lang('add_purchase'); ?>">
                                         <i data-feather="arrow-down-circle"> <?php echo lang('Add'); ?> <?php echo lang('purchase'); ?></i>
@@ -541,6 +549,11 @@
                             <ul class="treeview-menu">
                                 <li data-access="pos_1-73" class="menu_assign_class" data-menu__cid="irp_4"><a class="child-menu" href="<?php echo base_url()?>POSChecker/posAndWaiterMiddleman">
                                         <?php echo lang('pos'); ?></a></li>
+                                <?php /* Hotel add-on: the Front Desk board sits with the other panels while the module is ON */ ?>
+                                <?php if (irModuleEnabled('hotel')): ?>
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_front_desk'); ?>" class="menu_assign_class" data-menu__cid="irp_4"><a class="child-menu" href="<?php echo base_url()?>Hotel/frontDesk">
+                                        <?php echo lang('front_desk'); ?></a></li>
+                                <?php endif; ?>
                                 <li data-access="add-98" class="menu_assign_class" data-menu__cid="irp_4"><a class="child-menu" href="<?php echo base_url()?>Kitchen/addEditKitchen">
                                         <?php echo lang('Add'); ?> <?php echo lang('kitchen'); ?></a></li>
                                 <li data-access="view-98" class="menu_assign_class" data-menu__cid="irp_4"><a class="child-menu" href="<?php echo base_url()?>Kitchen/kitchens">

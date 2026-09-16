@@ -695,7 +695,7 @@ foreach ($notifications as $single_notification){
          rather than the real cut. Same family and host as the existing import,
          so this adds a weight - not another typeface. */ ?>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap">
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.0">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.1">
 </head>
 
 <body>

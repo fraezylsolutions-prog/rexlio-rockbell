@@ -2141,3 +2141,6 @@ $lang['hotel_err_task_exists']='An open task of that type already exists for thi
 /* Hotel Operations add-on - H4: module schema guard */
 $lang['module_schema_missing']='Database tables missing - apply the migration';
 $lang['module_schema_missing_badge']='Tables missing';
+/* Hotel Operations add-on - U1: front desk toasts */
+$lang['hotel_toast_checked_in']='Checked in:';
+$lang['hotel_toast_checked_out']='Checked out: room';

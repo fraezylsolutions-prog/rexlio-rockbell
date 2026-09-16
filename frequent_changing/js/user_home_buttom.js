@@ -45,6 +45,13 @@ $(".setting_report").each(function() {
 });
 // material icon init
 feather.replace();
+
+/* U1: the flash banner every screen shows (section.alert-wrapper > .alert) never left on its own.
+   Success banners now fade after 6 s; danger banners stay until dismissed - they need reading. */
+setTimeout(function () {
+    $(".alert-wrapper .alert-success").addClass("ir_alert_leaving");
+    setTimeout(function () { $(".alert-wrapper .alert-success").closest(".alert-wrapper").remove(); }, 450);
+}, 6000);
   
 let ir_precision_h = $("#ir_precision").val();
 let window_height = $(window).height();

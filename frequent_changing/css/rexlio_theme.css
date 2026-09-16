@@ -441,6 +441,12 @@ hr{border-color:var(--rx-line) !important}
 }
 .alert-success{background:var(--rx-good) !important; color:#fff !important; border:0 !important}
 .alert-danger {background:var(--rx-bad)  !important; color:#fff !important; border:0 !important}
+/* U1: the banners above are solid, but newDesign/style.css colours .alert-body/.alert-heading in the
+   badge colour with a more specific rule - green text on green. Same specificity here, loaded later. */
+.alert-success .alert-body, .alert-success .alert-heading, .alert-success p, .alert-success .alert-link,
+.alert-danger  .alert-body, .alert-danger  .alert-heading, .alert-danger  p, .alert-danger  .alert-link{color:#fff !important}
+.alert-success .btn-close, .alert-danger .btn-close{filter:brightness(0) invert(1); opacity:.85}
+.alert-wrapper .alert.ir_alert_leaving{transition:opacity .4s ease; opacity:0}
 
 @media (prefers-reduced-motion: reduce){
     *{transition:none !important; animation:none !important}

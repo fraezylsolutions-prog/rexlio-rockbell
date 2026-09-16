@@ -76,6 +76,12 @@
                 success: function (res) { polling = false; if (res && res.ok) { render(res); markUpdated(); } if (done) { done(res); } },
                 error: function () { polling = false; $("#hk_last_updated").text(last); $("#hk_offline_banner").show(); if (done) { done(null); } } });
         }
+        /* U1: a 4 s toast, same look as the app's success banner; the board refresh alone was too quiet */
+        var ci_room_no = "";
+        function toast(text, bad) {
+            var t = $('<div class="hk_toast' + (bad ? ' hk_toast_bad' : '') + '"></div>').text(text).appendTo("body");
+            setTimeout(function () { t.addClass("hk_toast_leaving"); setTimeout(function () { t.remove(); }, 450); }, 4000);
+        }
         function post(action, data, done) {
             $.ajax({ url: base_url + "Hotel/" + action, method: "POST", dataType: "json", data: data,
                 success: function (res) { done(res); }, error: function () { done({ ok: 0, reason: "network", message: "" }); } });
@@ -83,6 +89,7 @@
         /* --- check-in --- */
         $(document).on("click", ".hk_act_checkin", function () {
             var card = $(this).closest(".hk_card");
+            ci_room_no = card.attr("data-number");
             $("#hk_ci_room_id").val(card.attr("data-room_id")); $("#hk_ci_room").text(card.attr("data-number"));
             $("#hk_ci_confirm_dirty").val("0"); $("#hk_ci_warn").prop("hidden", true); $("#hk_ci_error").text("");
             $("#hk_ci_guest, #hk_ci_phone, #hk_ci_expected, #hk_ci_reference, #hk_ci_notes").val(""); $("#hk_ci_adults").val(1); $("#hk_ci_children").val(0);
@@ -94,7 +101,7 @@
             post("checkIn", { room_id: $("#hk_ci_room_id").val(), guest_name: $("#hk_ci_guest").val(), guest_phone: $("#hk_ci_phone").val(), adults: $("#hk_ci_adults").val(), children: $("#hk_ci_children").val(),
                               expected_checkout: $("#hk_ci_expected").val(), reference: $("#hk_ci_reference").val(), notes: $("#hk_ci_notes").val(), confirm_dirty: $("#hk_ci_confirm_dirty").val() }, function (res) {
                 btn.prop("disabled", false);
-                if (res && res.ok) { $("#hkCheckinModal").modal("hide"); refresh(); return; }
+                if (res && res.ok) { $("#hkCheckinModal").modal("hide"); toast(msg("hotel_toast_checked_in") + " " + ci_room_no + " - " + $("#hk_ci_guest").val()); refresh(); return; }
                 if (res && res.warn) {
                     /* the room is not clean: warn, and let the same button confirm */
                     $("#hk_ci_warn_text").text(msg("hotel_dirty_warn_text") + " (" + msg("room_" + res.housekeeping_status) + ")");
@@ -107,7 +114,7 @@
         $(document).on("click", ".hk_act_checkout", function () {
             var card = $(this).closest(".hk_card");
             if (!window.confirm(msg("hotel_confirm_checkout") + " " + card.attr("data-number"))) { return; }
-            post("checkOut", { room_id: card.attr("data-room_id") }, function (res) { if (!res || !res.ok) { alert(res && res.message ? res.message : "Error"); } refresh(); });
+            post("checkOut", { room_id: card.attr("data-room_id") }, function (res) { if (!res || !res.ok) { toast(res && res.message ? res.message : "Error", true); } else { toast(msg("hotel_toast_checked_out") + " " + card.attr("data-number")); } refresh(); });
         });
         /* --- out of order --- */
         $(document).on("click", ".hk_act_ooo", function () {
@@ -118,7 +125,7 @@
         });
         $(document).on("click", "#hk_ooo_submit", function () {
             post("setOutOfOrder", { room_id: $("#hk_ooo_room_id").val(), out_of_order: $("#hk_ooo_on").val(), note: $("#hk_ooo_note").val() }, function (res) {
-                if (res && res.ok) { $("#hkOooModal").modal("hide"); refresh(); return; }
+                if (res && res.ok) { $("#hkOooModal").modal("hide"); toast($("#hk_ooo_title").text()); refresh(); return; }
                 $("#hk_ooo_error").text(res && res.message ? res.message : "Error");
             });
         });

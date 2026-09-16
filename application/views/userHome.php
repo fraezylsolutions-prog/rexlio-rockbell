@@ -211,7 +211,7 @@
             if(t!=='dark'&&t!=='light'){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
             document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
     </script>
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.0">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.1">
 <div class="loader"></div>
 <!-- ADD THE CLASS sidebar-collapse TO HIDE THE SIDEBAR PRIOR TO LOADING THE SITE -->
 
@@ -1201,7 +1201,7 @@ endif;
     <script src="<?php echo base_url(); ?>assets/dist/js/jquery.mCustomScrollbar.concat.min.js?v=7.5"></script>
     <!-- material icon -->
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script src="<?php echo base_url(); ?>frequent_changing/js/user_home_buttom.js?v=7.5"></script>
+    <script src="<?php echo base_url(); ?>frequent_changing/js/user_home_buttom.js?v=7.6"></script>
     <script src="<?php echo base_url(); ?>frequent_changing/js/media.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>frequent_changing/newDesign/js/new-script.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/plugins/slick-slider/slick.min.js?v=7.5"></script>

@@ -2,7 +2,7 @@
          polls Hotel/boardAjax every 15 s and after every action. Actions are permission-gated
          twice: buttons only render for a permission the caller holds, and the controller checks
          again on every POST. */ ?>
-<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.1">
+<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.2">
 <section class="main-content-wrapper">
     <?php $this->view('hotel/_flash'); ?>
     <section class="content-header">
@@ -112,7 +112,7 @@
 <input type="hidden" id="hk_can_status" value="<?php echo !empty($can_status) ? 1 : 0; ?>">
 <?php foreach (array('check_in', 'check_out', 'room_vacant', 'room_occupied', 'room_out_of_order', 'room_clean', 'room_dirty', 'room_in_progress', 'room_inspected',
                      'hotel_set_out_of_order', 'hotel_back_in_service', 'history', 'hotel_no_rooms', 'hotel_since', 'hotel_confirm_checkout', 'hotel_check_in_anyway',
-                     'hotel_dirty_warn_text', 'guest', 'expected_checkout', 'hotel_task_open', 'no_data_found') as $k): ?>
+                     'hotel_dirty_warn_text', 'guest', 'expected_checkout', 'hotel_task_open', 'no_data_found', 'hotel_toast_checked_in', 'hotel_toast_checked_out') as $k): ?>
 <input type="hidden" id="hk_lang_<?php echo $k; ?>" value="<?php echo lang($k); ?>">
 <?php endforeach; ?>
-<script src="<?php echo base_url(); ?>frequent_changing/js/hotel_front_desk.js?v=1.0"></script>
+<script src="<?php echo base_url(); ?>frequent_changing/js/hotel_front_desk.js?v=1.1"></script>

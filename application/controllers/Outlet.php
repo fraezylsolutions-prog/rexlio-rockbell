@@ -320,6 +320,9 @@ class Outlet extends Cl_Controller {
                 redirect('Dashboard/dashboard');
             } else if($this->session->userdata('role') == 'Chef') {
                 redirect('Kitchen/kitchens');
+            } else if (irHousekeepingLanding()) {
+                //Hotel add-on (H3): housekeeping-only staff land on their board.
+                redirect('Hotel/housekeeping');
             } else {
                redirect('POSChecker/posAndWaiterMiddleman');
             }

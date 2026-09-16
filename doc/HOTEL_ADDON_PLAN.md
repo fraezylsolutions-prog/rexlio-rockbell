@@ -125,3 +125,39 @@ board for anyone holding `hotel_front_desk` view; others keep the landing tiles.
 | Board builders (Node, real script, real `boardAjax` answer): occupied / vacant-dirty / out-of-order cards, permission-dependent buttons, escaping, floor grouping, empty state, `since()` | 9/9 |
 | Real browser (real page + CSS + JS, `boardAjax` answered from the captured JSON): 3 cards on 2 floors, chips, buttons per state; **check-in modal → warning → "Check In Anyway" → second post carries `confirm_dirty=1`, modal closes**; out-of-order modal; history modal | PASS |
 | Regression: H1 35/35 and H0 16/16 (both updated for the index → board redirect), Part B 18/18, tables panel 55 / 22 / 28 / 16 | green |
+
+### H3 — Housekeeping board (2026-09-16). Local only; not on live.
+`Hotel/housekeeping`: a standalone full-screen page on the Kitchen Panel pattern (own `<html>`, no
+sidebar — for a tablet on the floor; `housekeeping_panel.php`, `hotel_housekeeping.js`, `hotel.css`
+v1.1), polled every 10 s and after every action through `Hotel/tasksAjax`. Sections are decided by
+the server's `is_mine` / `assigned_to` / `status`, never by role name:
+- **My tasks** and **Unassigned (pool)** for every `hotel_housekeeping` viewer; **Assigned to others**
+  only for `assign` holders; **Done — awaiting verification** only for `verify` holders.
+- **Start** (`taskStart`, `update_task`): `pending → in_progress`; a pool task is claimed by the actor;
+  the room goes `in_progress` unless the task is `maintenance`. **Finish** (`taskDone`): → `done`;
+  `cleaning` / `turndown` mark the room `clean`; inspection / maintenance leave it alone.
+- **Verify** (`taskVerify`, `verify`): `done → verified`, room → `inspected`; the task leaves the board.
+- **Assign** / **New task** / **Cancel** (`taskAssign`, `taskCreate`, `taskCancel`, `assign`): assignee
+  must be a user whose role holds `update_task` (or Admin) — validated before anything is written;
+  New task dedupes an open task of the same type (`task_exists`); a `cleaning` task on a
+  `clean` / `inspected` room marks it `dirty`; cancel leaves the room as it is. Every action writes
+  an audit row (`Hotel Task …`).
+- An `update_task` holder may only touch tasks that are theirs or in the pool (`task` for anyone
+  else's) unless they also hold `assign`; outlet-scoped like everything else.
+- **Landing** (`irHousekeepingLanding()`): a session whose role holds `hotel_housekeeping` view, holds
+  **no** POS access and is not Admin lands on the board — from both single-outlet login branches and
+  `Outlet::setOutletSession`. Permission-based, so any custom role qualifies; with the module OFF the
+  staff fall back to their usual landing. `Hotel/index` sends such staff to the board too.
+- JSON now decodes the stored HTML entities once (`jsonOk`), since text is stored encoded and the boards
+  escape on render — `O'Brien` no longer shows as `O&#039;Brien` (H2's board benefits as well).
+- 30 language keys × 4; sidebar item and landing tile → `Hotel/housekeeping`.
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch: page per permission set (Stella: mine/pool only, no overlays; Manager: four chips, New task, room + staff selects, Front Desk link; Waiter refused; Cashier view-only), index → board, sidebar; pool → start (claim, room in_progress + log) → finish (clean + log) → verify (inspected, "Verified") with every wrong-state repeat refused (`task_state`) and every action Stella lacks refused by the constructor; create (pool, dedupe, bad type, bad room, **bad assignee refused before writing**), assign / unassign, others' task refused for Stella, maintenance leaves the room alone, cancel, outlet 6 scoping + fallback, audit rows; **landing**: Stella → `Hotel/housekeeping`, Cashier / Manager → middleman, OFF → middleman; everything refused while OFF; text round-trip (note `O'Brien <x> & co`, guest `D'Souza`) | **60/60** |
+| Board builders (Node, real script, real `tasksAjax` answers for Stella and the Manager): `sectionOf`, per-permission buttons on pool / mine / others / done cards, escaping, section order and counts, empty states, `since()` per status | 18/18 |
+| Real browser (real page + CSS + JS, `tasksAjax` answered from the captured JSON): Stella's board (My tasks 1 / Unassigned 1, Finish vs Start+Finish); Manager's board (four sections, Assign / Cancel / Verify), **New task overlay → Submit posts room / type / user / note and closes**, Assign overlay carries the task and room; phone width | PASS |
+| Regression: H2 47/47, H1 35/35, H0 16/16 (three assertions updated for index → board and the sidebar links), Part B 18/18 + 21/21, tables panel 55 / 22 / 28 / 16 | green |
+
+Not in H3 (by scope): no notification when a task lands in the pool — the board polls; H4 adds the
+toggle end-to-end check, docs and the owner's checklist.

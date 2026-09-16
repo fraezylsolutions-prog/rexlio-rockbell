@@ -463,6 +463,10 @@ class Authentication extends Cl_Controller {
                                            if ($user_information->designation == 'Chef') {
                                             redirect("Kitchen/kitchens");
                                         }else{
+                                            //Hotel add-on (H3): housekeeping-only staff land on their board.
+                                            if (irHousekeepingLanding()) {
+                                                redirect("Hotel/housekeeping");
+                                            }
                                             redirect("Sale/POS");
                                         }
                                        endif;
@@ -552,6 +556,10 @@ class Authentication extends Cl_Controller {
                                             if ($user_information->designation == 'Chef') {
                                                 redirect("Kitchen/kitchens");
                                             }else{
+                                                //Hotel add-on (H3): housekeeping-only staff land on their board.
+                                                if (irHousekeepingLanding()) {
+                                                    redirect("Hotel/housekeeping");
+                                                }
                                                 redirect("Sale/POS");
                                             }
                                         endif;

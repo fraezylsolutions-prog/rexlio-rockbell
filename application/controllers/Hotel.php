@@ -12,7 +12,7 @@
   #   H0  module gate + landing
   #   H1  Room Types + Rooms (this file's CRUD; Table.php pattern)
   #   H2  Front Desk board, check-in / check-out / out of order, status log, stay log
-  #   H3  Housekeeping board
+  #   H3  Housekeeping board (standalone page, Kitchen Panel pattern)
   # Permissions are tbl_access rows looked up BY NAME
   # (irAccessModuleId), never by a fixed id.
   ###########################################################
@@ -65,6 +65,14 @@ class Hotel extends Cl_Controller {
             $module = 'hotel_front_desk'; $function = 'checkout';
         } elseif ($segment_2 == "setOutOfOrder") {
             $module = 'hotel_front_desk'; $function = 'status';
+        } elseif ($segment_2 == "housekeeping" || $segment_2 == "tasksAjax") {
+            $module = 'hotel_housekeeping'; $function = 'view';
+        } elseif ($segment_2 == "taskStart" || $segment_2 == "taskDone") {
+            $module = 'hotel_housekeeping'; $function = 'update_task';
+        } elseif ($segment_2 == "taskVerify") {
+            $module = 'hotel_housekeeping'; $function = 'verify';
+        } elseif ($segment_2 == "taskAssign" || $segment_2 == "taskCreate" || $segment_2 == "taskCancel") {
+            $module = 'hotel_housekeeping'; $function = 'assign';
         } else {
             $this->refuse();
         }
@@ -104,6 +112,8 @@ class Hotel extends Cl_Controller {
      */
     public function index() {
         if ($this->can('hotel_front_desk', 'view')) { redirect('Hotel/frontDesk'); }
+        //H3: floor staff with the board but no front desk go straight to it
+        if ($this->can('hotel_housekeeping', 'view')) { redirect('Hotel/housekeeping'); }
         $data = array();
         $data['can_rooms'] = $this->can('hotel_rooms', 'view');
         $data['can_front_desk'] = $this->can('hotel_front_desk', 'view');
@@ -280,10 +290,18 @@ class Hotel extends Cl_Controller {
         return (int) $this->session->userdata('outlet_id');
     }
 
-    /** JSON helpers for the board's actions */
+    /** JSON helpers for the board's actions. Text is stored HTML-encoded (htmlspecialcharscustom
+     *  on the way in, the app's convention) and the boards escape again when they render, so
+     *  strings are decoded here once: "O'Brien" must not reach the screen as O&#039;Brien. */
     private function jsonOk($extra = array()) {
         header('Content-Type: application/json');
-        echo json_encode(array_merge(array('ok' => 1), $extra));
+        echo json_encode($this->jsonDecodeText(array_merge(array('ok' => 1), $extra)));
+    }
+    private function jsonDecodeText($v) {
+        if (is_string($v)) { return html_entity_decode($v, ENT_QUOTES | ENT_HTML401, 'UTF-8'); }
+        if (is_array($v)) { foreach ($v as $k => $x) { $v[$k] = $this->jsonDecodeText($x); } return $v; }
+        if (is_object($v)) { foreach (get_object_vars($v) as $k => $x) { $v->$k = $this->jsonDecodeText($x); } return $v; }
+        return $v;
     }
     private function jsonFail($reason, $extra = array()) {
         header('Content-Type: application/json');
@@ -460,5 +478,182 @@ class Hotel extends Cl_Controller {
         $data['stays'] = $stays;
         $data['main_content'] = $this->load->view('hotel/stays', $data, TRUE);
         $this->load->view('userHome', $data);
+    }
+
+    /* ================================================================ housekeeping board (H3) */
+
+    /**
+     * the task a user may act on: live, in an accessible outlet; an
+     * update_task holder may only touch tasks that are theirs or unassigned
+     * (the pool) unless they also hold assign
+     */
+    /** one audit row per task action, the same shape as the front desk's */
+    private function auditTask($title, $task, $extra = '') {
+        $room = $this->Hotel_model->getRoom($task->room_id);
+        putAuditLog($this->session->userdata('user_id'), $title . ': room ' . ($room ? $room->number : $task->room_id) . ', ' . $task->task_type . ' (task ' . $task->id . ')' . ($extra !== '' ? ' ' . $extra : ''), 'Hotel Task ' . $title, date('Y-m-d H:i:s'));
+    }
+
+    private function actionableTask($task_id, $own_only) {
+        $task = $this->Hotel_model->getTask($task_id);
+        if (!$task || (int) $task->company_id !== (int) $this->session->userdata('company_id')) { return NULL; }
+        if (!in_array((int) $task->outlet_id, $this->outletIds(), TRUE)) { return NULL; }
+        if ($own_only && $task->assigned_to !== NULL && (int) $task->assigned_to !== (int) $this->session->userdata('user_id')) { return NULL; }
+        return $task;
+    }
+
+    /**
+     * the Housekeeping board - a standalone full-screen page on the Kitchen
+     * Panel pattern (no sidebar; made for a tablet on the floor), polled
+     * every 10 s through tasksAjax
+     * @access public
+     * @return void
+     */
+    public function housekeeping() {
+        $outlet_id = $this->boardOutlet();
+        $data = array();
+        $data['outlet_id'] = $outlet_id;
+        $data['outlet'] = $this->Common_model->getDataById($outlet_id, 'tbl_outlets');
+        $data['outlets'] = $this->Hotel_model->getOutlets($this->outletIds());
+        $data['can_update'] = $this->can('hotel_housekeeping', 'update_task');
+        $data['can_assign'] = $this->can('hotel_housekeeping', 'assign');
+        $data['can_verify'] = $this->can('hotel_housekeeping', 'verify');
+        $data['can_front_desk'] = $this->can('hotel_front_desk', 'view');
+        $data['staff'] = $data['can_assign'] ? $this->Hotel_model->getHousekeepingUsers($this->session->userdata('company_id')) : array();
+        $data['rooms'] = $data['can_assign'] ? $this->Hotel_model->getRooms($this->session->userdata('company_id'), array($outlet_id)) : array();
+        $this->load->view('hotel/housekeeping_panel', $data);
+    }
+
+    /**
+     * the open tasks as JSON, sorted into sections for the caller
+     * @access public
+     * @return void
+     */
+    public function tasksAjax() {
+        $outlet_id = $this->boardOutlet();
+        $me = (int) $this->session->userdata('user_id');
+        $tasks = $this->Hotel_model->getOpenTasks($outlet_id);
+        $counts = array('mine' => 0, 'pool' => 0, 'others' => 0, 'done' => 0);
+        foreach ($tasks as $t) {
+            $t->is_mine = ((int) $t->assigned_to === $me) ? 1 : 0;
+            if ($t->status === 'done') { $counts['done']++; }
+            elseif ($t->assigned_to === NULL) { $counts['pool']++; }
+            elseif ($t->is_mine) { $counts['mine']++; }
+            else { $counts['others']++; }
+        }
+        $this->jsonOk(array('outlet_id' => $outlet_id, 'tasks' => $tasks, 'counts' => $counts, 'server_time' => date('Y-m-d H:i:s'), 'me' => $me,
+                            'can' => array('update' => $this->can('hotel_housekeeping', 'update_task') ? 1 : 0, 'assign' => $this->can('hotel_housekeeping', 'assign') ? 1 : 0, 'verify' => $this->can('hotel_housekeeping', 'verify') ? 1 : 0)));
+    }
+
+    /**
+     * start a task: pending -> in_progress. From the pool it is claimed by the
+     * actor. The room is marked in_progress.
+     * @access public
+     * @return void
+     */
+    public function taskStart() {
+        $task = $this->actionableTask((int) $this->input->post('task_id'), !$this->can('hotel_housekeeping', 'assign'));
+        if (!$task) { return $this->jsonFail('task'); }
+        if ($task->status !== 'pending') { return $this->jsonFail('task_state'); }
+        $me = (int) $this->session->userdata('user_id');
+        $this->Hotel_model->updateTask($task->id, array('status' => 'in_progress', 'started_at' => date('Y-m-d H:i:s'), 'assigned_to' => $task->assigned_to !== NULL ? (int) $task->assigned_to : $me));
+        if ($task->task_type !== 'maintenance') { $this->Hotel_model->setRoomStatus($task->room_id, 'housekeeping', 'in_progress', $me, lang('hotel_task_' . $task->task_type)); }
+        $this->auditTask('Start', $task);
+        $this->jsonOk();
+    }
+
+    /**
+     * finish a task: pending / in_progress -> done. The room is clean
+     * (inspection / maintenance tasks do not touch the room state).
+     * @access public
+     * @return void
+     */
+    public function taskDone() {
+        $task = $this->actionableTask((int) $this->input->post('task_id'), !$this->can('hotel_housekeeping', 'assign'));
+        if (!$task) { return $this->jsonFail('task'); }
+        if (!in_array($task->status, array('pending', 'in_progress'), TRUE)) { return $this->jsonFail('task_state'); }
+        $me = (int) $this->session->userdata('user_id');
+        $this->Hotel_model->updateTask($task->id, array('status' => 'done', 'done_at' => date('Y-m-d H:i:s'), 'started_at' => $task->started_at ? $task->started_at : date('Y-m-d H:i:s'), 'assigned_to' => $task->assigned_to !== NULL ? (int) $task->assigned_to : $me));
+        if (in_array($task->task_type, array('cleaning', 'turndown'), TRUE)) { $this->Hotel_model->setRoomStatus($task->room_id, 'housekeeping', 'clean', $me, lang('hotel_task_' . $task->task_type)); }
+        $this->auditTask('Finish', $task);
+        $this->jsonOk();
+    }
+
+    /**
+     * a supervisor verifies a done task: done -> verified; the room is inspected
+     * @access public
+     * @return void
+     */
+    public function taskVerify() {
+        $task = $this->actionableTask((int) $this->input->post('task_id'), FALSE);
+        if (!$task) { return $this->jsonFail('task'); }
+        if ($task->status !== 'done') { return $this->jsonFail('task_state'); }
+        $me = (int) $this->session->userdata('user_id');
+        $this->Hotel_model->updateTask($task->id, array('status' => 'verified', 'verified_by' => $me, 'verified_at' => date('Y-m-d H:i:s')));
+        $this->auditTask('Verify', $task);
+        if (in_array($task->task_type, array('cleaning', 'turndown', 'inspection'), TRUE)) { $this->Hotel_model->setRoomStatus($task->room_id, 'housekeeping', 'inspected', $me, lang('hotel_verified')); }
+        $this->jsonOk();
+    }
+
+    /**
+     * hand a task to someone (or back to the pool with user 0)
+     * @access public
+     * @return void
+     */
+    public function taskAssign() {
+        $task = $this->actionableTask((int) $this->input->post('task_id'), FALSE);
+        if (!$task) { return $this->jsonFail('task'); }
+        if (!in_array($task->status, array('pending', 'in_progress'), TRUE)) { return $this->jsonFail('task_state'); }
+        $user_id = (int) $this->input->post('user_id');
+        if ($user_id) {
+            $ok = FALSE;
+            foreach ($this->Hotel_model->getHousekeepingUsers($this->session->userdata('company_id')) as $u) { if ((int) $u->id === $user_id) { $ok = TRUE; } }
+            if (!$ok) { return $this->jsonFail('user'); }
+        }
+        $this->Hotel_model->updateTask($task->id, array('assigned_to' => $user_id ? $user_id : NULL));
+        $this->auditTask('Assign', $task, $user_id ? 'to user ' . $user_id : 'to the pool');
+        $this->jsonOk();
+    }
+
+    /**
+     * a task by hand (cleaning / turndown / inspection / maintenance) for a room
+     * of the outlet; a cleaning task marks a clean room dirty
+     * @access public
+     * @return void
+     */
+    public function taskCreate() {
+        $room = $this->actionableRoom((int) $this->input->post('room_id'));
+        if (!$room) { return $this->jsonFail('room'); }
+        $type = (string) $this->input->post('task_type');
+        if (!in_array($type, array('cleaning', 'turndown', 'inspection', 'maintenance'), TRUE)) { return $this->jsonFail('task_type'); }
+        $me = (int) $this->session->userdata('user_id');
+        $note = htmlspecialcharscustom($this->input->post($this->security->xss_clean('note')));
+        $assign = (int) $this->input->post('user_id');
+        if ($assign) {
+            $ok = FALSE;
+            foreach ($this->Hotel_model->getHousekeepingUsers($this->session->userdata('company_id')) as $u) { if ((int) $u->id === $assign) { $ok = TRUE; } }
+            if (!$ok) { return $this->jsonFail('user'); }
+        }
+        $task_id = $this->Hotel_model->createTask($room->company_id, $room->outlet_id, $room->id, $type, $me, $note);
+        if (!$task_id) { return $this->jsonFail('task_exists'); }
+        if ($assign) { $this->Hotel_model->updateTask($task_id, array('assigned_to' => $assign)); }
+        putAuditLog($me, 'Create: room ' . $room->number . ', ' . $type . ' (task ' . $task_id . ')' . ($assign ? ' to user ' . $assign : ''), 'Hotel Task Create', date('Y-m-d H:i:s'));
+        if ($type === 'cleaning' && in_array($room->housekeeping_status, array('clean', 'inspected'), TRUE)) {
+            $this->Hotel_model->setRoomStatus($room->id, 'housekeeping', 'dirty', $me, $note !== '' ? $note : lang('hotel_task_cleaning'));
+        }
+        $this->jsonOk(array('task_id' => $task_id));
+    }
+
+    /**
+     * drop an open task (assign permission). The room state is left as it is.
+     * @access public
+     * @return void
+     */
+    public function taskCancel() {
+        $task = $this->actionableTask((int) $this->input->post('task_id'), FALSE);
+        if (!$task) { return $this->jsonFail('task'); }
+        if (!in_array($task->status, array('pending', 'in_progress', 'done'), TRUE)) { return $this->jsonFail('task_state'); }
+        $this->Hotel_model->updateTask($task->id, array('status' => 'cancelled'));
+        $this->auditTask('Cancel', $task);
+        $this->jsonOk();
     }
 }

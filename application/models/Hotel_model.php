@@ -175,4 +175,52 @@ class Hotel_model extends CI_Model {
         }
         return $this->db->order_by('s.checkin_at', 'DESC')->limit(1000)->get()->result();
     }
+
+    /* ---------------------------------------------------------------- housekeeping (H3) */
+
+    /**
+     * open tasks of one outlet (pending / in_progress / done) with their room,
+     * who holds them and who made them - the board's whole data set
+     */
+    public function getOpenTasks($outlet_id) {
+        return $this->db->select('k.*, r.number AS room_number, r.floor, r.housekeeping_status, r.occupancy_status, t.name AS type_name,
+                                  ua.full_name AS assigned_name, uc.full_name AS created_name, uv.full_name AS verified_name')
+                        ->from('tbl_hotel_housekeeping_tasks k')
+                        ->join('tbl_hotel_rooms r', 'r.id = k.room_id', 'left')
+                        ->join('tbl_hotel_room_types t', 't.id = r.room_type_id', 'left')
+                        ->join('tbl_users ua', 'ua.id = k.assigned_to', 'left')
+                        ->join('tbl_users uc', 'uc.id = k.created_by', 'left')
+                        ->join('tbl_users uv', 'uv.id = k.verified_by', 'left')
+                        ->where('k.outlet_id', (int) $outlet_id)->where('k.del_status', 'Live')
+                        ->where_in('k.status', array('pending', 'in_progress', 'done'))
+                        ->order_by('k.status', 'ASC')->order_by('k.created_at', 'ASC')->get()->result();
+    }
+
+    public function getTask($id) {
+        return $this->db->get_where('tbl_hotel_housekeeping_tasks', array('id' => (int) $id, 'del_status' => 'Live'))->row();
+    }
+
+    public function updateTask($id, $data) {
+        $this->db->where('id', (int) $id)->update('tbl_hotel_housekeeping_tasks', $data);
+        return $this->db->affected_rows() > 0;
+    }
+
+    /**
+     * who can be handed a task: every live user of the company whose role holds
+     * hotel_housekeeping > update_task (Admin as well). Resolved from the role
+     * grants, so the list follows the Role screen without any hard-coded role name.
+     */
+    public function getHousekeepingUsers($company_id) {
+        $sql = "SELECT u.id, u.full_name, ro.role_name
+                  FROM tbl_users u
+                  JOIN tbl_roles ro ON ro.id = u.role_id AND ro.del_status = 'Live'
+                 WHERE u.company_id = ? AND u.del_status = 'Live'
+                   AND (ro.role_name = 'Admin' OR EXISTS (
+                        SELECT 1 FROM tbl_role_access ra
+                          JOIN tbl_access c ON c.id = ra.access_child_id AND c.function_name = 'update_task'
+                          JOIN tbl_access m ON m.id = c.parent_id AND m.module_name = 'hotel_housekeeping'
+                         WHERE ra.role_id = ro.id AND ra.del_status = 'Live'))
+                 ORDER BY u.full_name ASC";
+        return $this->db->query($sql, array((int) $company_id))->result();
+    }
 }

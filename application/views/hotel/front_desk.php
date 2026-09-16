@@ -2,7 +2,7 @@
          polls Hotel/boardAjax every 15 s and after every action. Actions are permission-gated
          twice: buttons only render for a permission the caller holds, and the controller checks
          again on every POST. */ ?>
-<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.0">
+<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.1">
 <section class="main-content-wrapper">
     <?php $this->view('hotel/_flash'); ?>
     <section class="content-header">

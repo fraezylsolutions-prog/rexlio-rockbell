@@ -40,3 +40,47 @@
 .hk_warn[hidden] { display: none !important; }
 .hk_empty { text-align: center; color: #8f8f8f; padding: 30px 0; }
 @media (max-width: 767.98px) { .hk_grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; } .hk_card { padding: 10px; } .hk_room_no { font-size: 18px; } }
+
+/* ---- Housekeeping board (H3): standalone page, tablet first ---- */
+.hkp_body { margin: 0; background: #f3f4f9; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1b1633; }
+.hkp_top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: #fff; border-bottom: 1px solid #e4e6ef; position: sticky; top: 0; z-index: 5; }
+.hkp_title { font-size: 20px; font-weight: 800; }
+.hkp_sub { font-size: 12.5px; color: #716e8c; margin-top: 2px; }
+.hkp_chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hkp_actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hkp_btn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e4e6ef; background: #f4f5fa; color: #1b1633; border-radius: 10px; padding: 12px 16px; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none; }
+.hkp_btn:hover { filter: brightness(.97); color: #1b1633; }
+.hkp_btn_primary { background: #6c4bf4; border-color: #6c4bf4; color: #fff; }
+.hkp_btn_primary:hover { color: #fff; }
+.hkp_btn_good { background: #12b76a; border-color: #12b76a; color: #fff; }
+.hkp_btn_good:hover { color: #fff; }
+.hkp_btn_ghost { background: transparent; }
+.hkp_select, .hkp_input { border: 1px solid #e4e6ef; border-radius: 10px; padding: 10px 12px; font-size: 15px; background: #fff; }
+.hkp_w100 { width: 100%; box-sizing: border-box; margin: 4px 0 12px; }
+.hkp_main { padding: 16px 18px 40px; }
+.hkp_section { margin-bottom: 22px; }
+.hkp_sec_title { font-size: 15px; font-weight: 800; color: #4b4b63; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .4px; }
+.hkp_sec_count { display: inline-block; min-width: 22px; text-align: center; background: #e4e6ef; border-radius: 999px; padding: 2px 8px; font-size: 12px; margin-left: 6px; }
+.hkp_grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.hkp_sec_empty { color: #a0a0b0; padding: 8px 2px; }
+.hkp_card { background: #fff; border: 1px solid #e4e6ef; border-left: 6px solid #f79009; border-radius: 12px; padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,.05); display: flex; flex-direction: column; gap: 6px; }
+.hkp_card.hkp_in_progress { border-left-color: #0ba5ec; }
+.hkp_card.hkp_done { border-left-color: #12b76a; }
+.hkp_card.hkp_type_maintenance { border-left-color: #344054; }
+.hkp_card_head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.hkp_room { font-size: 26px; font-weight: 800; }
+.hkp_type { font-size: 13px; font-weight: 700; color: #716e8c; }
+.hkp_meta { font-size: 13px; color: #716e8c; }
+.hkp_note { font-size: 13px; color: #1b1633; background: #f4f5fa; border-radius: 8px; padding: 6px 8px; }
+.hkp_card_actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.hkp_card_actions .hkp_btn { flex: 1 1 auto; justify-content: center; padding: 12px 10px; }
+.hkp_card_actions .hkp_btn_ghost { flex: 0 0 auto; }
+.hkp_overlay { position: fixed; inset: 0; background: rgba(7,12,31,.6); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+.hkp_overlay[hidden] { display: none !important; }
+.hkp_dialog { background: #fff; border-radius: 14px; padding: 18px; width: min(460px, 100%); }
+.hkp_dialog label { font-size: 12.5px; font-weight: 700; color: #4b4b63; }
+.hkp_dialog_head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 17px; }
+.hkp_close { background: transparent; border: 0; font-size: 26px; line-height: 1; cursor: pointer; color: #716e8c; }
+.hkp_dialog_foot { text-align: right; margin-top: 6px; }
+.hkp_err { color: #b42318; font-size: 13px; min-height: 18px; }
+@media (max-width: 600px) { .hkp_grid { grid-template-columns: 1fr; } .hkp_top { padding: 10px 12px; } .hkp_main { padding: 12px; } }

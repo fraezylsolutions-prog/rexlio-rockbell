@@ -524,7 +524,7 @@
                                         <?php echo lang('front_desk'); ?></a></li>
                                 <li data-access="view-<?php echo irAccessModuleId('hotel_front_desk'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/stays">
                                         <?php echo lang('stay_log'); ?></a></li>
-                                <li data-access="view-<?php echo irAccessModuleId('hotel_housekeeping'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/index">
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_housekeeping'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/housekeeping">
                                         <?php echo lang('housekeeping_board'); ?></a></li>
                                 <li data-access="view-<?php echo irAccessModuleId('hotel_rooms'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/rooms">
                                         <?php echo lang('rooms'); ?></a></li>

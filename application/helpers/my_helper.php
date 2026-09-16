@@ -5197,3 +5197,22 @@ if (!function_exists('irAccessModuleId')) {
         return $ids[$module_name];
     }
 }
+
+if (!function_exists('irHousekeepingLanding')) {
+    /**
+     * Hotel add-on (H3): is this session floor staff whose home is the Housekeeping
+     * board? True when the hotel module is on, the role holds hotel_housekeeping
+     * view and holds NO POS access. Decided from permissions, never from the role's
+     * name, so any custom role qualifies; Admin and every POS user keep their
+     * usual landing. Callers redirect to Hotel/housekeeping when this is true.
+     * @return bool
+     */
+    function irHousekeepingLanding() {
+        $CI = &get_instance();
+        if ($CI->session->userdata('role') == 'Admin') { return FALSE; }
+        if (!irModuleEnabled('hotel')) { return FALSE; }
+        if (checkAccess("73", "pos_1")) { return FALSE; }
+        $id = irAccessModuleId('hotel_housekeeping');
+        return $id && checkAccess((string) $id, 'view');
+    }
+}

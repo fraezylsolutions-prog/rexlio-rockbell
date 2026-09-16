@@ -65,7 +65,36 @@
         });
         return h;
     }
-    root.irHotelBoard = { esc: esc, since: since, money: money, nightsBetween: nightsBetween, roomCardHtml: roomCardHtml, boardHtml: boardHtml };
+    /* H10 - the analytics row (pure). Left: the live snapshot; right: the value generated in the period. */
+    function statsHtml(st, ctx) {
+        var m = ctx.msg, lt = st.live_total || {}, hk = st.housekeeping || {}, pd = st.period || { rows: [], total: { amount: 0, stays: 0, nights: 0 } };
+        var h = '<div class="hk_stats">';
+        h += '<div class="hk_stats_live">';
+        h += '<div class="hk_stat hk_stat_occ"><div class="hk_stat_label">' + esc(m("hk_rooms_checked_in")) + '</div><div class="hk_stat_big">' + Number(lt.occupied || 0) + ' <span class="hk_stat_sub">/ ' + Number(lt.rooms || 0) + ' ' + esc(m("rooms")) + '</span></div><div class="hk_stat_sub">' + esc(m("hk_value_in_house")) + ' <b>' + esc(money(lt.value)) + '</b></div></div>';
+        h += '<div class="hk_stat hk_stat_vac"><div class="hk_stat_label">' + esc(m("hk_vacant_rooms")) + '</div><div class="hk_stat_big">' + Number(lt.vacant || 0) + '</div><div class="hk_stat_sub">' + esc(m("hk_potential_value")) + ' <b>' + esc(money(lt.potential)) + '</b></div></div>';
+        h += '<div class="hk_stat hk_stat_pct"><div class="hk_stat_label">' + esc(m("hk_occupancy_rate")) + '</div><div class="hk_stat_big">' + Number(lt.occupancy || 0).toFixed(1) + '%</div><div class="hk_stat_sub">' + Number(lt.out_of_order || 0) + ' ' + esc(m("room_out_of_order")).toLowerCase() + '</div></div>';
+        h += '<div class="hk_stat hk_stat_hk"><div class="hk_stat_label">' + esc(m("housekeeping")) + '</div><div class="hk_hk_chips">' +
+             '<span class="hk_badge hk_c_clean">' + esc(m("room_clean")) + ' <b>' + Number(hk.clean || 0) + '</b></span>' +
+             '<span class="hk_badge hk_c_dirty">' + esc(m("room_dirty")) + ' <b>' + Number(hk.dirty || 0) + '</b></span>' +
+             '<span class="hk_badge hk_c_prog">' + esc(m("room_in_progress")) + ' <b>' + Number(hk.in_progress || 0) + '</b></span>' +
+             '<span class="hk_badge hk_c_insp">' + esc(m("room_inspected")) + ' <b>' + Number(hk.inspected || 0) + '</b></span></div></div>';
+        h += '</div>';
+        /* per category, live */
+        h += '<table class="hk_stats_table"><thead><tr><th>' + esc(m("room_type")) + '</th><th>' + esc(m("hk_rooms_checked_in")) + '</th><th>' + esc(m("hk_value_in_house")) + '</th><th>' + esc(m("hk_vacant_rooms")) + '</th><th>' + esc(m("hk_potential_value")) + '</th><th>' + esc(m("hk_occupancy_rate")) + '</th></tr></thead><tbody>';
+        (st.live || []).forEach(function (r) {
+            h += '<tr><td><b>' + esc(r.name) + '</b></td><td>' + Number(r.occupied) + ' <span class="hk_stat_sub">/ ' + Number(r.rooms) + '</span></td><td>' + esc(money(r.value)) + '</td><td>' + Number(r.vacant) + '</td><td>' + esc(money(r.potential)) + '</td><td>' + Number(r.occupancy).toFixed(1) + '%</td></tr>';
+        });
+        if (!(st.live || []).length) { h += '<tr><td colspan="6" class="hk_muted">' + esc(m("hotel_no_rooms")) + '</td></tr>'; }
+        h += '<tr class="hk_stats_total"><td>' + esc(m("total")) + '</td><td>' + Number(lt.occupied || 0) + ' / ' + Number(lt.rooms || 0) + '</td><td><b>' + esc(money(lt.value)) + '</b></td><td>' + Number(lt.vacant || 0) + '</td><td>' + esc(money(lt.potential)) + '</td><td>' + Number(lt.occupancy || 0).toFixed(1) + '%</td></tr></tbody></table>';
+        /* the period figure, explicitly labelled and kept apart from the live row */
+        h += '<div class="hk_stats_period"><div class="hk_stat_label">' + esc(m("hk_value_generated_period")) + ' &middot; ' + esc(pd.from) + ' &rarr; ' + esc(pd.to) + '</div>';
+        h += '<div class="hk_stat_big" id="hk_period_total">' + esc(money(pd.total.amount)) + ' <span class="hk_stat_sub">' + Number(pd.total.stays) + ' ' + esc(m("hk_stays")).toLowerCase() + ' &middot; ' + Number(pd.total.nights) + ' ' + esc(m("nights")).toLowerCase() + '</span></div>';
+        h += '<div class="hk_period_rows">';
+        (pd.rows || []).forEach(function (r) { h += '<span class="hk_badge hk_b_period">' + esc(r.name) + ' <b>' + esc(money(r.amount)) + '</b> <span class="hk_stat_sub">' + Number(r.stays) + '</span></span>'; });
+        h += '</div></div></div>';
+        return h;
+    }
+    root.irHotelBoard = { esc: esc, since: since, money: money, nightsBetween: nightsBetween, roomCardHtml: roomCardHtml, boardHtml: boardHtml, statsHtml: statsHtml };
 
     if (typeof $ === "undefined") { return; }   /* Node unit tests stop here */
     $(function () {
@@ -80,8 +109,14 @@
             $("#hk_board").html(boardHtml(res.rooms, { msg: msg, can: can, now: server_now }));
             $("#hk_c_occupied").text(res.counts.occupied); $("#hk_c_vacant").text(res.counts.vacant); $("#hk_c_dirty").text(res.counts.dirty); $("#hk_c_ooo").text(res.counts.out_of_order);
         }
+        /* H10 - the analytics row, refreshed with the board and when the period changes */
+        function refreshStats() {
+            $.ajax({ url: base_url + "Hotel/statsAjax", method: "POST", dataType: "json", data: { outlet_id: outlet(), start_date: $("#hk_st_from").val(), end_date: $("#hk_st_to").val() },
+                success: function (res) { if (res && res.ok) { $("#hk_stats").html(statsHtml(res, { msg: msg })); $("#hk_stats_time").text(String(res.server_time || "").substring(11, 16)); } } });
+        }
         function refresh(done) {
             if (polling) { return; } polling = true;
+            refreshStats();
             $.ajax({ url: base_url + "Hotel/boardAjax", method: "POST", dataType: "json", data: { outlet_id: outlet() },
                 success: function (res) { polling = false; if (res && res.ok) { render(res); markUpdated(); } if (done) { done(res); } },
                 error: function () { polling = false; $("#hk_last_updated").text(last); $("#hk_offline_banner").show(); if (done) { done(null); } } });
@@ -200,6 +235,15 @@
             });
         });
         $(document).on("change", "#hk_outlet", function () { refresh(); });
+        $(document).on("click", "#hk_st_apply", function () { refreshStats(); });
+        $(document).on("click", ".hk_st_preset", function () {
+            var today = $("#hk_today").val(), t = new Date(today + "T00:00:00"), from = new Date(t), to = new Date(t), p = $(this).attr("data-preset");
+            if (p === "week") { var wd = (t.getDay() + 6) % 7; from.setDate(t.getDate() - wd); to = new Date(from); to.setDate(from.getDate() + 6); }
+            else if (p === "month") { from.setDate(1); to = new Date(t.getFullYear(), t.getMonth() + 1, 0); }
+            else if (p === "year") { from = new Date(t.getFullYear(), 0, 1); to = new Date(t.getFullYear(), 11, 31); }
+            var ymd = function (d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+            $("#hk_st_from").val(ymd(from)); $("#hk_st_to").val(ymd(to)); refreshStats();
+        });
         refresh();
         setInterval(refresh, 15000);
     });

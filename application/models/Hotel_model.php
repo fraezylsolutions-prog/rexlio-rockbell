@@ -283,4 +283,22 @@ class Hotel_model extends CI_Model {
                         ->where("(s.checkout_at IS NULL OR s.checkout_at >= '" . $this->db->escape_str($from) . " 00:00:00')", NULL, FALSE)
                         ->get()->result();
     }
+
+    /** H10 - live rooms per type at one outlet: occupancy split, value of the stays in house, the type's base rate */
+    public function liveStatsByType($company_id, $outlet_id) {
+        return $this->db->select('r.room_type_id, t.name AS type_name, COALESCE(t.base_rate, 0) AS base_rate, COUNT(*) AS rooms,
+                SUM(r.occupancy_status = "occupied") AS occupied, SUM(r.occupancy_status = "vacant") AS vacant, SUM(r.occupancy_status = "out_of_order") AS out_of_order,
+                COALESCE(SUM((SELECT s.amount FROM tbl_hotel_stays s WHERE s.room_id = r.id AND s.status = "in_house" AND s.del_status = "Live" ORDER BY s.id DESC LIMIT 1)), 0) AS value', FALSE)
+                        ->from('tbl_hotel_rooms r')->join('tbl_hotel_room_types t', 't.id = r.room_type_id', 'left')
+                        ->where('r.company_id', (int) $company_id)->where('r.outlet_id', (int) $outlet_id)->where('r.del_status', 'Live')
+                        ->group_by(array('r.room_type_id', 't.name', 't.base_rate'))->order_by('t.name', 'ASC')->get()->result();
+    }
+
+    /** H10 - how many live rooms sit in each housekeeping state at one outlet */
+    public function housekeepingCounts($outlet_id) {
+        $out = array('clean' => 0, 'dirty' => 0, 'in_progress' => 0, 'inspected' => 0);
+        foreach ($this->db->select('housekeeping_status, COUNT(*) AS n')->from('tbl_hotel_rooms')->where('outlet_id', (int) $outlet_id)->where('del_status', 'Live')
+                          ->group_by('housekeeping_status')->get()->result() as $r) { if (isset($out[$r->housekeeping_status])) { $out[$r->housekeeping_status] = (int) $r->n; } }
+        return $out;
+    }
 }

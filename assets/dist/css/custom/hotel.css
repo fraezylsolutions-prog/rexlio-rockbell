@@ -101,3 +101,27 @@
 .hk_rp_zero { color: #c9c9d4; }
 .hk_rp_total { background: #f4f5fa; }
 .hk_rp_grand th { background: #eef0f6; }
+
+/* ---- H10: front desk analytics row ---- */
+.hk_stats_wrap { margin-bottom: 14px; }
+.hk_stats_head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.hk_stats_title { font-size: 15px; font-weight: 800; color: #4b4b63; text-transform: uppercase; letter-spacing: .4px; }
+.hk_stats_filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.hk_stats_filter label { font-size: 12.5px; font-weight: 700; color: #716e8c; margin: 0 4px 0 0; }
+.hk_stats_filter input[type=date] { width: auto; }
+.hk_stats_live { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.hk_stat { background: #fff; border: 1px solid #e4e6ef; border-radius: 12px; padding: 12px 14px; border-left: 6px solid #9aa0b4; }
+.hk_stat_occ { border-left-color: #f04438; } .hk_stat_vac { border-left-color: #12b76a; } .hk_stat_pct { border-left-color: #6c4bf4; } .hk_stat_hk { border-left-color: #0ba5ec; }
+.hk_stat_label { font-size: 12px; font-weight: 700; color: #716e8c; }
+.hk_stat_big { font-size: 24px; font-weight: 800; color: #1b1633; line-height: 1.2; }
+.hk_stat_sub { font-size: 12px; color: #716e8c; font-weight: 500; }
+.hk_hk_chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.hk_c_clean { background: #dcfae6; color: #067647; } .hk_c_dirty { background: #fef0c7; color: #b54708; } .hk_c_prog { background: #e0f2fe; color: #026aa2; } .hk_c_insp { background: #e9d7fe; color: #6941c6; }
+.hk_stats_table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+.hk_stats_table th { text-align: left; font-size: 11.5px; color: #716e8c; text-transform: uppercase; letter-spacing: .3px; padding: 6px 8px; border-bottom: 1px solid #e4e6ef; }
+.hk_stats_table td { padding: 7px 8px; border-bottom: 1px solid #f0f1f6; }
+.hk_stats_total td { background: #f4f5fa; font-weight: 700; }
+.hk_stats_period { background: #f5f2ff; border: 1px solid #e0d8ff; border-left: 6px solid #6c4bf4; border-radius: 12px; padding: 12px 14px; }
+.hk_period_rows { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.hk_b_period { background: #fff; color: #1b1633; border: 1px solid #e0d8ff; }
+@media (max-width: 767.98px) { .hk_stats_table { display: block; overflow-x: auto; white-space: nowrap; } }

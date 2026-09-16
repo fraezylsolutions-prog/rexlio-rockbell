@@ -346,6 +346,14 @@ class Dashboard extends Cl_Controller {
         //client later asks "how many orders is that?"
         $return_array['running_order_count'] = $running_details->running_order_count;
 
+        //Hotel add-on (H10): Rooms Checked-in, a LIVE count like card 4 - rooms occupied right
+        //now in this outlet, ignoring the date and time filters. Only while the module is ON;
+        //the view shows the Transactions card otherwise, so the key is simply absent then.
+        if (irModuleEnabled('hotel')) {
+            $return_array['rooms_checked_in'] = (int) $this->db->where('outlet_id', (int) $outlet_id)->where('del_status', 'Live')
+                                                                   ->where('occupancy_status', 'occupied')->count_all_results('tbl_hotel_rooms');
+        }
+
         echo json_encode($return_array);
     }
 }

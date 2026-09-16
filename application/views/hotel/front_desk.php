@@ -2,7 +2,7 @@
          polls Hotel/boardAjax every 15 s and after every action. Actions are permission-gated
          twice: buttons only render for a permission the caller holds, and the controller checks
          again on every POST. */ ?>
-<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.3">
+<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.4">
 <section class="main-content-wrapper">
     <?php $this->view('hotel/_flash'); ?>
     <section class="content-header">
@@ -31,6 +31,28 @@
 
     <div class="hk_offline_banner" id="hk_offline_banner" style="display:none;">
         <i class="fas fa-exclamation-triangle"></i> <?php echo lang('offline_showing_last_known'); ?> <span id="hk_last_updated"></span>
+    </div>
+
+    <?php /* H10 - analytics row: a LIVE snapshot (never date-filtered, labelled Now) and, kept apart, the
+             value generated in a chosen period. Rendered by irHotelBoard.statsHtml from Hotel/statsAjax. */ ?>
+    <div class="box-wrapper hk_stats_wrap">
+        <div class="hk_stats_head">
+            <div class="hk_stats_title"><?php echo lang('hk_now'); ?> <span class="hk_muted" id="hk_stats_time"></span></div>
+            <form class="hk_stats_filter" id="hk_stats_form" onsubmit="return false;">
+                <label><?php echo lang('hk_value_period'); ?></label>
+                <input type="date" id="hk_st_from" class="form-control form-control-sm" value="<?php echo date('Y-m-01'); ?>">
+                <span>&rarr;</span>
+                <input type="date" id="hk_st_to" class="form-control form-control-sm" value="<?php echo date('Y-m-t'); ?>">
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary hk_st_preset" data-preset="today"><?php echo lang('today'); ?></button>
+                    <button type="button" class="btn btn-outline-secondary hk_st_preset" data-preset="week"><?php echo lang('hk_this_week'); ?></button>
+                    <button type="button" class="btn btn-outline-secondary hk_st_preset" data-preset="month"><?php echo lang('this_month'); ?></button>
+                    <button type="button" class="btn btn-outline-secondary hk_st_preset" data-preset="year"><?php echo lang('hk_this_year'); ?></button>
+                </div>
+                <button type="button" class="btn btn-sm bg-blue-btn" id="hk_st_apply"><?php echo lang('submit'); ?></button>
+            </form>
+        </div>
+        <div id="hk_stats"><div class="hk_empty"><?php echo lang('loading'); ?>&hellip;</div></div>
     </div>
 
     <div class="box-wrapper">
@@ -174,7 +196,9 @@
 <?php foreach (array('check_in', 'check_out', 'room_vacant', 'room_occupied', 'room_out_of_order', 'room_clean', 'room_dirty', 'room_in_progress', 'room_inspected',
                      'hotel_set_out_of_order', 'hotel_back_in_service', 'history', 'hotel_no_rooms', 'hotel_since', 'hotel_confirm_checkout', 'hotel_check_in_anyway',
                      'hotel_dirty_warn_text', 'guest', 'expected_checkout', 'hotel_task_open', 'no_data_found', 'hotel_toast_checked_in', 'hotel_toast_checked_out',
-                     'nights', 'hotel_value_edit', 'hotel_variance_text', 'hotel_value_updated', 'hotel_log_value', 'hotel_err_amount') as $k): ?>
+                     'nights', 'hotel_value_edit', 'hotel_variance_text', 'hotel_value_updated', 'hotel_log_value', 'hotel_err_amount',
+                     'hk_rooms_checked_in', 'hk_vacant_rooms', 'hk_occupancy_rate', 'hk_potential_value', 'hk_value_generated_period', 'hk_grand_total_value', 'hk_stays', 'rooms',
+                     'room_type', 'room_clean', 'room_dirty', 'room_in_progress', 'room_inspected', 'hk_value_in_house', 'total', 'hotel_no_rooms') as $k): ?>
 <input type="hidden" id="hk_lang_<?php echo $k; ?>" value="<?php echo lang($k); ?>">
 <?php endforeach; ?>
-<script src="<?php echo base_url(); ?>frequent_changing/js/hotel_front_desk.js?v=1.2"></script>
+<script src="<?php echo base_url(); ?>frequent_changing/js/hotel_front_desk.js?v=1.3"></script>

@@ -166,6 +166,18 @@
                 <i data-feather="trending-up"></i>
             </div>
         </a>
+        <?php /* Hotel add-on (H10): while the module is ON this card is Rooms Checked-in - a LIVE
+                 count of rooms occupied right now (like Running Order Value it ignores the date and
+                 time filters). The Transactions card returns the moment the module is switched off. */
+              if (irModuleEnabled('hotel')): ?>
+        <a href="<?php echo base_url(); ?>Hotel/frontDesk" class="btn btn-dblue1" role="button" id="ir_rooms_checked_in_card">
+            <p><?php echo lang('hk_rooms_checked_in')?></p>
+            <h5 class="set_rooms_checked_in">0</h5>
+            <div class="card-icon red_icon">
+                <i data-feather="key"></i>
+            </div>
+        </a>
+        <?php else: ?>
         <a href="javascript:void(0)" class="get_action_prevent btn btn-dblue1" role="button">
             <p><?php echo lang('transactions')?></p>
             <h5 class="spincrement set_today_total_3">0</h5>
@@ -173,6 +185,7 @@
                 <i data-feather="activity"></i>
             </div>
         </a>
+        <?php endif; ?>
         <?php /* Running Order Value: a LIVE snapshot of what is currently open,
                  deliberately ignoring the date picker - an order open last week
                  is either still open (counted here) or completed (counted in the
@@ -684,7 +697,7 @@
     </div>
 </section>
 
-<script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/dashboard_chart_custom.js?v=7.7.2"></script>
+<script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/dashboard_chart_custom.js?v=7.7.3"></script>
 <!-- ChartJS -->
 <script src="<?php echo base_url(); ?>assets/bower_components/chart.js/Chart.js"></script>
 <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/local/loader.js"></script>

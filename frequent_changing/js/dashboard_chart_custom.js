@@ -122,6 +122,8 @@ $(function () {
                 $(".set_today_total_1").html(response.set_total_1);
                 $(".set_today_total_2").html(response.set_total_2);
                 $(".set_today_total_3").html(response.set_total_3);
+                /* Hotel add-on (H10): Rooms Checked-in, present only while the module is ON */
+                if (typeof response.rooms_checked_in !== "undefined") { $(".set_rooms_checked_in").text(response.rooms_checked_in); }
                 $(".set_today_total_4").html(response.set_total_4);
                 /* set_total_5 now comes from the server. It used to be derived
                    here as revenue/transactions (Average Receipt); that card is

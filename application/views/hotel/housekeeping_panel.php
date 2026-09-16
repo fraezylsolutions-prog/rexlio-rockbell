@@ -13,7 +13,7 @@ $user_name = $this->session->userdata('full_name'); ?>
     <title><?php echo escape_output($site_name); ?> &middot; <?php echo lang('housekeeping_board'); ?></title>
     <link rel="stylesheet" href="<?php echo base_url(); ?>assets/bower_components/font-awesome/v5/all.min.css">
     <link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/common.css">
-    <link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.3">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.4">
     <script src="<?php echo base_url(); ?>frequent_changing/bar_panel/js/jquery-3.3.1.min.js"></script>
 </head>
 <body class="hkp_body">

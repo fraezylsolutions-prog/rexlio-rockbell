@@ -244,3 +244,23 @@ for every day of the range (rooms out of order or added mid-range are not netted
 |---|---|
 | HTTP on rexlio_scratch with hand-computable January fixtures (3-night stay, a same-day stay, a stay straddling into February, one straddling in from December, a cancelled one, one at another outlet, one in-house since yesterday): month view outlet 1 (31 days, 4 rooms, 124 available, 8 occupied, 6.5 %, 3 arrivals, 3 departures, 180 000, RevPAR 1 451.61; per-category rows); day view 5–8 Jan (per-day occupied / arrivals / departures incl. the same-day stay, 25 % → 50 %, totals); in-house counts yesterday and today but not tomorrow; all outlets adds the fifth room and its stay; week view days add to 14; an empty month shows zeros without a division error; Cashier refused; menu link | **18/18** |
 | Real browser: filter bar, five summary cards, weekly rows (ISO weeks from Monday), category table | PASS |
+
+### H10 — dashboards (2026-09-17). Local only; not on live.
+- **Main dashboard**: while the module is ON the *Transactions* KPI card becomes **Rooms Checked-in** — a
+  live count of rooms occupied right now in the dashboard's outlet, ignoring the date and time filters
+  (the Running Order pattern); it links to the Front Desk. The Transactions card returns the moment the
+  module is OFF; the Transactions trend-chart toggle below is untouched (decision 5).
+- **Front Desk analytics row** (above the board, `Hotel/statsAjax`, refreshed with the board every 15 s):
+  a **NOW** block — rooms checked-in per category (count + value of the stays in house), vacant per
+  category (count + potential value at base rate), occupancy % overall and per category, out of order,
+  housekeeping state counts — and, kept visibly apart, **Value generated this period** with its own date
+  filter and presets (today / this week / this month / this year; default this month), total and per
+  category. Decision 3: the live block never takes the date filter. All grouping is by `room_type_id`.
+- Also: report / stats date inputs are validated as calendar dates (`2020-13-45` no longer reaches SQL).
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch (rooms in every state across two categories, in-house stays with values, a check-out this month and one last month): dashboard card present with the module ON and the chart toggle kept, `rooms_checked_in` = 2 in the totals JSON regardless of a 2020 date filter, outlet 6 → 1, module OFF restores the Transactions card and drops the key; front desk row markup; statsAjax refused without the permission; live totals (6 rooms, 2 in, 3 vacant, 1 OOO, 135 000 in house, 70 000 potential, 33.3 %), per category, housekeeping counts; period this month 150 000 / 3 stays with last month excluded, per category; last month 30 000 while the live block is byte-identical; garbage dates fall back; other outlet; module OFF | **17/17** |
+| Node `statsHtml` on the real answer: cards, chips, category table, separate period block, empty state | 5/5 |
+| Real browser: Front Desk row above the board (NOW cards, category table, period block), main dashboard card "Rooms checked-in 2" in the Transactions slot with the chart toggle still below | PASS |
+| Regression: H2 47, H4 33, H5 35, 5c 28, Node 9 + 5 | green |

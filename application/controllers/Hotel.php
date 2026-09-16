@@ -65,6 +65,8 @@ class Hotel extends Cl_Controller {
             $module = 'hotel_front_desk'; $function = 'checkout';
         } elseif ($segment_2 == "setOutOfOrder") {
             $module = 'hotel_front_desk'; $function = 'status';
+        } elseif ($segment_2 == "statsAjax") {
+            $module = 'hotel_front_desk'; $function = 'view';
         } elseif ($segment_2 == "editStayValue") {
             $module = 'hotel_front_desk'; $function = 'value';
         } elseif (in_array($segment_2, array("reports", "reportValue", "reportOccupancy", "reportStays", "reportHousekeeping"), TRUE)) {
@@ -446,6 +448,42 @@ class Hotel extends Cl_Controller {
     }
 
     /**
+     * H10 - the Front Desk analytics row. Two clearly separate things: a LIVE snapshot (rooms
+     * checked in / vacant / out of order per category with the value of the stays in house and
+     * the potential value of the vacant rooms at base rate, occupancy %, housekeeping states)
+     * and the VALUE GENERATED IN A PERIOD (stays checked in between two dates, per category and
+     * in total) - decision 3: a historical count is never blended into the live row.
+     * @access public
+     * @return void
+     */
+    public function statsAjax() {
+        $company_id = (int) $this->session->userdata('company_id');
+        $outlet_id = $this->boardOutlet();
+        $from = trim((string) $this->input->post('start_date')); $to = trim((string) $this->input->post('end_date'));
+        if (!$this->validDate($from)) { $from = date('Y-m-01'); }
+        if (!$this->validDate($to)) { $to = date('Y-m-t'); }
+        if ($from > $to) { $t = $from; $from = $to; $to = $t; }
+        $live = array(); $tot = array('rooms' => 0, 'occupied' => 0, 'vacant' => 0, 'out_of_order' => 0, 'value' => 0.0, 'potential' => 0.0);
+        foreach ($this->Hotel_model->liveStatsByType($company_id, $outlet_id) as $r) {
+            $row = array('type_id' => (int) $r->room_type_id, 'name' => $r->type_name ? $r->type_name : lang('hk_no_category'), 'rooms' => (int) $r->rooms, 'occupied' => (int) $r->occupied,
+                         'vacant' => (int) $r->vacant, 'out_of_order' => (int) $r->out_of_order, 'value' => (float) $r->value, 'potential' => (int) $r->vacant * (float) $r->base_rate,
+                         'occupancy' => (int) $r->rooms > 0 ? round((int) $r->occupied * 100 / (int) $r->rooms, 1) : 0);
+            $live[] = $row;
+            foreach (array('rooms', 'occupied', 'vacant', 'out_of_order', 'value', 'potential') as $k) { $tot[$k] += $row[$k]; }
+        }
+        $tot['occupancy'] = $tot['rooms'] > 0 ? round($tot['occupied'] * 100 / $tot['rooms'], 1) : 0;
+        $period = array(); $period_total = array('stays' => 0, 'nights' => 0, 'amount' => 0.0);
+        foreach ($this->Hotel_model->valueByTypeAndBucket($company_id, array($outlet_id), $from, $to, 'year') as $r) {
+            $tid = (int) $r->room_type_id;
+            if (!isset($period[$tid])) { $period[$tid] = array('type_id' => $tid, 'name' => $r->type_name ? $r->type_name : lang('hk_no_category'), 'stays' => 0, 'nights' => 0, 'amount' => 0.0); }
+            $period[$tid]['stays'] += (int) $r->stays; $period[$tid]['nights'] += (int) $r->nights; $period[$tid]['amount'] += (float) $r->amount;
+            $period_total['stays'] += (int) $r->stays; $period_total['nights'] += (int) $r->nights; $period_total['amount'] += (float) $r->amount;
+        }
+        $this->jsonOk(array('outlet_id' => $outlet_id, 'server_time' => date('Y-m-d H:i:s'), 'live' => $live, 'live_total' => $tot,
+                            'housekeeping' => $this->Hotel_model->housekeepingCounts($outlet_id), 'period' => array('from' => $from, 'to' => $to, 'rows' => array_values($period), 'total' => $period_total)));
+    }
+
+    /**
      * H5 - change a stay's expected check-out / rate / amount ('value' permission).
      * Works on in-house and checked-out stays (a manager settling a variance later).
      * The amount follows nights x rate unless one is typed; every change is logged
@@ -496,7 +534,7 @@ class Hotel extends Cl_Controller {
         if (in_array($view, array('day', 'week', 'month', 'year'), TRUE)) { $f['view'] = $view; }
         foreach (array('from' => 'start_date', 'to' => 'end_date') as $k => $name) {
             $v = trim((string) $this->input->get_post($name));
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) { $f[$k] = $v; }
+            if ($this->validDate($v)) { $f[$k] = $v; }
         }
         if ($f['from'] > $f['to']) { $t = $f['from']; $f['from'] = $f['to']; $f['to'] = $t; }
         /* a day view over years of data would be thousands of columns - cap the span per view */
@@ -624,6 +662,11 @@ class Hotel extends Cl_Controller {
         $data = array('filters' => $f, 'per' => $per, 'types' => $types, 'total' => $total);
         $data['main_content'] = $this->load->view('hotel/report_occupancy', $data, TRUE);
         $this->load->view('userHome', $data);
+    }
+
+    /** a real Y-m-d calendar date ("2020-13-45" matches the shape but would blow up in the query) */
+    private function validDate($v) {
+        return (bool) preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', (string) $v, $m) && checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
     }
 
     /** whole nights between two Y-m-d dates, never less than 1 (a same-day stay is one night's value) */

@@ -2192,3 +2192,12 @@ $lang['hk_period']='Period';
 $lang['hk_days']='Days';
 $lang['hk_by_category']='By room category';
 $lang['hk_occupancy_note']='Available = live rooms x days in the period. Occupied = room-nights: a stay counts each night from check-in to the night before check-out (a same-day stay counts one); in-house stays count up to today. Arrivals and value are on the check-in day, departures on the check-out day. RevPAR = value / available room-nights. Recorded value only - not sales.';
+/* Hotel Operations add-on - H10: dashboards */
+$lang['hk_rooms_checked_in']='Rooms checked-in';
+$lang['hk_vacant_rooms']='Vacant rooms';
+$lang['hk_potential_value']='Potential value';
+$lang['hk_value_in_house']='Value in house';
+$lang['hk_value_generated_period']='Value generated this period';
+$lang['hk_grand_total_value']='Grand total value';
+$lang['hk_now']='Now';
+$lang['hk_value_period']='Value period';

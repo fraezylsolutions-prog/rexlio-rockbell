@@ -1,7 +1,7 @@
 # Go-live runbook — Hotel Operations add-on (and everything committed since the last deploy)
 
 Prepared 2026-09-16 for the owner to run. Claude runs nothing against live (see `DEPLOYMENT.md`).
-Local HEAD at preparation: `5fdbfbd6` (H4). Replace `<user>`, `<livedb>`, `<cpaneluser>` with the live values.
+Local HEAD at preparation: `342837a0` (H11 - value tracking, reports and dashboards included; 11 migrations). Replace `<user>`, `<livedb>`, `<cpaneluser>` with the live values.
 
 Order, as always: **backup → preflight → migrations (each prints PASS) → code → switch on → smoke test.**
 
@@ -40,6 +40,9 @@ with the old code; nothing else has changed yet.
     # the hotel add-on - 01 before 02
     mysql -u <user> -p <livedb> < db/migrations/2026-09-16_01_modules.sql
     mysql -u <user> -p <livedb> < db/migrations/2026-09-16_02_hotel-schema.sql
+    # value tracking + reports (added 2026-09-17)
+    mysql -u <user> -p <livedb> < db/migrations/2026-09-17_01_hotel-stay-value.sql
+    mysql -u <user> -p <livedb> < db/migrations/2026-09-17_02_hotel-reports-permission.sql
 
     # confirm: every row APPLIED
     mysql -u <user> -p <livedb> < db/migrations/preflight_status.sql

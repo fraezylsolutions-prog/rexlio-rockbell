@@ -7,7 +7,7 @@ daily flow for the front desk and for housekeeping, and the checklist for puttin
 ## 1. What it is — and what it is not
 
 **In:**
-- **Rooms** — room types (name, informational rate) and rooms per outlet (number, floor, notes).
+- **Rooms** — room types (name, rate per night) and rooms per outlet (number, floor, notes).
 - **Front Desk** — a live room board per outlet: who is in which room, since when, whether the room is
   clean; check-in, check-out, out-of-order; a per-room history; a **Stay Log** with filters and CSV export.
 - **Housekeeping board** — a full-screen tablet page (same idea as the Kitchen Panel): cleaning tasks
@@ -42,11 +42,12 @@ them up on their next login, as with every other permission).
 | Group | Functions | What they unlock |
 |---|---|---|
 | **Hotel Rooms** (`hotel_rooms`) | view, add, update, delete | Room Types and Rooms screens |
-| **Hotel Front Desk** (`hotel_front_desk`) | view, checkin, checkout, status | the board and Stay Log; check-in; check-out; out-of-order / back in service |
+| **Hotel Front Desk** (`hotel_front_desk`) | view, checkin, checkout, status, **value** | the board and Stay Log; check-in; check-out; out-of-order / back in service; **value** = type a rate at check-in, settle a check-out variance, Edit value on any stay |
 | **Hotel Housekeeping** (`hotel_housekeeping`) | view, update_task, assign, verify | the board; Start / Finish own or pool tasks; New task / Assign / Cancel; Verify |
+| **Hotel Reports** (`hotel_reports`) | view | every hotel report under Reports (section 6) |
 
-Defaults set by the migration: **Admin** and **Manager** — everything. **Cashier** — front desk view,
-check-in, check-out; housekeeping view. **Housekeeping** — a new role created for each business:
+Defaults set by the migrations: **Admin** and **Manager** — everything (incl. *value* and reports).
+**Cashier** — front desk view, check-in, check-out; housekeeping view; no *value*, no reports. **Housekeeping** — a new role created for each business:
 housekeeping view + update_task, plus the outlet chooser. Adjust freely; the code only ever asks
 "does this role hold this function", never "what is the role called".
 
@@ -101,19 +102,59 @@ Status vocabulary, for reference: occupancy `vacant → occupied → vacant` (or
 housekeeping `dirty → in_progress → clean → inspected`; task `pending → in_progress → done → verified`
 (or `cancelled`).
 
-## 6. If something looks wrong
+### The value of a stay (recorded, not billed)
+Every stay carries a **rate per night**, **nights** and an **amount** — the figure the reports call *value
+generated*. It is **recorded for reporting only**: nothing reaches sales, registers, Today's Sale or a
+receipt, and there is no guest folio.
+- **At check-in** the rate comes from the room type; nights = expected check-out − today (minimum 1);
+  amount = nights × rate, shown live in the modal. A rate above 0 needs the expected check-out; a room
+  type with no rate is complimentary. Only a holder of *Hotel Front Desk › value* (Admin and Manager by
+  default) may type a different rate — everyone else sees it read-only.
+- **At check-out** the actual nights are recorded. If they differ from the expected nights, a *value*
+  holder is asked whether to **keep the recorded value or adjust it** (with a reason). Staff without the
+  permission simply check out; the difference shows as a *variance* badge in the Stay Log and the reports
+  for a manager to settle later with **Edit value** (front desk card for in-house stays, Stay Log for any
+  stay). Every change is kept in the room history with the old and new figure.
+
+### Dashboards
+- Main dashboard: while the module is on, the **Rooms checked-in** card (a live count, like Running
+  Order) replaces the Transactions card and links to the Front Desk.
+- Front Desk: the row above the board is **NOW** — rooms checked-in and their value in house, vacant rooms
+  and their potential value at base rate, occupancy %, out-of-order and housekeeping counts, per category
+  and in total — plus, kept apart, **Value generated this period** with its own date and clock-time
+  filter and presets. The NOW figures never take the filter.
+
+## 6. Reports (`Reports` menu, permission *Hotel Reports › view*)
+All share one filter bar: outlet (or all), **View = Day / Week / Month / Year** (the columns or rows of
+the period tables), a date range, presets (today / this week / this month / this year), plus report-specific
+selects. Every table exports (print / copy / Excel / CSV / PDF). Everything is grouped by **room category**
+as it exists in the data — a new category appears by itself.
+
+| Report | Answers |
+|---|---|
+| **Value Generated** | amount per category per period (Day / Week / Month / Year columns), row / column / grand totals, stays and nights per cell. Counted on the check-in date, in-house included, cancelled excluded. |
+| **Occupancy** | per period: rooms, available room-nights, occupied, occupancy %, arrivals, departures, value, RevPAR (value ÷ available); the same per category. |
+| **Stays** | one row per stay with its value and a variance badge; sub-totals by period, by category, by staff; filters for category, staff, status. |
+| **Housekeeping Productivity** | per attendant / task type / category / period: created, done, verified, cancelled, open, average wait (created → started), work (started → done) and check (done → verified). |
+| **Room Turnaround** | per check-out: how long the room stayed dirty and how long until inspected; slowest first; averages per category. |
+| **Out of Order** | every out-of-order spell: when, by whom, why, back in service, duration; room-days lost per category. |
+| **Room Status History** | the room history as a printable list, by room and by kind (occupancy / housekeeping / value). |
+
+## 7. If something looks wrong
 
 | Symptom | Cause / what to do |
 |---|---|
 | "That feature is switched off" | The module is off. Settings › Modules. |
 | No **Hotel Operations** group in the sidebar | Module off, or the role holds none of the three groups. |
 | A housekeeping user lands on the POS instead of the board | Their role also holds POS access — remove it, or accept that they reach the board from the sidebar. |
-| "Not installed" / "Tables missing" on the Modules screen | Apply migration 01 / 02 (section 7). |
+| "Not installed" / "Tables missing" on the Modules screen | Apply migration 01 / 02 (section 8). |
+| Front Desk or a report shows an error page after a code update | The database is behind the code: run `db/migrations/preflight_status.sql` and apply whatever it lists as MISSING. |
+| A cashier cannot change the rate at check-in | By design — grant *Hotel Front Desk › value* to their role if they should. |
 | Check-in button says "Check in anyway" | The room is not clean / inspected yet — intended; it warns, it does not block. |
 | A room stays *Dirty* after cleaning | The task was not marked **Finish** on the board (or was cancelled). Finish it, or create a new cleaning task. |
 | Someone else's task shows no buttons for me | Working another person's task needs the assign permission. |
 
-## 7. Go-live checklist (owner)
+## 8. Go-live checklist (owner)
 
 Order matters: migrations first, code second, switch last (see `DEPLOYMENT.md` › Routine deploy).
 
@@ -121,6 +162,10 @@ Order matters: migrations first, code second, switch last (see `DEPLOYMENT.md` �
 - [ ] Apply `db/migrations/2026-09-16_01_modules.sql` — prints `PASS`.
 - [ ] Apply `db/migrations/2026-09-16_02_hotel-schema.sql` — prints `PASS` (creates the five tables,
       the permission rows, the Housekeeping role and the default grants; re-runnable).
+- [ ] Apply `db/migrations/2026-09-17_01_hotel-stay-value.sql` — prints `PASS` (stay value columns, the
+      *value* permission).
+- [ ] Apply `db/migrations/2026-09-17_02_hotel-reports-permission.sql` — prints `PASS` (the reports
+      permission). Or simply run `preflight_status.sql` first and apply what it lists as MISSING.
 - [ ] Deploy the code (the two migrations are additive, so the order "migration then code" leaves live
       working at every step).
 - [ ] Sign in as Admin › Settings › Modules: Hotel Operations shows **OFF** with *Switch on* (not
@@ -133,9 +178,9 @@ Order matters: migrations first, code second, switch last (see `DEPLOYMENT.md` �
       The test stay stays in the Stay Log as history; that is fine.
 - [ ] Rollback if needed: Settings › Modules › **Switch off** (no data is lost); the migrations can stay.
 
-## 8. Files, for the technical reader
+## 9. Files, for the technical reader
 
-Controller `application/controllers/Hotel.php`, model `Hotel_model.php`, views `views/hotel/*`,
+Controller `application/controllers/Hotel.php` (rooms, front desk, housekeeping, stats, reports), model `Hotel_model.php`, views `views/hotel/*` (`report_*.php`, `_report_filter.php`),
 scripts `frequent_changing/js/hotel_front_desk.js` and `hotel_housekeeping.js`, styles
 `assets/dist/css/custom/hotel.css`. Module switch: `irModuleEnabled()` / `irRequireModule()` /
 `irModuleRegistry()` in `helpers/my_helper.php`, screen `Setting::modules`. Landing rule:

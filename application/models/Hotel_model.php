@@ -231,4 +231,35 @@ class Hotel_model extends CI_Model {
                  ORDER BY u.full_name ASC";
         return $this->db->query($sql, array((int) $company_id))->result();
     }
+
+    /* ---------------------------------------------------------------- reports (H6+) */
+
+    /** the SQL expression that buckets a datetime column for a report view */
+    public function bucketExpr($column, $view) {
+        switch ($view) {
+            case 'day':   return "DATE($column)";
+            case 'week':  return "DATE(DATE_SUB($column, INTERVAL WEEKDAY($column) DAY))";   // Monday of that week
+            case 'year':  return "DATE_FORMAT($column, '%Y-01-01')";
+            default:      return "DATE_FORMAT($column, '%Y-%m-01')";                          // month
+        }
+    }
+
+    /**
+     * H6 - value generated, by room type and period bucket. Stays are counted on their
+     * CHECK-IN date (the value is booked then, decision 2a); cancelled stays are excluded,
+     * in-house stays included (their value is already recorded). Grouped by room_type_id,
+     * so any category the business adds later appears by itself.
+     */
+    public function valueByTypeAndBucket($company_id, $outlet_ids, $from, $to, $view) {
+        if (!$outlet_ids) { return array(); }
+        $b = $this->bucketExpr('s.checkin_at', $view);
+        return $this->db->select("r.room_type_id, t.name AS type_name, $b AS bucket, COUNT(*) AS stays, COALESCE(SUM(s.nights), 0) AS nights, COALESCE(SUM(s.amount), 0) AS amount", FALSE)
+                        ->from('tbl_hotel_stays s')
+                        ->join('tbl_hotel_rooms r', 'r.id = s.room_id')
+                        ->join('tbl_hotel_room_types t', 't.id = r.room_type_id', 'left')
+                        ->where('s.company_id', (int) $company_id)->where('s.del_status', 'Live')->where('s.status !=', 'cancelled')
+                        ->where_in('s.outlet_id', $outlet_ids)
+                        ->where('s.checkin_at >=', $from . ' 00:00:00')->where('s.checkin_at <=', $to . ' 23:59:59')
+                        ->group_by(array('r.room_type_id', 't.name', 'bucket'))->order_by('t.name', 'ASC')->get()->result();
+    }
 }

@@ -67,6 +67,8 @@ class Hotel extends Cl_Controller {
             $module = 'hotel_front_desk'; $function = 'status';
         } elseif ($segment_2 == "editStayValue") {
             $module = 'hotel_front_desk'; $function = 'value';
+        } elseif (in_array($segment_2, array("reports", "reportValue", "reportOccupancy", "reportStays", "reportHousekeeping"), TRUE)) {
+            $module = 'hotel_reports'; $function = 'view';
         } elseif ($segment_2 == "housekeeping" || $segment_2 == "tasksAjax") {
             $module = 'hotel_housekeeping'; $function = 'view';
         } elseif ($segment_2 == "taskStart" || $segment_2 == "taskDone") {
@@ -476,6 +478,87 @@ class Hotel extends Cl_Controller {
             putAuditLog($user_id, 'Stay value: stay ' . $stay->id . ' ' . $stay->amount . ' -> ' . $amount . ' (' . $nights . ' x ' . $rate . ')', 'Hotel Stay Value', date('Y-m-d H:i:s'));
         }
         $this->jsonOk(array('stay_id' => (int) $stay->id, 'expected_checkout' => $expected, 'rate' => $rate, 'nights' => $nights, 'amount' => $amount));
+    }
+
+    /* ================================================================ reports (H6+) */
+
+    /**
+     * the filter every hotel report shares: outlet scope (one accessible outlet or all of
+     * them), the view (day / week / month / year buckets) and a date range, defaulting to
+     * this month. Reads GET or POST so a report URL can be bookmarked.
+     */
+    private function reportFilters() {
+        $ids = $this->outletIds();
+        $f = array('outlet_ids' => $ids, 'outlet_id' => 'all', 'view' => 'month', 'from' => date('Y-m-01'), 'to' => date('Y-m-t'));
+        $posted = (string) $this->input->get_post('outlet_id');
+        if ($posted !== '' && $posted !== 'all' && in_array((int) $posted, $ids, TRUE)) { $f['outlet_ids'] = array((int) $posted); $f['outlet_id'] = (string) (int) $posted; }
+        $view = (string) $this->input->get_post('view');
+        if (in_array($view, array('day', 'week', 'month', 'year'), TRUE)) { $f['view'] = $view; }
+        foreach (array('from' => 'start_date', 'to' => 'end_date') as $k => $name) {
+            $v = trim((string) $this->input->get_post($name));
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) { $f[$k] = $v; }
+        }
+        if ($f['from'] > $f['to']) { $t = $f['from']; $f['from'] = $f['to']; $f['to'] = $t; }
+        /* a day view over years of data would be thousands of columns - cap the span per view */
+        $max_days = array('day' => 92, 'week' => 371, 'month' => 1830, 'year' => 7300);
+        $span = (strtotime($f['to']) - strtotime($f['from'])) / 86400;
+        if ($span > $max_days[$f['view']]) { $f['from'] = date('Y-m-d', strtotime($f['to'] . ' -' . $max_days[$f['view']] . ' days')); $f['capped'] = 1; }
+        $f['outlets'] = $this->Hotel_model->getOutlets($ids);
+        return $f;
+    }
+
+    /** the period buckets of a range, in order, keyed by their Y-m-d start: the report's columns */
+    private function reportBuckets($from, $to, $view) {
+        $out = array();
+        $t = strtotime($from); $end = strtotime($to);
+        if ($view === 'week') { $t = strtotime('monday this week', $t); }
+        elseif ($view === 'month') { $t = strtotime(date('Y-m-01', $t)); }
+        elseif ($view === 'year') { $t = strtotime(date('Y-01-01', $t)); }
+        $guard = 0;
+        while ($t <= $end && $guard++ < 10000) {
+            $key = date('Y-m-d', $t);
+            switch ($view) {
+                case 'day':   $out[$key] = date('d M Y', $t); $t = strtotime('+1 day', $t); break;
+                case 'week':  $out[$key] = lang('week') . ' ' . date('W', $t) . ' · ' . date('d M', $t); $t = strtotime('+7 days', $t); break;
+                case 'year':  $out[$key] = date('Y', $t); $t = strtotime('+1 year', $t); break;
+                default:      $out[$key] = date('M Y', $t); $t = strtotime('+1 month', $t); break;
+            }
+        }
+        return $out;
+    }
+
+    /** landing for the Reports menu: the first report */
+    public function reports() { redirect('Hotel/reportValue'); }
+
+    /**
+     * H6 - Value Generated: rows = room categories (every live type, zeros included),
+     * columns = the buckets of the selected view over the range, row / column / grand totals.
+     * @access public
+     * @return void
+     */
+    public function reportValue() {
+        $company_id = (int) $this->session->userdata('company_id');
+        $f = $this->reportFilters();
+        $buckets = $this->reportBuckets($f['from'], $f['to'], $f['view']);
+        $rows = $this->Hotel_model->valueByTypeAndBucket($company_id, $f['outlet_ids'], $f['from'], $f['to'], $f['view']);
+        /* every live category is a row, even with nothing in the period */
+        $types = array();
+        foreach ($this->Hotel_model->getRoomTypes($company_id) as $t) { $types[(int) $t->id] = array('name' => $t->name, 'cells' => array(), 'stays' => 0, 'nights' => 0, 'amount' => 0.0); }
+        $col = array(); foreach ($buckets as $k => $label) { $col[$k] = array('stays' => 0, 'nights' => 0, 'amount' => 0.0); }
+        $grand = array('stays' => 0, 'nights' => 0, 'amount' => 0.0);
+        foreach ($rows as $r) {
+            $tid = (int) $r->room_type_id;
+            if (!isset($types[$tid])) { $types[$tid] = array('name' => $r->type_name ? $r->type_name : lang('hotel_no_category'), 'cells' => array(), 'stays' => 0, 'nights' => 0, 'amount' => 0.0); }
+            $b = substr($r->bucket, 0, 10);
+            if (!isset($buckets[$b])) { continue; }
+            $types[$tid]['cells'][$b] = array('stays' => (int) $r->stays, 'nights' => (int) $r->nights, 'amount' => (float) $r->amount);
+            $types[$tid]['stays'] += (int) $r->stays; $types[$tid]['nights'] += (int) $r->nights; $types[$tid]['amount'] += (float) $r->amount;
+            $col[$b]['stays'] += (int) $r->stays; $col[$b]['nights'] += (int) $r->nights; $col[$b]['amount'] += (float) $r->amount;
+            $grand['stays'] += (int) $r->stays; $grand['nights'] += (int) $r->nights; $grand['amount'] += (float) $r->amount;
+        }
+        $data = array('filters' => $f, 'buckets' => $buckets, 'types' => $types, 'columns' => $col, 'grand' => $grand);
+        $data['main_content'] = $this->load->view('hotel/report_value', $data, TRUE);
+        $this->load->view('userHome', $data);
     }
 
     /** whole nights between two Y-m-d dates, never less than 1 (a same-day stay is one night's value) */

@@ -538,6 +538,8 @@
                                         <?php echo lang('rooms'); ?></a></li>
                                 <li data-access="view-<?php echo irAccessModuleId('hotel_rooms'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/roomTypes">
                                         <?php echo lang('room_types'); ?></a></li>
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_reports'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/reports">
+                                        <?php echo lang('hk_reports'); ?></a></li>
                             </ul>
                         </li>
                         <?php endif; ?>
@@ -1004,6 +1006,10 @@
 
                             </a>
                             <ul class="treeview-menu">
+                                <?php /* Hotel add-on (H6): the hotel reports, while the module is ON; one permission (hotel_reports > view) covers them */ ?>
+                                <?php if (irModuleEnabled('hotel')): ?>
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_reports'); ?>" class="menu_assign_class" data-menu__cid="irp_15"><a class="child-menu" href="<?php echo base_url()?>Hotel/reportValue"><?php echo lang('hk_report_value'); ?></a></li>
+                                <?php endif; ?>
                                 <li data-access="view-159" class="menu_assign_class" data-menu__cid="irp_15">
                                     <a class="child-menu" href="<?php echo base_url()?>Report/registerReport">
                                         <?php echo lang('register_report'); ?>

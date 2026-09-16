@@ -210,3 +210,22 @@ Migration `2026-09-17_01_hotel-stay-value.sql`: `rate`, `nights`, `amount`, `act
 | HTTP on rexlio_scratch: permission rows; board carries base_rate / stay value / can.value; page fields read-only vs editable; check-in: expected required when rate > 0, past date refused, Cashier's posted rate ignored (type rate wins), Manager's negotiated rate honoured, negative rate refused, day-use = 1 night, complimentary type; edit value: Cashier refused by the constructor, unknown stay, extend → recomputed + logged, typed amount + reason, no log on a no-op, bad date / amount; check-out: variance prompt with expected / actual / suggested, bad amount refused, adjust with reason (actual_nights, amount, log "4 / 2"), Cashier checks out unprompted with the variance recorded and the amount untouched, later settlement on a checked-out stay, same-day no prompt, early departure "keep"; Stay Log columns / badges / total / edit buttons per permission, CSV; sales tables untouched | **35/35** |
 | Node builders on a real `boardAjax` answer: money(), nightsBetween(), occupied card value line + Edit value button (permission-dependent), vacant card data-rate | 5/5 |
 | Real browser: check-in modal live nights/amount from the expected date (15,000 → 3 nights → 45,000, required star), variance prompt on check-out with the suggested figure → adjust posts `confirm_value=1`, amount, reason; Edit value modal recalculates on a new expected date and posts | PASS |
+
+### H6 — Value Generated report (2026-09-17). Local only; not on live.
+Migration `2026-09-17_02_hotel-reports-permission.sql`: `hotel_reports › view` (Admin, Manager) — one
+permission for every hotel report; the reports live in the Hotel controller (module-gated), the Reports
+menu links there (and the Hotel group has "Hotel Reports").
+`Hotel/reportValue`: shared filter bar (`_report_filter.php`: outlet or all, **View = Day / Week / Month /
+Year**, date range, presets today / this week / this month / this year, GET so it bookmarks; the span is
+capped per view so a Day view cannot ask for a thousand columns). Rows = **every live room category**
+(zeros included, so a new category appears by itself), columns = the view's buckets across the range
+(weeks start Monday), each cell amount + stays · nights, row totals, column totals, **grand total**,
+summary cards (value, stays, nights, average per stay). Stays are counted on their **check-in date**
+(the value is booked then), in-house included, cancelled excluded. DataTables export (print / copy /
+Excel / CSV / PDF) like every other report.
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch with stays across Jan–Mar in two categories, a third category with none, an in-house stay, a cancelled stay and one at another outlet: Cashier refused, `Hotel/reports` → the report, both menu links with the looked-up token; **year view** (every category as a row incl. the empty one, per-category and grand totals 290 000 / 6 stays / 13 nights, cancelled excluded, summary card); **month view** outlet 1 (three ordered columns, cells, in-house counted, other outlet excluded, column and grand totals); **day view** (one column per day, cells on the right days); **week view** (Monday buckets); defaults (this month, month view), span cap with notice, reversed dates swapped, bad view / date / outlet fall back; module OFF hides and refuses | **20/20** |
+| Node: the preset date maths (today / week from a Wednesday and a Sunday / Feb / year) | 5/5 |
+| Real browser: filter bar, summary cards, pivot with sub-counts, totals row, DataTables export buttons, alphabetical categories | PASS |

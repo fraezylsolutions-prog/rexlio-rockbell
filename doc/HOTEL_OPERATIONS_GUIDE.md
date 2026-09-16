@@ -1,6 +1,6 @@
 # Hotel Operations add-on — owner's guide and go-live checklist
 
-Built 2026-09-16 (stages H0–H4; the engineering log is in `HOTEL_ADDON_PLAN.md`). This page is for
+Built 2026-09-16/17 (stages H0–H11; the engineering log is in `HOTEL_ADDON_PLAN.md`). This page is for
 the owner and the managers who will run it: what it does, how to switch it on, who sees what, the
 daily flow for the front desk and for housekeeping, and the checklist for putting it live.
 
@@ -15,8 +15,8 @@ daily flow for the front desk and for housekeeping, and the checklist for puttin
   status follows.
 
 **Not in (deliberately):** reservations / availability by date, guest folios or any room billing, guest
-ID capture. The rate on a room type is for display only — nothing about rooms goes through the POS or a
-receipt. The add-on owns its own tables (`tbl_hotel_*`) and touches nothing in the restaurant side.
+ID capture. The rate on a room type only feeds the recorded value of a stay (section 5) — nothing about
+rooms goes through the POS or a receipt. The add-on owns its own tables (`tbl_hotel_*`) and touches nothing in the restaurant side.
 
 ## 2. Switching it on and off
 
@@ -62,7 +62,7 @@ housekeeping view + update_task, plus the outlet chooser. Adjust freely; the cod
 ## 4. Setting up
 
 1. Settings › Modules › **Switch on**.
-2. Hotel Operations › **Room Types**: e.g. Standard, Deluxe, Suite (the rate is informational).
+2. Hotel Operations › **Room Types**: e.g. Standard, Deluxe, Suite, each with its rate per night.
 3. Hotel Operations › **Rooms**: one per room, at the outlet it belongs to — number, floor (used to
    group the board), type. New rooms start *vacant* and *clean*.
 4. Settings › Roles: confirm who holds what (section 3). Create housekeeping users in the

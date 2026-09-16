@@ -9,7 +9,7 @@ Order, as always: **backup → preflight → migrations (each prints PASS) → c
 
     cd /home/<cpaneluser>/repositories/rexlio
     git pull                                   # the migration files must be present locally
-    git log --oneline -1                       # expect 5fdbfbd6 feat(hotel): H4 ...
+    git log --oneline -1                       # expect b38c1746 docs(hotel): ... (or later)
 
 ## 1. Backup — not optional
 

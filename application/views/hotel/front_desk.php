@@ -2,7 +2,7 @@
          polls Hotel/boardAjax every 15 s and after every action. Actions are permission-gated
          twice: buttons only render for a permission the caller holds, and the controller checks
          again on every POST. */ ?>
-<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.4">
+<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.5">
 <section class="main-content-wrapper">
     <?php $this->view('hotel/_flash'); ?>
     <section class="content-header">
@@ -43,6 +43,10 @@
                 <input type="date" id="hk_st_from" class="form-control form-control-sm" value="<?php echo date('Y-m-01'); ?>">
                 <span>&rarr;</span>
                 <input type="date" id="hk_st_to" class="form-control form-control-sm" value="<?php echo date('Y-m-t'); ?>">
+                <?php /* clock-time window on the check-in time, independent of the dates (blank = whole day) */ ?>
+                <input type="time" id="hk_st_from_time" class="form-control form-control-sm" title="<?php echo lang('start_time'); ?>">
+                <span>&rarr;</span>
+                <input type="time" id="hk_st_to_time" class="form-control form-control-sm" title="<?php echo lang('end_time'); ?>">
                 <div class="btn-group btn-group-sm">
                     <button type="button" class="btn btn-outline-secondary hk_st_preset" data-preset="today"><?php echo lang('today'); ?></button>
                     <button type="button" class="btn btn-outline-secondary hk_st_preset" data-preset="week"><?php echo lang('hk_this_week'); ?></button>
@@ -201,4 +205,4 @@
                      'room_type', 'room_clean', 'room_dirty', 'room_in_progress', 'room_inspected', 'hk_value_in_house', 'total', 'hotel_no_rooms') as $k): ?>
 <input type="hidden" id="hk_lang_<?php echo $k; ?>" value="<?php echo lang($k); ?>">
 <?php endforeach; ?>
-<script src="<?php echo base_url(); ?>frequent_changing/js/hotel_front_desk.js?v=1.3"></script>
+<script src="<?php echo base_url(); ?>frequent_changing/js/hotel_front_desk.js?v=1.4"></script>

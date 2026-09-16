@@ -108,7 +108,7 @@
 .hk_stats_title { font-size: 15px; font-weight: 800; color: #4b4b63; text-transform: uppercase; letter-spacing: .4px; }
 .hk_stats_filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .hk_stats_filter label { font-size: 12.5px; font-weight: 700; color: #716e8c; margin: 0 4px 0 0; }
-.hk_stats_filter input[type=date] { width: auto; }
+.hk_stats_filter input[type=date], .hk_stats_filter input[type=time] { width: auto; }
 .hk_stats_live { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px; }
 .hk_stat { background: #fff; border: 1px solid #e4e6ef; border-radius: 12px; padding: 12px 14px; border-left: 6px solid #9aa0b4; }
 .hk_stat_occ { border-left-color: #f04438; } .hk_stat_vac { border-left-color: #12b76a; } .hk_stat_pct { border-left-color: #6c4bf4; } .hk_stat_hk { border-left-color: #0ba5ec; }

@@ -463,6 +463,9 @@ class Hotel extends Cl_Controller {
         if (!$this->validDate($from)) { $from = date('Y-m-01'); }
         if (!$this->validDate($to)) { $to = date('Y-m-t'); }
         if ($from > $to) { $t = $from; $from = $to; $to = $t; }
+        $st = trim((string) $this->input->post('start_time')); $et = trim((string) $this->input->post('end_time'));
+        if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $st)) { $st = ''; }
+        if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $et)) { $et = ''; }
         $live = array(); $tot = array('rooms' => 0, 'occupied' => 0, 'vacant' => 0, 'out_of_order' => 0, 'value' => 0.0, 'potential' => 0.0);
         foreach ($this->Hotel_model->liveStatsByType($company_id, $outlet_id) as $r) {
             $row = array('type_id' => (int) $r->room_type_id, 'name' => $r->type_name ? $r->type_name : lang('hk_no_category'), 'rooms' => (int) $r->rooms, 'occupied' => (int) $r->occupied,
@@ -473,14 +476,14 @@ class Hotel extends Cl_Controller {
         }
         $tot['occupancy'] = $tot['rooms'] > 0 ? round($tot['occupied'] * 100 / $tot['rooms'], 1) : 0;
         $period = array(); $period_total = array('stays' => 0, 'nights' => 0, 'amount' => 0.0);
-        foreach ($this->Hotel_model->valueByTypeAndBucket($company_id, array($outlet_id), $from, $to, 'year') as $r) {
+        foreach ($this->Hotel_model->valueByTypeAndBucket($company_id, array($outlet_id), $from, $to, 'year', $st, $et) as $r) {
             $tid = (int) $r->room_type_id;
             if (!isset($period[$tid])) { $period[$tid] = array('type_id' => $tid, 'name' => $r->type_name ? $r->type_name : lang('hk_no_category'), 'stays' => 0, 'nights' => 0, 'amount' => 0.0); }
             $period[$tid]['stays'] += (int) $r->stays; $period[$tid]['nights'] += (int) $r->nights; $period[$tid]['amount'] += (float) $r->amount;
             $period_total['stays'] += (int) $r->stays; $period_total['nights'] += (int) $r->nights; $period_total['amount'] += (float) $r->amount;
         }
         $this->jsonOk(array('outlet_id' => $outlet_id, 'server_time' => date('Y-m-d H:i:s'), 'live' => $live, 'live_total' => $tot,
-                            'housekeeping' => $this->Hotel_model->housekeepingCounts($outlet_id), 'period' => array('from' => $from, 'to' => $to, 'rows' => array_values($period), 'total' => $period_total)));
+                            'housekeeping' => $this->Hotel_model->housekeepingCounts($outlet_id), 'period' => array('from' => $from, 'to' => $to, 'start_time' => $st, 'end_time' => $et, 'rows' => array_values($period), 'total' => $period_total)));
     }
 
     /**

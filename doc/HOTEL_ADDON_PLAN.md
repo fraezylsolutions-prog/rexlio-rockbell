@@ -254,8 +254,9 @@ for every day of the range (rooms out of order or added mid-range are not netted
   a **NOW** block — rooms checked-in per category (count + value of the stays in house), vacant per
   category (count + potential value at base rate), occupancy % overall and per category, out of order,
   housekeeping state counts — and, kept visibly apart, **Value generated this period** with its own date
-  filter and presets (today / this week / this month / this year; default this month), total and per
-  category. Decision 3: the live block never takes the date filter. All grouping is by `room_type_id`.
+  filter and presets (today / this week / this month / this year; default this month) **and a clock-time
+  window on the check-in time** (blank = whole day, independent of the dates, like the dashboard's own
+  time filter), total and per category. Decision 3: the live block never takes the date or time filter. All grouping is by `room_type_id`.
 - Also: report / stats date inputs are validated as calendar dates (`2020-13-45` no longer reaches SQL).
 
 | Test | Result |

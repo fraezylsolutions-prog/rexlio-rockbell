@@ -3,7 +3,7 @@
          Counted on the check-in date - the value is booked at check-in (decision 2a). */
 $report_action = 'reportValue';
 $nb = count($buckets); ?>
-<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.4">
+<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/hotel.css?v=1.5">
 <section class="main-content-wrapper">
     <section class="content-header">
         <h3 class="top-left-header"><?php echo lang('hk_report_value'); ?></h3>

@@ -250,9 +250,13 @@ class Hotel_model extends CI_Model {
      * in-house stays included (their value is already recorded). Grouped by room_type_id,
      * so any category the business adds later appears by itself.
      */
-    public function valueByTypeAndBucket($company_id, $outlet_ids, $from, $to, $view) {
+    public function valueByTypeAndBucket($company_id, $outlet_ids, $from, $to, $view, $start_time = '', $end_time = '') {
         if (!$outlet_ids) { return array(); }
         $b = $this->bucketExpr('s.checkin_at', $view);
+        /* H10: a clock-time window on the check-in time (HH:MM), independent of the dates - the
+           dashboard's own time filter works the same way on order_time */
+        if ($start_time !== '') { $this->db->where('TIME(s.checkin_at) >=', $start_time . ':00'); }
+        if ($end_time !== '') { $this->db->where('TIME(s.checkin_at) <=', $end_time . ':59'); }
         return $this->db->select("r.room_type_id, t.name AS type_name, $b AS bucket, COUNT(*) AS stays, COALESCE(SUM(s.nights), 0) AS nights, COALESCE(SUM(s.amount), 0) AS amount", FALSE)
                         ->from('tbl_hotel_stays s')
                         ->join('tbl_hotel_rooms r', 'r.id = s.room_id')

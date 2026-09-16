@@ -87,7 +87,7 @@
         if (!(st.live || []).length) { h += '<tr><td colspan="6" class="hk_muted">' + esc(m("hotel_no_rooms")) + '</td></tr>'; }
         h += '<tr class="hk_stats_total"><td>' + esc(m("total")) + '</td><td>' + Number(lt.occupied || 0) + ' / ' + Number(lt.rooms || 0) + '</td><td><b>' + esc(money(lt.value)) + '</b></td><td>' + Number(lt.vacant || 0) + '</td><td>' + esc(money(lt.potential)) + '</td><td>' + Number(lt.occupancy || 0).toFixed(1) + '%</td></tr></tbody></table>';
         /* the period figure, explicitly labelled and kept apart from the live row */
-        h += '<div class="hk_stats_period"><div class="hk_stat_label">' + esc(m("hk_value_generated_period")) + ' &middot; ' + esc(pd.from) + ' &rarr; ' + esc(pd.to) + '</div>';
+        h += '<div class="hk_stats_period"><div class="hk_stat_label">' + esc(m("hk_value_generated_period")) + ' &middot; ' + esc(pd.from) + ' &rarr; ' + esc(pd.to) + ((pd.start_time || pd.end_time) ? ' &middot; ' + esc(pd.start_time || "00:00") + '-' + esc(pd.end_time || "23:59") : '') + '</div>';
         h += '<div class="hk_stat_big" id="hk_period_total">' + esc(money(pd.total.amount)) + ' <span class="hk_stat_sub">' + Number(pd.total.stays) + ' ' + esc(m("hk_stays")).toLowerCase() + ' &middot; ' + Number(pd.total.nights) + ' ' + esc(m("nights")).toLowerCase() + '</span></div>';
         h += '<div class="hk_period_rows">';
         (pd.rows || []).forEach(function (r) { h += '<span class="hk_badge hk_b_period">' + esc(r.name) + ' <b>' + esc(money(r.amount)) + '</b> <span class="hk_stat_sub">' + Number(r.stays) + '</span></span>'; });
@@ -111,7 +111,7 @@
         }
         /* H10 - the analytics row, refreshed with the board and when the period changes */
         function refreshStats() {
-            $.ajax({ url: base_url + "Hotel/statsAjax", method: "POST", dataType: "json", data: { outlet_id: outlet(), start_date: $("#hk_st_from").val(), end_date: $("#hk_st_to").val() },
+            $.ajax({ url: base_url + "Hotel/statsAjax", method: "POST", dataType: "json", data: { outlet_id: outlet(), start_date: $("#hk_st_from").val(), end_date: $("#hk_st_to").val(), start_time: $("#hk_st_from_time").val(), end_time: $("#hk_st_to_time").val() },
                 success: function (res) { if (res && res.ok) { $("#hk_stats").html(statsHtml(res, { msg: msg })); $("#hk_stats_time").text(String(res.server_time || "").substring(11, 16)); } } });
         }
         function refresh(done) {
@@ -242,7 +242,7 @@
             else if (p === "month") { from.setDate(1); to = new Date(t.getFullYear(), t.getMonth() + 1, 0); }
             else if (p === "year") { from = new Date(t.getFullYear(), 0, 1); to = new Date(t.getFullYear(), 11, 31); }
             var ymd = function (d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
-            $("#hk_st_from").val(ymd(from)); $("#hk_st_to").val(ymd(to)); refreshStats();
+            $("#hk_st_from").val(ymd(from)); $("#hk_st_to").val(ymd(to)); $("#hk_st_from_time, #hk_st_to_time").val(""); refreshStats();
         });
         refresh();
         setInterval(refresh, 15000);

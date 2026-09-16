@@ -59,6 +59,10 @@ class Setting extends Cl_Controller {
         }else if($segment_2=="resetTransactionalData" || $segment_2=="resettransactionaldata"){
                $controller = "350";
             $function = "reset";
+        }else if($segment_2=="modules"){
+            //module switches (H0): own access row, looked up by name
+            $controller = (string) irAccessModuleId('modules');
+            $function = "update";
         }else{
            $this->session->set_flashdata('exception_er', lang('menu_not_permit_access'));
             redirect('Authentication/userProfile');
@@ -870,6 +874,45 @@ class Setting extends Cl_Controller {
             $this->load->view('userHome', $data);
         }
     }
-   
+
+    /**
+     * Settings > Modules (H0 of the Hotel Operations add-on). One switch per
+     * add-on in irModuleRegistry(). The switch is business-wide and read per
+     * request (irModuleEnabled), so it takes effect on the next request with no
+     * re-login and no deploy. Gated by its own tbl_access row ('modules',
+     * function 'update'), granted to Admin by default; the row's id is looked up
+     * by name because migrations do not fix ids.
+     * @access public
+     * @return void
+     */
+    public function modules() {
+        $module_access_id = irAccessModuleId('modules');
+        if(!$module_access_id || !checkAccess((string) $module_access_id, "update")){
+            $this->session->set_flashdata('exception_er', lang('menu_not_permit_access'));
+            redirect('Authentication/userProfile');
+        }
+        if(htmlspecialcharscustom($this->input->post('submit')) == 'toggle'){
+            $key = htmlspecialcharscustom($this->input->post($this->security->xss_clean('module_key')));
+            $enabled = htmlspecialcharscustom($this->input->post($this->security->xss_clean('enabled'))) === '1';
+            if(irModuleSet($key, $enabled, (int) $this->session->userdata('user_id'))){
+                $this->session->set_flashdata('exception', lang('module_updated'));
+            }else{
+                $this->session->set_flashdata('exception_1', lang('module_not_installed'));
+            }
+            redirect('setting/modules');
+        }
+        $data = array();
+        $data['registry'] = irModuleRegistry();
+        $data['rows'] = irModuleRows();
+        $users = array();
+        foreach($data['rows'] as $row){
+            if($row->updated_by && !isset($users[$row->updated_by])){
+                $users[$row->updated_by] = userName($row->updated_by);
+            }
+        }
+        $data['user_names'] = $users;
+        $data['main_content'] = $this->load->view('setting/modules', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
 
 }

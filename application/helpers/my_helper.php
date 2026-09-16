@@ -5092,3 +5092,108 @@ if (!function_exists('irWaiterTableName')) {
         return sprintf('%s-%04d', $first, $n);
     }
 }
+
+/* =============================================================================
+   Module switches (H0 of the Hotel Operations add-on; reused by every later
+   toggleable add-on). One row per module in tbl_modules; the switch is read PER
+   REQUEST - deliberately NOT snapshotted into the session the way permissions
+   are - so Settings > Modules takes effect on the next request without a
+   re-login or a deploy. Two ideas kept apart on purpose:
+     - a module switch (business-wide: is the add-on on at all?)
+     - a permission     (per role: may this user open this screen of it?)
+   ============================================================================= */
+if (!function_exists('irModuleRegistry')) {
+    /**
+     * The add-ons the Modules screen knows about: key => [label lang key,
+     * description lang key]. A module only becomes switchable once its migration
+     * has inserted its tbl_modules row (the screen shows "not installed" until
+     * then), so listing a future module here is harmless.
+     * @return array
+     */
+    function irModuleRegistry() {
+        return array(
+            'hotel' => array('label' => 'module_hotel', 'desc' => 'module_hotel_desc'),
+        );
+    }
+}
+if (!function_exists('irModuleRows')) {
+    /**
+     * All tbl_modules rows keyed by module_key, one query per request. Answers
+     * an empty array (every module off) when the table is not there yet, so the
+     * code deploy can precede the migration without a fatal.
+     * @param bool $reset drop the per-request cache (after a write)
+     * @return array
+     */
+    function irModuleRows($reset = FALSE) {
+        static $rows = NULL;
+        if ($reset) { $rows = NULL; return array(); }
+        if ($rows !== NULL) { return $rows; }
+        $rows = array();
+        $CI = &get_instance();
+        if (!$CI->db->table_exists('tbl_modules')) { return $rows; }
+        foreach ($CI->db->get('tbl_modules')->result() as $r) { $rows[$r->module_key] = $r; }
+        return $rows;
+    }
+}
+if (!function_exists('irModuleEnabled')) {
+    /**
+     * Is this add-on switched on for the business? Read per request.
+     * @param string $key e.g. 'hotel'
+     * @return bool
+     */
+    function irModuleEnabled($key) {
+        $rows = irModuleRows();
+        return isset($rows[$key]) && (int) $rows[$key]->is_enabled === 1;
+    }
+}
+if (!function_exists('irModuleSet')) {
+    /**
+     * Flip a switch. Only keys in the registry with an existing row are accepted.
+     * @return bool TRUE when a row was updated
+     */
+    function irModuleSet($key, $enabled, $user_id) {
+        $reg = irModuleRegistry();
+        $rows = irModuleRows();
+        if (!isset($reg[$key]) || !isset($rows[$key])) { return FALSE; }
+        $CI = &get_instance();
+        $CI->db->where('module_key', $key)->update('tbl_modules', array(
+            'is_enabled' => $enabled ? 1 : 0, 'updated_by' => (int) $user_id, 'updated_at' => date('Y-m-d H:i:s'),
+        ));
+        irModuleRows(TRUE);
+        putAuditLog($user_id, 'Module ' . $key . ' switched ' . ($enabled ? 'ON' : 'OFF'), 'Module Switch', date('Y-m-d H:i:s'));
+        return TRUE;
+    }
+}
+if (!function_exists('irRequireModule')) {
+    /**
+     * For a module's controller constructor: when the add-on is off, nothing of
+     * it is reachable - not by URL, not by bookmark. Redirects with a notice.
+     * @param string $key
+     * @return void
+     */
+    function irRequireModule($key) {
+        if (irModuleEnabled($key)) { return; }
+        $CI = &get_instance();
+        $CI->session->set_flashdata('exception_er', lang('module_switched_off'));
+        redirect('Authentication/userProfile');
+    }
+}
+if (!function_exists('irAccessModuleId')) {
+    /**
+     * The tbl_access id of a module row (parent_id 0) looked up by module_name,
+     * cached per request. Rows added by migrations get whatever id the install
+     * assigns, so the code must never assume one. 0 when missing, which makes
+     * checkAccess() refuse (Admin still passes - it short-circuits on role).
+     * @param string $module_name
+     * @return int
+     */
+    function irAccessModuleId($module_name) {
+        static $ids = array();
+        if (array_key_exists($module_name, $ids)) { return $ids[$module_name]; }
+        $CI = &get_instance();
+        $row = $CI->db->select('id')->from('tbl_access')->where('module_name', $module_name)->where('parent_id', 0)
+                      ->where('del_status', 'Live')->get()->row();
+        $ids[$module_name] = $row ? (int) $row->id : 0;
+        return $ids[$module_name];
+    }
+}

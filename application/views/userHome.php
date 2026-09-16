@@ -511,6 +511,19 @@
                             </a>
                         </li>
                         <?php endif;?>
+                        <?php /* Hotel Operations add-on: the whole group exists only while Settings > Modules has it ON */ ?>
+                        <?php if (irModuleEnabled('hotel')): ?>
+                        <li class="treeview menu__cidirp_hotel common_use" id="ir_hotel_menu">
+                            <a href="javascript:void(0)">
+                                <i data-feather="home"></i>
+                                <span><?php echo lang('hotel_operations'); ?></span>
+                            </a>
+                            <ul class="treeview-menu">
+                                <li data-access="" class="" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/index">
+                                        <?php echo lang('hotel_operations'); ?></a></li>
+                            </ul>
+                        </li>
+                        <?php endif; ?>
                         <li class="treeview menu__cidirp_4 common_use">
                             <a href="javascript:void(0)">
                                 <i data-feather="command"></i>
@@ -557,6 +570,9 @@
 
                                 <li data-access="update-6" class="menu_assign_class" data-menu__cid="irp_32"><a class="child-menu" href="<?php echo base_url()?>setting/index">
                                         <?php echo lang('Settings'); ?></a></li>
+                                <?php /* Module switches (H0): business-wide ON/OFF per add-on, read per request */ ?>
+                                <li data-access="update-<?php echo irAccessModuleId('modules'); ?>" class="menu_assign_class" data-menu__cid="irp_32"><a class="child-menu" href="<?php echo base_url()?>setting/modules">
+                                        <?php echo lang('modules'); ?></a></li>
                                  
                                 <?php
                                 if(!isFoodCourt()):

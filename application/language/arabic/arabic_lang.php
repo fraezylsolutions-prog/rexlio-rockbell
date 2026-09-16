@@ -2024,3 +2024,20 @@ $lang['ir_tp_switch_title'] = 'Switch outlet?';
 $lang['ir_tp_switch_outlet'] = 'Switch to';
 /* Part B: the POS rail's Search button */
 $lang['ir_search']='بحث';
+/* Hotel Operations add-on - H0: module switches */
+$lang['modules']='Modules';
+$lang['modules_desc']='Switch add-on features on or off for the whole business. A change applies on the next page load - no sign-out needed.';
+$lang['module']='Module';
+$lang['module_hotel']='Hotel Operations';
+$lang['module_hotel_desc']='Rooms, Front Desk (check-in / check-out log) and the Housekeeping board.';
+$lang['module_on']='ON';
+$lang['module_off']='OFF';
+$lang['switch_on']='Switch on';
+$lang['switch_off']='Switch off';
+$lang['module_updated']='Module updated.';
+$lang['module_not_installed']='Not installed - apply its database migration first.';
+$lang['module_switched_off']='That feature is switched off. An administrator can turn it on under Settings > Modules.';
+$lang['modules_note']='Switching a module off hides it; nothing is deleted. Switching it back on restores everything as it was.';
+$lang['last_changed']='Last changed';
+$lang['hotel_operations']='Hotel Operations';
+$lang['hotel_landing_placeholder']='The Hotel Operations add-on is switched on. Rooms, the Front Desk and the Housekeeping board arrive with the next stages.';

@@ -339,12 +339,36 @@ Staff feedback against their previous, simpler system. Display-only rename plus 
 
 ## Separately Planned (larger standalone features, not yet started)
 - **WhatsApp End-of-Day Sales Notifications** — free/unofficial route (Baileys) first, official Meta Cloud API added later
-- **Web Push Notifications** — for the waiter panel, browser-based via service worker
+- **Web Push Notifications** — for the waiter panel, browser-based via service worker.
+  **Architectural requirement (2026-09-16):** the notification system and the Mobile API layer must be
+  INDEPENDENTLY toggleable by Super Admin at runtime — two switches, no deployment to flip either. Design it
+  in from the start: see "Module toggles" below.
 - **Owner's Mobile App** (new, not yet scoped) — simple mobile app for the business owner. Needs a dedicated planning discussion before implementation. Open questions: native app vs. mobile-responsive web view of existing data; whether it reuses the existing user/auth system or hits the backend via a separate API; read-only dashboard view vs. includes actions; whether the existing browser-based Waiter Panel pattern (no native app required) is a relevant precedent to follow instead of a true native build.
 - **Dashboard Enhancement** (new, not yet scoped) — dashboard should show: total running order value (likely sourced from tbl_kitchen_sales, consistent with how the Running Order screen sources live data, since running orders don't exist in tbl_sales until completion); today's sale across all outlets; a filter to select a particular outlet and register to narrow the above figures. Needs investigation into current dashboard structure (existing outlet/register filtering, if any; current data source) before implementation.
 
 ## Deferred to Final Functional Phase
 - **Hotel Operations Add-on Module** — scope finalized to Housekeeping (Kitchen Panel pattern) + Front Desk basics (room status, check-in/check-out log) only. Built as an isolated, toggleable add-on with new tables only — no modification to existing core tables. Reservations (date-range availability) and Guest Folio (billing bridge) explicitly out of scope for now.
+  **Reconfirmed 2026-09-16:** still the plan. Super Admin turns it ON/OFF at any time, no deployment — see "Module toggles" below.
+
+### Module toggles — requirement for both features above (recorded 2026-09-16, not yet built)
+Super Admin must be able to switch each of these on and off independently, at any time, without a code
+deployment: (1) Hotel Operations, (2) Push Notifications, (3) Mobile API. Proposed mechanism, to be designed in
+before either feature is built rather than bolted on:
+- **Storage:** one new table `tbl_modules` (module_key, is_enabled, scope, updated_by, updated_at) — one row per
+  module. Not more columns on `tbl_companies` (the hotel rule is "no core-table modification") and not
+  `tbl_access` (a permission is per role; this is per business).
+- **Read path:** a helper `irModuleEnabled('hotel' | 'push' | 'mobile_api')`, one query cached per request. Read
+  per request, NOT snapshotted into the session (unlike permissions), so a flip takes effect on the next request
+  with no re-login.
+- **Gates:** sidebar / header items hidden; each module's controller constructor redirects (web) or answers
+  `503 {"error":"module_disabled"}` (API) when off; the service worker is only registered when push is on and
+  the server stops sending; existing subscriptions are kept, not deleted.
+- **Screen:** a "Modules" tab in Settings, visible to Admin only through a new `tbl_access` row (`manage_modules`),
+  each module a switch with who/when it was last changed.
+- **Scope:** business-wide switch for all three. Hotel additionally gets a per-outlet participation list (rooms
+  exist at some outlets only); push and the API are business-wide.
+- **Data:** turning a module off hides it; its tables and rows stay untouched, so turning it back on restores
+  everything.
 
 ## Absolute Final Phase (after everything above)
 - **Branding & License Cleanup** — remove CodeCanyon/iRestora PLUS references, apply Rexlio branding within White Label license rights. Does not include license/activation bypass (separate legal matter from cosmetic rebranding). Add custom anti-copy protection within license terms.

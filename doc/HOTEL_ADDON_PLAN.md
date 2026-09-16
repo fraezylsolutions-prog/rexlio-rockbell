@@ -76,3 +76,26 @@ sidebar group rendered only while ON; `Hotel` controller shell whose constructor
 | Regression: Part B 18/18, tables panel 5a 55/55, 5b 22/22, 5c 28/28, deep-link 16/16 | green |
 
 Note: CodeIgniter answers a POST-then-redirect with 303 (GET redirects with 307) — the suite accepts both.
+
+### H1 — schema, permissions, Housekeeping role, Rooms CRUD (2026-09-16). Local only; not on live.
+Migration `2026-09-16_02_hotel-schema.sql` (PASS on scratch, idempotent on re-run): the five
+`tbl_hotel_*` tables; access rows `hotel_rooms` (add/update/view/delete), `hotel_front_desk`
+(view/checkin/checkout/status), `hotel_housekeeping` (view/update_task/assign/verify) under the
+Role screen's "Panel" group; the **Housekeeping** role per company; grants — Admin + Manager all,
+Cashier front desk view/checkin/checkout + board view, Housekeeping board view + own tasks + outlet
+enter/view. `Hotel_model`; `Hotel` controller with the per-method access map (ids by name); Room
+Types and Rooms CRUD on the Table.php pattern (encrypted ids, soft delete, select2, DataTable);
+landing tiles per permission; sidebar items with name-resolved tokens; 31 language keys × 4.
+Rules: room number unique among the LIVE rooms of an outlet (a deleted number can be reused);
+outlet must be one the caller may access; a room with a guest in it cannot be deleted; a type
+still assigned to rooms cannot be deleted; statuses are shown on the list but only the Front Desk
+(H2) and the board (H3) change them.
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch (Manager / Cashier / Housekeeping sessions carrying the migration's real tokens): permission matrix incl. a Waiter refused even while ON; room types add / validation / edit / prefill / counts; rooms add with defaults, duplicate per outlet, foreign outlet, validation, edit keeps own number, list badges + guest, tampered id; delete guards (in-house stay, type in use) and soft-delete reuse; Cashier cannot delete; everything refused while OFF incl. an Admin POST | **35/35** |
+| Real browser: Rooms list and Add Room form with the live CSS | PASS |
+| Regression: H0 16/16 (its no-re-login proof now uses a permitted pre-switch session — since H1 a Waiter without a hotel permission is refused by design), Part B 18/18, tables panel 55 / 22 / 28 / 16 | green |
+
+Found while verifying: `Custom::encrypt_decrypt('')` answers FALSE, not "" — the CRUD normalises the
+id (Table.php survives on a loose `==`); the Save button used an undefined `save` key → `submit`.

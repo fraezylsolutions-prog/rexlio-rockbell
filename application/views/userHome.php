@@ -519,8 +519,15 @@
                                 <span><?php echo lang('hotel_operations'); ?></span>
                             </a>
                             <ul class="treeview-menu">
-                                <li data-access="" class="" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/index">
-                                        <?php echo lang('hotel_operations'); ?></a></li>
+                                <?php /* tokens = <function>-<id of the hotel_* access row>, ids looked up by name (H1) */ ?>
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_front_desk'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/index">
+                                        <?php echo lang('front_desk'); ?></a></li>
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_housekeeping'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/index">
+                                        <?php echo lang('housekeeping_board'); ?></a></li>
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_rooms'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/rooms">
+                                        <?php echo lang('rooms'); ?></a></li>
+                                <li data-access="view-<?php echo irAccessModuleId('hotel_rooms'); ?>" class="menu_assign_class" data-menu__cid="irp_hotel"><a class="child-menu" href="<?php echo base_url()?>Hotel/roomTypes">
+                                        <?php echo lang('room_types'); ?></a></li>
                             </ul>
                         </li>
                         <?php endif; ?>

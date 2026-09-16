@@ -5112,7 +5112,12 @@ if (!function_exists('irModuleRegistry')) {
      */
     function irModuleRegistry() {
         return array(
-            'hotel' => array('label' => 'module_hotel', 'desc' => 'module_hotel_desc'),
+            'hotel' => array(
+                'label' => 'module_hotel', 'desc' => 'module_hotel_desc',
+                //what the module needs in the database; the switch refuses ON while any is missing
+                'migration' => 'db/migrations/2026-09-16_02_hotel-schema.sql',
+                'tables' => array('tbl_hotel_room_types', 'tbl_hotel_rooms', 'tbl_hotel_room_status_log', 'tbl_hotel_housekeeping_tasks', 'tbl_hotel_stays'),
+            ),
         );
     }
 }
@@ -5146,15 +5151,39 @@ if (!function_exists('irModuleEnabled')) {
         return isset($rows[$key]) && (int) $rows[$key]->is_enabled === 1;
     }
 }
+if (!function_exists('irModuleSchemaMissing')) {
+    /**
+     * The registry tables a module still lacks in this database - empty when it
+     * is fully installed. Lets the Modules screen say "apply migration X"
+     * instead of letting a half-applied install switch ON and fatal on first use.
+     * One query per table, per request.
+     * @param string $key
+     * @return array table names
+     */
+    function irModuleSchemaMissing($key) {
+        static $cache = array();
+        if (isset($cache[$key])) { return $cache[$key]; }
+        $reg = irModuleRegistry();
+        $missing = array();
+        if (isset($reg[$key]['tables'])) {
+            $CI = &get_instance();
+            foreach ($reg[$key]['tables'] as $t) { if (!$CI->db->table_exists($t)) { $missing[] = $t; } }
+        }
+        $cache[$key] = $missing;
+        return $missing;
+    }
+}
 if (!function_exists('irModuleSet')) {
     /**
-     * Flip a switch. Only keys in the registry with an existing row are accepted.
+     * Flip a switch. Only keys in the registry with an existing row are accepted,
+     * and ON only when the module's tables are all there (OFF is always allowed).
      * @return bool TRUE when a row was updated
      */
     function irModuleSet($key, $enabled, $user_id) {
         $reg = irModuleRegistry();
         $rows = irModuleRows();
         if (!isset($reg[$key]) || !isset($rows[$key])) { return FALSE; }
+        if ($enabled && irModuleSchemaMissing($key)) { return FALSE; }
         $CI = &get_instance();
         $CI->db->where('module_key', $key)->update('tbl_modules', array(
             'is_enabled' => $enabled ? 1 : 0, 'updated_by' => (int) $user_id, 'updated_at' => date('Y-m-d H:i:s'),

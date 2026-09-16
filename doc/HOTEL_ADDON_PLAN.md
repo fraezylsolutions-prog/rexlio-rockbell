@@ -161,3 +161,26 @@ the server's `is_mine` / `assigned_to` / `status`, never by role name:
 
 Not in H3 (by scope): no notification when a task lands in the pool — the board polls; H4 adds the
 toggle end-to-end check, docs and the owner's checklist.
+
+### H4 — toggle end to end, schema guard, docs (2026-09-16). Local only; not on live.
+- **Half-installed guard.** `irModuleRegistry()` now lists each module's `tables` and `migration`;
+  `irModuleSchemaMissing($key)` names the tables absent from this database; `irModuleSet()` refuses ON
+  while any is missing (OFF is always allowed). Settings › Modules shows a *Tables missing* badge with the
+  migration file and the table names and withholds *Switch on*; a forced POST answers with the same notice
+  and writes nothing. Closes the gap "migration 01 applied, 02 not, switch flipped, fatal on first use".
+- **Docs.** `doc/HOTEL_OPERATIONS_GUIDE.md` — owner's guide (what it is / is not, switching, permissions
+  table with the migration's defaults, landing rule, setup, the front-desk and housekeeping daily flows,
+  status vocabulary, troubleshooting, **go-live checklist**, file map). Roadmap: hotel item and the
+  "Module toggles" section marked built, with the one decision change (business-wide, no per-outlet list)
+  recorded and the plug-in recipe for Push / Mobile API.
+- Per-stage commits: H0 `feat(hotel): H0`, H1, H2, H3 `dd5532ca`, H4 (this one).
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch, module switch **with H1–H3 data in place**: fixture (3 rooms, 2 stays, 2 open tasks incl. one in progress for Stella); ON — landing + sidebar; **who may flip**: Manager without the grant refused (screen and POST), a **non-admin holding `update-<modules>`** gets the screen and the sidebar item; **OFF by that user**: row / updated_by / audit; **every Hotel entry refused for Admin, Manager and Stella — 9 GET + 16 POST each, including check-in / check-out / task actions / room CRUD with real payloads — and no row changed** (rooms, stays, tasks, log, types; task still pending, 101 still in house); the notice on the landing page; no sidebar group for three roles; Modules screen still reachable; Stella falls back to the middleman; **base product answers byte-for-byte as while ON** (POS, tables route, running orders, waiter and cashier outlet entry); **guard**: one table renamed away → badge + migration + table named, no *Switch on*, forced POST refused with the notice and no audit row, module still unreachable without a fatal; table back → normal; **ON again**: audit, `boardAjax` / `tasksAjax` JSON identical to the pre-switch snapshot for the Manager and for Stella, Stay Log intact, landing and sidebar back, Stella starts the task that waited through the OFF period; unknown key → "not installed", nothing written | **33/33** |
+| Base-product suites run **with the module OFF**: tables panel 5a 55/55, 5c 28/28, Part B 18/18 | green |
+| Real browser: Settings › Modules as the granted non-admin (OFF badge, Switch on, last changed by / at) | PASS |
+| Regression (module ON): H3 60/60, H2 47/47, H1 35/35, H0 16/16, Node 18 + 9, tables panel 55 / 22 / 28 / 16, Part B 18 + 21 | green |
+
+**Not done here, by design:** nothing was applied to the live database. Going live is the owner's
+checklist in the guide (backup → migration 01 → 02 → deploy → Switch on).

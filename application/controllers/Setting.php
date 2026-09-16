@@ -894,8 +894,12 @@ class Setting extends Cl_Controller {
         if(htmlspecialcharscustom($this->input->post('submit')) == 'toggle'){
             $key = htmlspecialcharscustom($this->input->post($this->security->xss_clean('module_key')));
             $enabled = htmlspecialcharscustom($this->input->post($this->security->xss_clean('enabled'))) === '1';
+            $reg = irModuleRegistry();
             if(irModuleSet($key, $enabled, (int) $this->session->userdata('user_id'))){
                 $this->session->set_flashdata('exception', lang('module_updated'));
+            }elseif($enabled && isset($reg[$key]) && irModuleSchemaMissing($key)){
+                //H4: half-installed (tbl_modules row there, module tables not) - name the migration
+                $this->session->set_flashdata('exception_1', lang('module_schema_missing') . ' ' . $reg[$key]['migration'] . ' (' . implode(', ', irModuleSchemaMissing($key)) . ')');
             }else{
                 $this->session->set_flashdata('exception_1', lang('module_not_installed'));
             }

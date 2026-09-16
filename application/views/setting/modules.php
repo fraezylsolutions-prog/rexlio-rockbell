@@ -31,7 +31,8 @@
                 <tbody>
                 <?php foreach ($registry as $key => $meta):
                     $row = isset($rows[$key]) ? $rows[$key] : NULL;
-                    $on = $row && (int) $row->is_enabled === 1; ?>
+                    $on = $row && (int) $row->is_enabled === 1;
+                    $missing = $row ? irModuleSchemaMissing($key) : array(); ?>
                     <tr data-module="<?php echo escape_output($key); ?>">
                         <td>
                             <b><?php echo lang($meta['label']); ?></b>
@@ -40,6 +41,9 @@
                         <td>
                             <?php if (!$row): ?>
                                 <span class="badge bg-secondary"><?php echo lang('module_not_installed'); ?></span>
+                            <?php elseif ($missing && !$on): ?>
+                                <span class="badge bg-warning text-dark ir_module_schema"><?php echo lang('module_schema_missing_badge'); ?></span>
+                                <div class="text-muted" style="font-size:12px"><?php echo lang('module_schema_missing'); ?> <code><?php echo escape_output($meta['migration']); ?></code><br><?php echo escape_output(implode(', ', $missing)); ?></div>
                             <?php elseif ($on): ?>
                                 <span class="badge bg-success ir_module_state"><?php echo lang('module_on'); ?></span>
                             <?php else: ?>
@@ -53,7 +57,7 @@
                             <?php else: ?>&mdash;<?php endif; ?>
                         </td>
                         <td>
-                            <?php if ($row): ?>
+                            <?php if ($row && ($on || !$missing)): ?>
                             <?php echo form_open(base_url() . 'setting/modules', array('class' => 'ir_module_form')); ?>
                                 <input type="hidden" name="module_key" value="<?php echo escape_output($key); ?>">
                                 <input type="hidden" name="enabled" value="<?php echo $on ? '0' : '1'; ?>">

@@ -2233,3 +2233,6 @@ $lang['hotel_err_task_state']='This task has already moved on. The board will re
 $lang['hotel_err_user']='That user cannot take housekeeping tasks.';
 $lang['hotel_err_task_type']='Unknown task type.';
 $lang['hotel_err_task_exists']='An open task of that type already exists for this room.';
+/* Hotel Operations add-on - H4: module schema guard */
+$lang['module_schema_missing']='Database tables missing - apply the migration';
+$lang['module_schema_missing_badge']='Tables missing';

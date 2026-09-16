@@ -349,8 +349,21 @@ Staff feedback against their previous, simpler system. Display-only rename plus 
 ## Deferred to Final Functional Phase
 - **Hotel Operations Add-on Module** — scope finalized to Housekeeping (Kitchen Panel pattern) + Front Desk basics (room status, check-in/check-out log) only. Built as an isolated, toggleable add-on with new tables only — no modification to existing core tables. Reservations (date-range availability) and Guest Folio (billing bridge) explicitly out of scope for now.
   **Reconfirmed 2026-09-16:** still the plan. Super Admin turns it ON/OFF at any time, no deployment — see "Module toggles" below.
+  **BUILT 2026-09-16 (H0–H4, local; not yet on live):** Rooms + Room Types, Front Desk board (check-in with
+  dirty-room warning, check-out → automatic cleaning task, out-of-order, history, Stay Log + CSV), Housekeeping
+  board (tablet page: My tasks / pool / assign / verify, permission-based landing for housekeeping-only staff),
+  Settings › Modules switch with a half-installed guard. Owner's guide + go-live checklist:
+  `doc/HOTEL_OPERATIONS_GUIDE.md`; engineering log: `doc/HOTEL_ADDON_PLAN.md`. Migrations
+  `2026-09-16_01_modules.sql` and `2026-09-16_02_hotel-schema.sql` (both additive, re-runnable).
 
-### Module toggles — requirement for both features above (recorded 2026-09-16, not yet built)
+### Module toggles — requirement for both features above (recorded 2026-09-16; framework BUILT with the hotel add-on)
+**As built (H0/H4):** `tbl_modules` + `irModuleRegistry()` / `irModuleEnabled()` / `irRequireModule()` in
+`my_helper.php`, Settings › Modules (`Setting::modules`, gated by the `tbl_access` row `modules` › `update`, looked
+up by name). The registry lists each module's tables and migration, and *Switch on* is withheld while any table is
+missing. Push Notifications and the Mobile API plug in by adding a registry entry + a `tbl_modules` row in their
+migration and calling `irRequireModule('<key>')` (web) / answering 503 (API) in their constructors. Decision
+change from the proposal below: the hotel switch is **business-wide only** — no per-outlet participation list
+(rooms simply belong to outlets). Original proposal kept for the record:
 Super Admin must be able to switch each of these on and off independently, at any time, without a code
 deployment: (1) Hotel Operations, (2) Push Notifications, (3) Mobile API. Proposed mechanism, to be designed in
 before either feature is built rather than bolted on:

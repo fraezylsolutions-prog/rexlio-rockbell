@@ -132,3 +132,6 @@
 .hk_rp_sub_table { margin: 6px 0 0; font-size: 12.5px; }
 .hk_rp_sub_table th, .hk_rp_sub_table td { padding: 4px 6px; }
 .hk_variance { font-size: 10px; vertical-align: middle; }
+
+/* ---- H11 ---- */
+.hk_row_open td { background: #fffaeb; }

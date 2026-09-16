@@ -69,7 +69,7 @@ class Hotel extends Cl_Controller {
             $module = 'hotel_front_desk'; $function = 'view';
         } elseif ($segment_2 == "editStayValue") {
             $module = 'hotel_front_desk'; $function = 'value';
-        } elseif (in_array($segment_2, array("reports", "reportValue", "reportOccupancy", "reportStays", "reportHousekeeping"), TRUE)) {
+        } elseif (in_array($segment_2, array("reports", "reportValue", "reportOccupancy", "reportStays", "reportHousekeeping", "reportTurnaround", "reportOutOfOrder", "reportStatusHistory"), TRUE)) {
             $module = 'hotel_reports'; $function = 'view';
         } elseif ($segment_2 == "housekeeping" || $segment_2 == "tasksAjax") {
             $module = 'hotel_housekeeping'; $function = 'view';
@@ -750,6 +750,105 @@ class Hotel extends Cl_Controller {
         );
         $data = array('filters' => $f, 'tasks' => $tasks, 'by_staff' => $by_staff, 'by_type' => $by_type, 'by_cat' => $by_cat, 'by_bucket' => $by_bucket, 'total' => $total);
         $data['main_content'] = $this->load->view('hotel/report_housekeeping', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
+
+    /**
+     * H11 - Room Turnaround: for every check-out in the range, how long the room stayed dirty
+     * (check-out -> housekeeping 'clean' in the room's log) and how long until it was inspected
+     * (clean -> 'inspected'). A room not yet clean is open, measured to now. Averages per
+     * category and overall; the table sorts slowest first.
+     * @access public
+     * @return void
+     */
+    public function reportTurnaround() {
+        $company_id = (int) $this->session->userdata('company_id');
+        $f = $this->reportFilters();
+        $stays = $this->Hotel_model->staysCheckedOut($company_id, $f['outlet_ids'], $f['from'], $f['to']);
+        $logs = $stays ? $this->Hotel_model->statusLogRange($company_id, $f['outlet_ids'], $f['from'] . ' 00:00:00', '2999-12-31 23:59:59', 'housekeeping') : array();
+        $by_room = array(); foreach ($logs as $l) { $by_room[(int) $l->room_id][] = $l; }
+        $rows = array(); $cats = array(); $tot = array('n' => 0, 'dirty' => array(), 'inspect' => array(), 'open' => 0);
+        $now = date('Y-m-d H:i:s');
+        foreach ($stays as $st) {
+            $clean = NULL; $insp = NULL;
+            foreach (isset($by_room[(int) $st->room_id]) ? $by_room[(int) $st->room_id] : array() as $l) {
+                if ($l->created_at < $st->checkout_at) { continue; }
+                if ($clean === NULL && ($l->to_status === 'clean' || $l->to_status === 'inspected')) { $clean = $l->created_at; }
+                if ($clean !== NULL && $l->to_status === 'inspected' && $l->created_at >= $clean) { $insp = $l->created_at; break; }
+                if ($clean !== NULL && $l->to_status === 'dirty') { break; }   // the next guest's cycle
+            }
+            $dirty_m = round((strtotime($clean ? $clean : $now) - strtotime($st->checkout_at)) / 60);
+            $insp_m = ($clean && $insp) ? round((strtotime($insp) - strtotime($clean)) / 60) : NULL;
+            $cn = $st->type_name ? $st->type_name : lang('hk_no_category');
+            if (!isset($cats[$cn])) { $cats[$cn] = array('n' => 0, 'dirty' => array(), 'inspect' => array(), 'open' => 0); }
+            foreach (array(&$tot, &$cats[$cn]) as &$g) { $g['n']++; if ($clean) { $g['dirty'][] = $dirty_m; } else { $g['open']++; } if ($insp_m !== NULL) { $g['inspect'][] = $insp_m; } } unset($g);
+            $rows[] = array('room' => $st->room_number, 'type' => $cn, 'guest' => $st->guest_name, 'checkout_at' => $st->checkout_at, 'clean_at' => $clean, 'dirty_min' => $dirty_m, 'inspected_at' => $insp, 'inspect_min' => $insp_m, 'open' => $clean === NULL);
+        }
+        usort($rows, function($a, $b) { return $b['dirty_min'] <=> $a['dirty_min']; });
+        $avg = function($g) { return array('n' => $g['n'], 'open' => $g['open'], 'dirty_avg' => $g['dirty'] ? round(array_sum($g['dirty']) / count($g['dirty'])) : NULL, 'dirty_max' => $g['dirty'] ? max($g['dirty']) : NULL, 'inspect_avg' => $g['inspect'] ? round(array_sum($g['inspect']) / count($g['inspect'])) : NULL); };
+        $cat_rows = array(); ksort($cats); foreach ($cats as $k => $g) { $cat_rows[$k] = $avg($g); }
+        $data = array('filters' => $f, 'rows' => $rows, 'cats' => $cat_rows, 'total' => $avg($tot));
+        $data['main_content'] = $this->load->view('hotel/report_turnaround', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
+
+    /**
+     * H11 - Out of Order: every out-of-order spell that starts in the range (or is still open at
+     * its start), from the occupancy log: taken out (when, by whom, why), back in service (when,
+     * by whom), duration; room-days lost per category and overall.
+     * @access public
+     * @return void
+     */
+    public function reportOutOfOrder() {
+        $company_id = (int) $this->session->userdata('company_id');
+        $f = $this->reportFilters();
+        $logs = $this->Hotel_model->statusLogRange($company_id, $f['outlet_ids'], date('Y-m-d', strtotime($f['from'] . ' -1 year')) . ' 00:00:00', $f['to'] . ' 23:59:59', 'occupancy');
+        $open = array(); $spells = array();
+        foreach ($logs as $l) {
+            $rid = (int) $l->room_id;
+            if ($l->to_status === 'out_of_order') { $open[$rid] = $l; }
+            elseif ($l->from_status === 'out_of_order' && isset($open[$rid])) { $spells[] = array('start' => $open[$rid], 'end' => $l); unset($open[$rid]); }
+        }
+        foreach ($open as $l) { $spells[] = array('start' => $l, 'end' => NULL); }
+        $now = date('Y-m-d H:i:s'); $rows = array(); $cats = array(); $tot = array('n' => 0, 'hours' => 0.0, 'open' => 0);
+        foreach ($spells as $sp) {
+            $s0 = $sp['start']->created_at; $e0 = $sp['end'] ? $sp['end']->created_at : NULL;
+            /* in the range when it starts in it, or was still open when the range started */
+            if ($s0 > $f['to'] . ' 23:59:59') { continue; }
+            if ($s0 < $f['from'] . ' 00:00:00' && $e0 !== NULL && $e0 < $f['from'] . ' 00:00:00') { continue; }
+            $hours = round((strtotime($e0 ? $e0 : $now) - strtotime($s0)) / 3600, 1);
+            $cn = $sp['start']->type_name ? $sp['start']->type_name : lang('hk_no_category');
+            if (!isset($cats[$cn])) { $cats[$cn] = array('n' => 0, 'hours' => 0.0, 'open' => 0); }
+            foreach (array(&$tot, &$cats[$cn]) as &$g) { $g['n']++; $g['hours'] += $hours; if ($e0 === NULL) { $g['open']++; } } unset($g);
+            $rows[] = array('room' => $sp['start']->room_number, 'type' => $cn, 'start' => $s0, 'start_by' => $sp['start']->user_name, 'reason' => $sp['start']->note,
+                            'end' => $e0, 'end_by' => $sp['end'] ? $sp['end']->user_name : NULL, 'end_note' => $sp['end'] ? $sp['end']->note : NULL, 'hours' => $hours);
+        }
+        usort($rows, function($a, $b) { return strcmp($b['start'], $a['start']); });
+        ksort($cats);
+        $data = array('filters' => $f, 'rows' => $rows, 'cats' => $cats, 'total' => $tot);
+        $data['main_content'] = $this->load->view('hotel/report_out_of_order', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
+
+    /**
+     * H11 - Room Status History: the log rows in the range, filterable by room and by kind
+     * (occupancy / housekeeping / value) - the front desk's history modal as a printable list.
+     * @access public
+     * @return void
+     */
+    public function reportStatusHistory() {
+        $company_id = (int) $this->session->userdata('company_id');
+        $f = $this->reportFilters();
+        $kind = (string) $this->input->get_post('kind'); if (!in_array($kind, array('occupancy', 'housekeeping', 'value'), TRUE)) { $kind = ''; }
+        $room_id = (int) $this->input->get_post('room_id');
+        $rows = array_reverse($this->Hotel_model->statusLogRange($company_id, $f['outlet_ids'], $f['from'] . ' 00:00:00', $f['to'] . ' 23:59:59', $kind, $room_id));
+        $rooms = array(); foreach ($this->Hotel_model->getRooms($company_id, $f['outlet_ids']) as $r) { $rooms[(int) $r->id] = $r->number . (count($f['outlets']) > 1 ? ' (' . $r->outlet_name . ')' : ''); }
+        $f['extra_filters'] = array(
+            array('name' => 'room_id', 'label' => lang('room'), 'options' => $rooms, 'selected' => $room_id ? $room_id : ''),
+            array('name' => 'kind', 'label' => lang('hk_kind'), 'options' => array('occupancy' => lang('occupancy'), 'housekeeping' => lang('housekeeping'), 'value' => lang('hotel_log_value')), 'selected' => $kind),
+        );
+        $data = array('filters' => $f, 'rows' => $rows);
+        $data['main_content'] = $this->load->view('hotel/report_status_history', $data, TRUE);
         $this->load->view('userHome', $data);
     }
 

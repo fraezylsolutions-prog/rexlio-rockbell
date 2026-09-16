@@ -289,3 +289,19 @@ verified** (checking), each over the tasks that have both timestamps; summary ca
 | Test | Result |
 |---|---|
 | HTTP on rexlio_scratch with fixed timestamps (Stella: verified / done / pending; GM: verified maintenance + cancelled inspection; a pool task; one at another outlet; one last year): Cashier refused; menu; per-attendant counts and averages (15m / 40m / 1h 00m; 1h 00m / 2h 00m / 30m; pool dashes); totals 6 / 3 / 2 / 1 / 2 with 30m / 1h 07m / 45m; by task type, by category, by period; task-type and attendant filters; all-outlets day view; empty period | **15/15** |
+
+### H11 — the remaining reports (2026-09-17). Local only; not on live.
+- **Room Turnaround** (`Hotel/reportTurnaround`): every check-out in the range — how long the room stayed
+  dirty (check-out → *clean* / *inspected* in its history) and how long until inspected; a room not yet
+  clean is open, measured to now, flagged *Still dirty*; slowest first; averages and longest per category.
+- **Out of Order** (`Hotel/reportOutOfOrder`): every spell from the occupancy history — taken out (when,
+  by whom, why), back in service (when, by whom, note), duration; spells still open at the range start
+  included; room-days lost per category; *Still out* count.
+- **Room Status History** (`Hotel/reportStatusHistory`): the history rows of the range, newest first,
+  filterable by room and by kind (occupancy / housekeeping / value) — the front desk's history modal as
+  a printable, exportable list.
+
+| Test | Result |
+|---|---|
+| HTTP on rexlio_scratch (history rows with fixed timestamps; two check-outs on one room, one still dirty, one at another outlet; OOO spells: closed, open, entirely before the range, open across the range start): Cashier refused ×3; menu; turnaround order / durations / open flag / summary / per category / all outlets; out-of-order rows, durations (2.0d, 5.4d), open spell, category room-days, an empty window; history row count and order, the value row, a housekeeping row, room + kind filters | **16/16** |
+| Real browser: turnaround and out-of-order pages render with cards, category table, DataTables export | PASS |

@@ -350,4 +350,32 @@ class Hotel_model extends CI_Model {
         return $this->db->select('u.id, u.full_name')->from('tbl_hotel_housekeeping_tasks k')->join('tbl_users u', 'u.id = k.assigned_to')
                         ->where('k.company_id', (int) $company_id)->where('k.del_status', 'Live')->group_by(array('u.id', 'u.full_name'))->order_by('u.full_name', 'ASC')->get()->result();
     }
+
+    /**
+     * H11 - status log rows of the rooms in scope between two datetimes, optionally one kind
+     * (occupancy / housekeeping / value) and one room; oldest first. $to_dt may be far ahead
+     * (the turnaround report follows a check-out forward in time).
+     */
+    public function statusLogRange($company_id, $outlet_ids, $from_dt, $to_dt, $kind = '', $room_id = 0) {
+        if (!$outlet_ids) { return array(); }
+        $this->db->select('l.*, r.number AS room_number, r.outlet_id, t.name AS type_name, u.full_name AS user_name')
+                 ->from('tbl_hotel_room_status_log l')->join('tbl_hotel_rooms r', 'r.id = l.room_id')
+                 ->join('tbl_hotel_room_types t', 't.id = r.room_type_id', 'left')->join('tbl_users u', 'u.id = l.user_id', 'left')
+                 ->where('r.company_id', (int) $company_id)->where('r.del_status', 'Live')->where_in('r.outlet_id', $outlet_ids)
+                 ->where('l.created_at >=', $from_dt)->where('l.created_at <=', $to_dt);
+        if (in_array($kind, array('occupancy', 'housekeeping', 'value'), TRUE)) { $this->db->where('l.status_kind', $kind); }
+        if ($room_id) { $this->db->where('l.room_id', (int) $room_id); }
+        return $this->db->order_by('l.created_at', 'ASC')->order_by('l.id', 'ASC')->limit(20000)->get()->result();
+    }
+
+    /** H11 - stays checked out within the range (by check-out time) */
+    public function staysCheckedOut($company_id, $outlet_ids, $from, $to) {
+        if (!$outlet_ids) { return array(); }
+        return $this->db->select('s.id, s.room_id, s.guest_name, s.checkin_at, s.checkout_at, r.number AS room_number, t.name AS type_name, uo.full_name AS out_by')
+                        ->from('tbl_hotel_stays s')->join('tbl_hotel_rooms r', 'r.id = s.room_id')
+                        ->join('tbl_hotel_room_types t', 't.id = r.room_type_id', 'left')->join('tbl_users uo', 'uo.id = s.checked_out_by', 'left')
+                        ->where('s.company_id', (int) $company_id)->where('s.del_status', 'Live')->where('s.status', 'checked_out')->where_in('s.outlet_id', $outlet_ids)
+                        ->where('s.checkout_at >=', $from . ' 00:00:00')->where('s.checkout_at <=', $to . ' 23:59:59')
+                        ->order_by('s.checkout_at', 'ASC')->limit(5000)->get()->result();
+    }
 }

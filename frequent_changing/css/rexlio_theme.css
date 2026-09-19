@@ -1556,6 +1556,11 @@ a.ir_rail_search:active{transform:translateY(1px)}
 #ir_action_sheet .ir-as-btn small{display:block; font:500 12px/1.2 system-ui,sans-serif; color:var(--rx-muted); margin-top:3px}
 #ir_action_sheet .ir-as-btn.ir-as-primary{background:var(--rx-accent); border-color:var(--rx-accent); color:#fff}
 #ir_action_sheet .ir-as-btn.ir-as-wide{grid-column:1 / -1}
+/* P2: placed items on Modify - locked rows keep their figures but lose edit / remove; the lock icon says why */
+.order_holder .single_order .ir_lock_icon{display:none}
+.order_holder .single_order.ir_locked{background:var(--rx-accent-soft) !important; opacity:.92}
+.order_holder .single_order.ir_locked .edit_item, .order_holder .single_order.ir_locked .removeCartItem{display:none !important}
+.order_holder .single_order.ir_locked .ir_lock_icon{display:inline-block; margin-right:6px; color:var(--rx-muted); font-size:12px}
 #ir_action_sheet .ir-as-btn.ir-as-primary i, #ir_action_sheet .ir-as-btn.ir-as-primary small{color:#fff; opacity:.9}
 #ir_action_sheet .ir-as-btn.ir-as-danger{border-color:rgba(239,68,68,.45)}
 #ir_action_sheet .ir-as-btn.ir-as-danger i{color:var(--rx-bad)}

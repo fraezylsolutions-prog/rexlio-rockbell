@@ -2251,3 +2251,6 @@ $lang['hk_rows']='rows';
 $lang['ir_msg_cart_cleared']='Cart cleared - choose a table to start again';
 /* P3 (2026-09-19): Order Details on the table card sheet */
 $lang['ir_as_hint_details']='items, quantities and prices - read only';
+/* P2 (2026-09-19): placed items locked on Modify without pos_26 */
+$lang['ir_msg_item_locked']='Already placed - this item cannot be changed here. You can add more of it; ask a manager to change or remove it.';
+$lang['txt_pos_26']='Edit placed items when modifying an order';

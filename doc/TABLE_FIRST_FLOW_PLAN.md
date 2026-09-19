@@ -457,3 +457,29 @@ touches neither the cart nor the panel (the sheet closes, the panel stays open b
 |---|---|
 | Real browser on rexlio_scratch: seven sheet actions in order (details first, spanning both columns); tapping Order Details on an order not yet on this till adopts it and opens the modal with its two items and 42 000 total; cart 0 / *Place Order* / no modification marker before and after; panel still open | PASS |
 
+
+### P2 — placed items visible but locked on Modify (2026-09-19). Local only; not on live.
+**Question answered:** can existing items be edited / removed on *Modify* by any role? Today, yes for
+everyone: the rows loaded by Modify were ordinary cart rows, and the only guard was the vendor's `pos_7`
+(*delete item when modifying*, a reason prompt) - which on live data Waiter holds and Cashier does not,
+and which the waiter app bypasses in code. Reusing it would have locked the wrong people.
+**Decision (owner, 2026-09-19):** permission-based, a **new** POS function `pos_26` *Edit placed items
+when modifying an order*, granted by migration `2026-09-19_01_pos-edit-placed-items.sql` to **Admin and
+Manager only** (not Cashier, not Waiter; grant under Settings › Roles if wanted; snapshotted at login).
+**Mechanics:** the Modify row builder marks every placed row `ir_placed` + `data-placed_qty`, and adds
+`ir_locked` when the role lacks `pos_26`. Locked rows keep their figures, lose the pencil and the ×, and
+show a lock icon. Enforcement is in the handlers, not only the icons: `.edit_item`, `.removeCartItem`
+and *decrease* (below the placed quantity) each refuse with a toast (*Already placed - this item cannot
+be changed here. You can add more of it; ask a manager to change or remove it.*). *Increase* still works
+(it is a new addition). Items **added during** the modify session are not `ir_placed`: fully editable,
+removable, and they skip the vendor's `pos_7` reason prompt - that prompt now applies to placed rows
+only. Holders (Admin/Manager) get today's behaviour unchanged, kitchen-status checks and `pos_7`
+included. pos_script 5.8, theme css 7.9.3, hidden inputs `pos_26` + `ir_msg_item_locked`.
+
+| Test | Result |
+|---|---|
+| Migration on rexlio_scratch: PASS, re-run PASS; preflight row APPLIED; Admin + Manager granted, Cashier and Waiter not | PASS |
+| Real browser, **Cashier** (no `pos_26`): Modify S5D260915-004 → both rows `ir_placed ir_locked`, lock icon shown, pencil and × hidden; clicking edit / remove refused with the toast; decrease at the placed quantity refused; increase allowed (2 → 3, total 62 000); a newly added item is unlocked, editable and removable with no reason prompt; placed rows untouched throughout | PASS |
+| Real browser, **Manager** (`pos_26`): same order → rows `ir_placed` only, pencil and × visible, no lock; decrease on a placed row goes through the vendor reason prompt (2 → 1, total 22 000); edit handler passes the guard | PASS |
+| HTTP/static suite (12): migration re-run PASS, grant list exactly Admin + Manager, `pos_26` hidden input empty for the cashier and `1` for the manager, guards present in all three handlers, css | PASS |
+| Regression: 5a 55, 5b 22, 5c 28, deep link 16, Part B 18 + 21, menu/POS 6 | green |

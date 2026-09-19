@@ -6652,6 +6652,15 @@
          half-built cart for A would land on B. This does everything Cancel did, plus it forgets the
          chosen table, the order being modified and the header tooltip, so the POS is back to "New".
          Returns the number of item rows it discarded. */
+      /* P2 (2026-09-19): rows loaded by Modify are "placed". Without pos_26 they are locked: no edit, no
+         removal, no quantity below what was placed (adding more is fine - it is a new addition). The row
+         builder marks them (class ir_placed + data-placed_qty, class ir_locked when the role lacks pos_26)
+         and every handler asks here as well, so hiding an icon is never the only guard. */
+      window.irRowLocked = function (el) {
+          let row = $(el).closest(".single_order");
+          return row.length > 0 && row.hasClass("ir_locked");
+      };
+      window.irRefuseLocked = function () { toastr["warning"]($("#ir_msg_item_locked").val() || "Placed items cannot be changed here", ""); return false; };
       window.irClearCart = function () {
           let discarded = $(".order_holder .single_order").length;
           $(".order_table_holder .order_holder").empty();
@@ -6700,6 +6709,7 @@
         }
       });
     $(document).on("click", ".edit_item", function () {
+          if (irRowLocked(this)) { return irRefuseLocked(); }   //P2
           //add for vr01
           $("#modal_item_price").html(0);
           $("#vr01_modal_price_variable").html(0);
@@ -8890,6 +8900,11 @@
         "click",
         ".single_order .first_portion .third_column .decrease_item_table",
         function () {
+            //P2: a locked row may not drop below what was placed
+            if (irRowLocked(this)) {
+                let row = $(this).closest(".single_order");
+                if (Number($(this).parent().find("span").html()) <= Number(row.attr("data-placed_qty"))) { return irRefuseLocked(); }
+            }
             //focus search field
             focusSearch();
 
@@ -8898,6 +8913,9 @@
               pos_7 = 1;
           }
           let place_edit_order = $("#place_edit_order").html();
+          //P2: a row added in THIS modify session is not a placed item - it behaves like a fresh cart
+          //(no pos_7, no reason prompt). The placed rows keep the vendor gate above.
+          if (!$(this).closest(".single_order").hasClass("ir_placed")) { place_edit_order = ""; }
           if(place_edit_order!="Update Order"){
             pos_7 = 1;
           }
@@ -15065,9 +15083,11 @@
             : this_item.item_type;
   
         let is_free_update = Number(this_item.is_free);
+        /* P2: this row was already placed; lock it for roles without pos_26 */
+        let ir_lock_cls = " ir_placed" + (Number($("#pos_26").val()) === 1 ? "" : " ir_locked");
         if(is_free_update!=1) {
             draw_table_for_order +=
-                '<div  data-cp_type="1"  data-id="' + this_item.food_menu_id + '" class="customer_panel single_order fix" id="order_for_item_' +
+                '<div  data-cp_type="1"  data-id="' + this_item.food_menu_id + '" data-placed_qty="' + Number(this_item.qty) + '" class="customer_panel single_order fix' + ir_lock_cls + '" id="order_for_item_' +
                 this_item.food_menu_id +
                 '">';
             draw_table_for_order += '<div class="first_portion">';
@@ -15124,7 +15144,7 @@
             draw_table_for_order +=
                 '<div class="single_order_column first_column cart_item_counter" data-id="' + item_id + '"><i   class="fas fa-pencil-alt edit_item txt_5" id="edit_item_' +
                 this_item.food_menu_id +
-                '"></i>  <span class="1_cp_name_' + this_item.food_menu_id + '" id="item_name_table_' +
+                '"></i><i class="fas fa-lock ir_lock_icon" title="' + ($("#ir_msg_item_locked").val() || "") + '"></i>  <span class="1_cp_name_' + this_item.food_menu_id + '" id="item_name_table_' +
                 this_item.food_menu_id +
                 '">' +
                 this_item.menu_name +
@@ -15881,6 +15901,7 @@
    
     // Remove when click cross icon in cart item list
     $("body").on("click", ".removeCartItem", function () {
+        if (irRowLocked(this)) { return irRefuseLocked(); }   //P2
         //focus search field
         focusSearch();
       let waiter_app_status = $("#waiter_app_status").val();
@@ -15900,6 +15921,9 @@
               pos_7 = 1;
           }
           let place_edit_order = $("#place_edit_order").html();
+          //P2: a row added in THIS modify session is not a placed item - it behaves like a fresh cart
+          //(no pos_7, no reason prompt). The placed rows keep the vendor gate above.
+          if (!$(this).closest(".single_order").hasClass("ir_placed")) { place_edit_order = ""; }
           if(place_edit_order!="Update Order"){
             pos_7 = 1;
           }

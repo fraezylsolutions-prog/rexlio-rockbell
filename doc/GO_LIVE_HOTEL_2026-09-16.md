@@ -1,7 +1,7 @@
 # Go-live runbook — Hotel Operations add-on (and everything committed since the last deploy)
 
 Prepared 2026-09-16 for the owner to run. Claude runs nothing against live (see `DEPLOYMENT.md`).
-Local HEAD at preparation: `342837a0` (H11 - value tracking, reports and dashboards included; 11 migrations). Replace `<user>`, `<livedb>`, `<cpaneluser>` with the live values.
+Local HEAD at preparation: `342837a0` (H11 plus the POS fixes P1/P3/P2 of 2026-09-19; 12 migrations). Replace `<user>`, `<livedb>`, `<cpaneluser>` with the live values.
 
 Order, as always: **backup → preflight → migrations (each prints PASS) → code → switch on → smoke test.**
 
@@ -43,6 +43,8 @@ with the old code; nothing else has changed yet.
     # value tracking + reports (added 2026-09-17)
     mysql -u <user> -p <livedb> < db/migrations/2026-09-17_01_hotel-stay-value.sql
     mysql -u <user> -p <livedb> < db/migrations/2026-09-17_02_hotel-reports-permission.sql
+    # POS: placed items locked on Modify without pos_26 (added 2026-09-19)
+    mysql -u <user> -p <livedb> < db/migrations/2026-09-19_01_pos-edit-placed-items.sql
 
     # confirm: every row APPLIED
     mysql -u <user> -p <livedb> < db/migrations/preflight_status.sql
@@ -69,7 +71,7 @@ Then, in a browser, hard-refresh the POS once (Ctrl+F5) — the changed scripts 
 1. Sign in as **Admin** → Settings → **Modules**. Hotel Operations must show **OFF** with a *Switch on*
    button. If it shows *Not installed* or *Tables missing*, a migration from step 3 did not run — go back.
 2. **Switch on.** The **Hotel Operations** group appears in the sidebar on the next page load; no sign-out.
-3. Managers, cashiers and housekeeping staff pick up their new hotel permissions **at their next login**
+3. Managers, cashiers and housekeeping staff pick up their new hotel permissions (and Managers the POS `pos_26` *edit placed items* one) **at their next login**
    (permissions are snapshotted at login). Admin needs nothing.
 
 ## 6. Smoke test

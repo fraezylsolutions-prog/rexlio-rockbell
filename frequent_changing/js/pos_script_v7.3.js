@@ -2640,7 +2640,11 @@
       function irRunOrderAction(sale_no, action){
           irTpEnsureLocalCard(sale_no, function(card){
               if(!card){ return; }
-              if(action === "modify"){
+              if(action === "details"){
+                  /* P3: read-only. The order is on this till (adopted above if it was not), the modal
+                     reads it from IndexedDB. The cart and the tables panel are left exactly as they are. */
+                  get_details_of_a_particular_order_for_modal(sale_no);
+              }else if(action === "modify"){
                   irCloseTablesPanel();
                   $("#update_sale_id").val(sale_no);
                   get_details_of_a_particular_order(sale_no);
@@ -18057,7 +18061,7 @@
         let m = window.location.search.match(/[?&]ir_action=([a-z]+)/);
         if(!m){ return; }
         let action = m[1];
-        if(["modify", "invoice", "split", "bill", "cancel"].indexOf(action) > -1){
+        if(["modify", "invoice", "split", "bill", "cancel", "details"].indexOf(action) > -1){
             setTimeout(function(){ irRunOrderAction(sale_no, action); }, 300);
         }else if(action === "merge" && typeof irOpenTablesPanel === "function"){
             irOpenTablesPanel();

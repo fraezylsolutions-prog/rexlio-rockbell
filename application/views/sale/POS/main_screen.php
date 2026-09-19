@@ -695,7 +695,7 @@ foreach ($notifications as $single_notification){
          rather than the real cut. Same family and host as the existing import,
          so this adds a weight - not another typeface. */ ?>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap">
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.1">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.2">
 </head>
 
 <body>
@@ -1488,6 +1488,9 @@ foreach ($notifications as $single_notification){
                             <button type="button" class="ir-as-close" id="ir_as_close" aria-label="<?php echo lang('close'); ?>">&times;</button>
                         </div>
                         <div class="ir-as-grid" id="ir_as_grid">
+                            <?php /* P3 (2026-09-19): read-only look at the order - the running-order panel's Order Details
+                                     modal - before any of the actions below. Never enters the modify flow, never touches the cart. */ ?>
+                            <button type="button" class="ir-as-btn ir-as-wide" data-action="details"><i class="fas fa-info-circle"></i><div><?php echo lang('order_details'); ?><small><?php echo lang('ir_as_hint_details'); ?></small></div></button>
                             <button type="button" class="ir-as-btn ir-as-primary" data-action="modify"><i class="fas fa-edit"></i><div><?php echo lang('modify_order_'); ?><small><?php echo lang('ir_as_hint_modify'); ?></small></div></button>
                             <button type="button" class="ir-as-btn" data-action="invoice"><i class="fas fa-file-invoice"></i><div><?php echo lang('invoice'); ?><small><?php echo lang('ir_as_hint_invoice'); ?></small></div></button>
                             <button type="button" class="ir-as-btn" data-action="split"><i class="fas fa-clone"></i><div><?php echo lang('split_bill'); ?><small><?php echo lang('ir_as_hint_split'); ?></small></div></button>
@@ -4758,7 +4761,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=5.5"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=5.6"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">

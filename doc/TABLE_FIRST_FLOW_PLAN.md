@@ -446,3 +446,14 @@ rows were discarded. Business rule: opening the panel just to look also discards
 | Real browser on rexlio_scratch (cashier, real menu items, real panel data): **reproduction** - 2 items on Table 2 + the Modify state of sale S5D260915-004; with the hook disabled, opening the panel and tapping Table 8 left cart 2 / 50 000, marker, *Update Order*, table 8 (the corruption); with the hook, opening the panel emptied everything (cart 0, no marker, *Place Order*, no table) and the toast showed; tapping a table afterwards set only the table. Rail *Tables* button clears too; footer Cancel still confirms then clears; opening with an empty cart shows no toast | PASS |
 | Regression: 5a 55, 5b 22, 5c 28, deep link 16, Part B 18 + 21, menu/POS 6 | green |
 
+### P3 — Order Details on the table card (2026-09-19). Local only; not on live.
+A seventh sheet action, **Order Details**, first and full-width above Modify: the running-order panel's
+existing read-only modal (`get_details_of_a_particular_order_for_modal`) - items, quantities, prices,
+totals. Adoption-first like the other actions (the order is pulled onto this till if it is not), and it
+touches neither the cart nor the panel (the sheet closes, the panel stays open behind the modal). The
+`?ir_action=details` deep link works too. Theme css 7.9.2, pos_script 5.6.
+
+| Test | Result |
+|---|---|
+| Real browser on rexlio_scratch: seven sheet actions in order (details first, spanning both columns); tapping Order Details on an order not yet on this till adopts it and opens the modal with its two items and 42 000 total; cart 0 / *Place Order* / no modification marker before and after; panel still open | PASS |
+

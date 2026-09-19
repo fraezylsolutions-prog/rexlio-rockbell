@@ -1555,6 +1555,7 @@ a.ir_rail_search:active{transform:translateY(1px)}
 #ir_action_sheet .ir-as-btn i{width:26px; text-align:center; font-size:18px; color:var(--rx-accent)}
 #ir_action_sheet .ir-as-btn small{display:block; font:500 12px/1.2 system-ui,sans-serif; color:var(--rx-muted); margin-top:3px}
 #ir_action_sheet .ir-as-btn.ir-as-primary{background:var(--rx-accent); border-color:var(--rx-accent); color:#fff}
+#ir_action_sheet .ir-as-btn.ir-as-wide{grid-column:1 / -1}
 #ir_action_sheet .ir-as-btn.ir-as-primary i, #ir_action_sheet .ir-as-btn.ir-as-primary small{color:#fff; opacity:.9}
 #ir_action_sheet .ir-as-btn.ir-as-danger{border-color:rgba(239,68,68,.45)}
 #ir_action_sheet .ir-as-btn.ir-as-danger i{color:var(--rx-bad)}

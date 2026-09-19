@@ -2249,3 +2249,5 @@ $lang['hk_change']='Change';
 $lang['hk_rows']='rows';
 /* P1 (2026-09-19): the tables panel clears the cart on open */
 $lang['ir_msg_cart_cleared']='Cart cleared - choose a table to start again';
+/* P3 (2026-09-19): Order Details on the table card sheet */
+$lang['ir_as_hint_details']='items, quantities and prices - read only';

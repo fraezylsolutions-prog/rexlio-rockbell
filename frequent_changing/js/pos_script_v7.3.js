@@ -2506,6 +2506,13 @@
       }
       function irOpenTablesPanel(){
           if(!irTpOn()){ return; }
+          /* P1: opening the panel ALWAYS starts from an empty cart (business rule, 2026-09-19): items
+             and any order-being-modified are discarded here, before a table or order can be chosen,
+             so nothing can be carried onto another table. A toast says so when something was lost. */
+          if(typeof irClearCart === "function"){
+              let discarded = irClearCart();
+              if(discarded > 0){ toastr.info(irTpMsg("ir_msg_cart_cleared", "Cart cleared - choose a table to start again"), ""); }
+          }
           $("#ir_tables_panel").prop("hidden", false);
           irTpRefresh();
           if(ir_tp_timer){ clearInterval(ir_tp_timer); }
@@ -6634,6 +6641,44 @@
                 return false;
             }
         });
+      /* P1 (2026-09-19): THE cart reset. Until now the only place the cart was ever emptied was the
+         body of the Cancel button below, so nothing else could reuse it - in particular the tables
+         panel, which let a cart (and the hidden .modification marker of an order being modified)
+         survive a switch to another table: "Update Order" would then move sale A onto table B, or a
+         half-built cart for A would land on B. This does everything Cancel did, plus it forgets the
+         chosen table, the order being modified and the header tooltip, so the POS is back to "New".
+         Returns the number of item rows it discarded. */
+      window.irClearCart = function () {
+          let discarded = $(".order_holder .single_order").length;
+          $(".order_table_holder .order_holder").empty();
+          clearFooterCartCalculation();
+          $("#table_button").attr("disabled", false);
+          $(".single_table_div[data-table-checked=checked]").attr("data-table-checked", "unchecked");
+          let cid = $("#default_customer_hidden").val();
+          let wid = $("#default_waiter_hidden").val();
+          $("#walk_in_customer").val(cid).trigger("change");
+          $("#walk_in_customer1").val(cid).trigger("change");
+          if (wid) {
+            if (waiter_app_status != "Yes") {
+              $("#select_waiter").val(wid).trigger("change");
+              $("#select_waiter1").val(wid).trigger("change");
+            }
+          } else {
+            if (waiter_app_status != "Yes") {
+              $("#select_waiter").val("").trigger("change");
+              $("#select_waiter1").val("").trigger("change");
+            }
+          }
+          //no table, no order being modified: the next Place Order is a NEW order
+          $("#table_id").val(""); $("#hidden_table_name").val(""); $("#hidden_table_capacity").val("");
+          $("#update_table_obj").html(""); $("#update_sale_id").val(""); $("#sale_no_new_hidden").val("");
+          $("#order_number_or_new_text").html("New");
+          $(".holder .order_details > .single_order").attr("data-selected", "unselected");
+          if ($("#ir_tables_open").length) { $("#ir_tables_open").attr("data-tippy-content", $("#ir_lang_table_status").val() || "Tables"); }
+          focusSearch();
+          $("#place_edit_order").html(place_order);
+          return discarded;
+      };
       $(document).on("click", "#cancel_button", function (e) {
         //get total items in cart
         let total_items_in_cart = $(".order_holder .single_order").length;
@@ -6646,34 +6691,7 @@
               confirmButtonText: ok,
               showCancelButton: true,
             },
-            function () {
-              $(".order_table_holder .order_holder").empty();
-              clearFooterCartCalculation();
-              $("#table_button").attr("disabled", false);
-              $(".single_table_div[data-table-checked=checked]").attr(
-                "data-table-checked",
-                "unchecked"
-              );
-              let cid = $("#default_customer_hidden").val();
-              let wid = $("#default_waiter_hidden").val();
-              $("#walk_in_customer").val(cid).trigger("change");
-              $("#walk_in_customer1").val(cid).trigger("change");
-              if (wid) {
-                if (waiter_app_status != "Yes") {
-                  $("#select_waiter").val(wid).trigger("change");
-                  $("#select_waiter1").val(wid).trigger("change");
-                }
-              } else {
-                if (waiter_app_status != "Yes") {
-                  $("#select_waiter").val("").trigger("change");
-                  $("#select_waiter1").val("").trigger("change");
-                }
-              }
-  
-                //focus search field
-                focusSearch();
-              $("#place_edit_order").html(place_order);
-            }
+            function () { irClearCart(); }
           );
         }
       });

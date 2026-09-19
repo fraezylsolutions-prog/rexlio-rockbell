@@ -428,3 +428,21 @@ Permissions are snapshotted at login: **sign out and in** on every account first
    says "your role cannot act on it"; grant the permission on the role screen, sign out/in →
    six actions appear.
 6. **Customer self-order / online-order session** — no panel, no chair icon.
+
+### P1 — the panel always starts from an empty cart (2026-09-19). Local only; not on live.
+**Bug (data integrity):** the cart survived a table switch. The only cart reset in the POS was the body
+of the footer *Cancel* button; the tables panel never touched the cart, so a cart built for table A - or
+an order loaded with *Modify* (which leaves a hidden `.modification` marker, `update_sale_id` and the
+*Update Order* label behind) - was still there after tapping table B. *Update Order* would then move
+sale A onto table B; a fresh cart would be placed on the wrong table.
+**Fix:** one `irClearCart()` (the Cancel body, plus: forget the chosen table, the order being modified,
+the header tooltip; returns the rows discarded). Cancel keeps its confirm and calls it. **Every entry into
+the panel** (`irOpenTablesPanel`: header chair icon, all Tables buttons, auto-open after placing, deep
+links) calls it first, no exceptions; a toast says *Cart cleared - choose a table to start again* when
+rows were discarded. Business rule: opening the panel just to look also discards an unfinished cart.
+
+| Test | Result |
+|---|---|
+| Real browser on rexlio_scratch (cashier, real menu items, real panel data): **reproduction** - 2 items on Table 2 + the Modify state of sale S5D260915-004; with the hook disabled, opening the panel and tapping Table 8 left cart 2 / 50 000, marker, *Update Order*, table 8 (the corruption); with the hook, opening the panel emptied everything (cart 0, no marker, *Place Order*, no table) and the toast showed; tapping a table afterwards set only the table. Rail *Tables* button clears too; footer Cancel still confirms then clears; opening with an empty cart shows no toast | PASS |
+| Regression: 5a 55, 5b 22, 5c 28, deep link 16, Part B 18 + 21, menu/POS 6 | green |
+

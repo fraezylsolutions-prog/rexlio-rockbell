@@ -317,6 +317,9 @@ foreach ($waiters as $waiter){
 <input type="hidden" id="sale_no_new_hidden" value="">
 <input type="hidden" id="random_code_hidden" value="">
 <input type="hidden" id="update_sale_id" value="">
+<?php /* P1: the tables panel resets the cart on every open; the toast text and the header tooltip's default label */ ?>
+<input type="hidden" id="ir_msg_cart_cleared" value="<?php echo lang('ir_msg_cart_cleared'); ?>">
+<input type="hidden" id="ir_lang_table_status" value="<?php echo lang('table_status'); ?>">
 <div class="total_split_sale ir_display_none"></div>
 <input type="hidden" id="outlet_tax_registration_no" value="<?php echo escape_output($this->session->userdata('tax_registration_no')); ?>">
 <input type="hidden" id="token_no" value="">

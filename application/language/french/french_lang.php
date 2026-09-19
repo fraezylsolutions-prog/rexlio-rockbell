@@ -2245,3 +2245,5 @@ $lang['hk_ooo_note']='A spell starts when a room is set out of order and ends wh
 $lang['hk_kind']='Kind';
 $lang['hk_change']='Change';
 $lang['hk_rows']='rows';
+/* P1 (2026-09-19): the tables panel clears the cart on open */
+$lang['ir_msg_cart_cleared']='Cart cleared - choose a table to start again';

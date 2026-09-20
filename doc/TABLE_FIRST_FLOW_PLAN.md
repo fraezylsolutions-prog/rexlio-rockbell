@@ -483,3 +483,27 @@ included. pos_script 5.8, theme css 7.9.3, hidden inputs `pos_26` + `ir_msg_item
 | Real browser, **Manager** (`pos_26`): same order → rows `ir_placed` only, pencil and × visible, no lock; decrease on a placed row goes through the vendor reason prompt (2 → 1, total 22 000); edit handler passes the guard | PASS |
 | HTTP/static suite (12): migration re-run PASS, grant list exactly Admin + Manager, `pos_26` hidden input empty for the cashier and `1` for the manager, guards present in all three handlers, css | PASS |
 | Regression: 5a 55, 5b 22, 5c 28, deep link 16, Part B 18 + 21, menu/POS 6 | green |
+
+### P4 — waiter auto-logout after order placement becomes a switch (2026-09-20). Local only; not on live.
+**Gap confirmed:** the feature's offline safety covers the *moment of placing* (never fires for an offline
+save; re-checks the server before leaving). It cannot cover the connection dropping *after* the logout and
+*before* the waiter signs back in — login is server-only, so the waiter is stuck out until the network
+returns. No timing check closes that; the feature has to be switchable.
+**Where:** Settings › **Modules**, a new **POS behaviour** group under the add-ons — chosen over a field on
+the vendor's Settings form because it already gives exactly what is needed: one business-wide row,
+Admin-gated (`modules › update`), audit-logged, read per request (no re-login), no schema change (one
+`tbl_modules` row), trivial rollback. A `tbl_companies` column would have needed an ALTER, the vendor's
+big form, and a login snapshot — the wrong shape for "turn it off now, the network is bad".
+**Mechanics:** registry entry `waiter_auto_logout` (`kind: switch`, `default: 1`, no tables);
+`irModuleEnabled()` answers the registry default while the row is missing (add-ons have none, so they still
+fail closed); the POS hidden input becomes `role AND switch`. **`irWaiterAutoLogout()` in pos_script is
+byte-identical** — with the switch OFF the flag is 0 and the function returns on its first line, before any
+connectivity check; with it ON every existing guard runs as before. Migration
+`2026-09-20_01_waiter-auto-logout-switch.sql` inserts the row ON. Applies the next time the sale screen opens.
+
+| Test | Result |
+|---|---|
+| HTTP suite (21) on rexlio_scratch: migration PASS / re-run PASS; Modules screen groups Add-ons then POS behaviour, switch ON with *Switch off*; cashier refused; waiter POS flag 1 / cashier 0 while ON; toggle OFF → row 0, updated_by, audit row, OFF badge, waiter flag 0, cashier 0, hotel untouched; back ON → flag 1; **row deleted** → waiter flag 1 (default ON), screen shows ON + "on by default until installed" naming the migration, no button, toggle refused | PASS |
+| JS (6) running the real `irWaiterAutoLogout` text with stubs: flag 0 online/offline → no connectivity check, no timer, no request, no navigation; flag 1 offline → stopped by the polled flag; flag 1 online + server answers → toast, 3 s, live re-check, navigate; flag 1 online + server gone → stays with the warning; function identical to HEAD | PASS |
+| Real browser (Admin): screen as above; *Switch off* click → row OFF, "Module updated", *Switch On*; waiter's POS page carries `ir_waiter_auto_logout` 0 while OFF and 1 after switching back | PASS |
+| Regression: 5a 55, 5b 22, 5c 28, deep link 16, Part B 18 + 21, menu/POS 6, P2 12; hotel h0 16, h1 35, h2 47, h3 60, h4 33 (two assertions scoped to the hotel row now that the screen lists two rows), h5 35, h6 20, h7 18, h8 13, h9 15, h10 20, h11 16 | green |

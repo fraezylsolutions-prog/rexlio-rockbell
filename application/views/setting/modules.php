@@ -29,17 +29,26 @@
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($registry as $key => $meta):
+                <?php $group = ''; foreach ($registry as $key => $meta):
                     $row = isset($rows[$key]) ? $rows[$key] : NULL;
-                    $on = $row && (int) $row->is_enabled === 1;
-                    $missing = $row ? irModuleSchemaMissing($key) : array(); ?>
+                    $kind = isset($meta['kind']) ? $meta['kind'] : 'addon';
+                    $default_on = isset($meta['default']) && (int) $meta['default'] === 1;
+                    $on = $row ? (int) $row->is_enabled === 1 : $default_on;
+                    $missing = $row ? irModuleSchemaMissing($key) : array();
+                    /* P4: add-ons first, then the behaviour switches, each under a heading */
+                    if ($kind !== $group): $group = $kind; ?>
+                    <tr class="ir_module_group"><td colspan="4" class="text-muted" style="font-size:12.5px; text-transform:uppercase; letter-spacing:.04em"><?php echo lang($kind === 'switch' ? 'modules_group_switches' : 'modules_group_addons'); ?></td></tr>
+                    <?php endif; ?>
                     <tr data-module="<?php echo escape_output($key); ?>">
                         <td>
                             <b><?php echo lang($meta['label']); ?></b>
                             <div class="text-muted" style="font-size:12.5px"><?php echo lang($meta['desc']); ?></div>
                         </td>
                         <td>
-                            <?php if (!$row): ?>
+                            <?php if (!$row && $default_on): ?>
+                                <span class="badge bg-success ir_module_state"><?php echo lang('module_on'); ?></span>
+                                <div class="text-muted" style="font-size:12px"><?php echo lang('module_default_until_installed'); ?> <code><?php echo escape_output($meta['migration']); ?></code></div>
+                            <?php elseif (!$row): ?>
                                 <span class="badge bg-secondary"><?php echo lang('module_not_installed'); ?></span>
                             <?php elseif ($missing && !$on): ?>
                                 <span class="badge bg-warning text-dark ir_module_schema"><?php echo lang('module_schema_missing_badge'); ?></span>

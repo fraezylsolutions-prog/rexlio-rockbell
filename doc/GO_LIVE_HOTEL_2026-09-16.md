@@ -1,7 +1,7 @@
 # Go-live runbook — Hotel Operations add-on (and everything committed since the last deploy)
 
 Prepared 2026-09-16 for the owner to run. Claude runs nothing against live (see `DEPLOYMENT.md`).
-Local HEAD at preparation: `342837a0` (H11 plus the POS fixes P1/P3/P2 of 2026-09-19; 12 migrations). Replace `<user>`, `<livedb>`, `<cpaneluser>` with the live values.
+Local HEAD at preparation: `342837a0` (H11 plus the POS fixes P1/P3/P2 of 2026-09-19 and the waiter auto-logout switch of 2026-09-20; 13 migrations). Replace `<user>`, `<livedb>`, `<cpaneluser>` with the live values.
 
 Order, as always: **backup → preflight → migrations (each prints PASS) → code → switch on → smoke test.**
 
@@ -45,6 +45,8 @@ with the old code; nothing else has changed yet.
     mysql -u <user> -p <livedb> < db/migrations/2026-09-17_02_hotel-reports-permission.sql
     # POS: placed items locked on Modify without pos_26 (added 2026-09-19)
     mysql -u <user> -p <livedb> < db/migrations/2026-09-19_01_pos-edit-placed-items.sql
+    # POS: waiter auto-logout becomes a Settings > Modules switch, default ON (added 2026-09-20)
+    mysql -u <user> -p <livedb> < db/migrations/2026-09-20_01_waiter-auto-logout-switch.sql
 
     # confirm: every row APPLIED
     mysql -u <user> -p <livedb> < db/migrations/preflight_status.sql

@@ -5118,6 +5118,16 @@ if (!function_exists('irModuleRegistry')) {
                 'migration' => 'db/migrations/2026-09-16_02_hotel-schema.sql',
                 'tables' => array('tbl_hotel_room_types', 'tbl_hotel_rooms', 'tbl_hotel_room_status_log', 'tbl_hotel_housekeeping_tasks', 'tbl_hotel_stays'),
             ),
+            /* P4 (2026-09-20): not an add-on but a behaviour switch, kept here because it needs exactly
+               what the add-ons need - business-wide, Admin-gated, audited, read per request. 'default'
+               is the answer while its tbl_modules row does not exist yet, so deploying the code before
+               the migration changes nothing (add-ons have no default: they stay off until installed). */
+            'waiter_auto_logout' => array(
+                'label' => 'module_waiter_auto_logout', 'desc' => 'module_waiter_auto_logout_desc',
+                'kind' => 'switch', 'default' => 1,
+                'migration' => 'db/migrations/2026-09-20_01_waiter-auto-logout-switch.sql',
+                'tables' => array(),
+            ),
         );
     }
 }
@@ -5148,7 +5158,12 @@ if (!function_exists('irModuleEnabled')) {
      */
     function irModuleEnabled($key) {
         $rows = irModuleRows();
-        return isset($rows[$key]) && (int) $rows[$key]->is_enabled === 1;
+        if (!isset($rows[$key])) {
+            //P4: a switch with a registry default answers that until its row is installed
+            $reg = irModuleRegistry();
+            return isset($reg[$key]['default']) && (int) $reg[$key]['default'] === 1;
+        }
+        return (int) $rows[$key]->is_enabled === 1;
     }
 }
 if (!function_exists('irModuleSchemaMissing')) {

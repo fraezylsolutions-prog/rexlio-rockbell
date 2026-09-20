@@ -34,6 +34,25 @@ The screen can also say:
   names): the module row exists but its tables do not. *Switch on* is withheld until the migration has
   been run, so a half-applied install cannot be switched on and fail on first use.
 
+### The same screen also holds the POS behaviour switches
+
+Below the add-ons, under **POS behaviour**, sits **Automatic waiter logout after order placement**
+(added 2026-09-20). It is not a module — it is a business-wide on/off for an existing POS behaviour,
+kept on this screen because it needs exactly what the add-ons need: one decision for the whole venue,
+Admin-gated, audited, live on the next page load.
+
+- **ON (the default, today's behaviour):** a waiter is signed out a few seconds after placing an order.
+  All the offline safety stays: it never fires when the order was saved offline, and it re-checks the
+  server before leaving, so a drop in those few seconds keeps the waiter on the POS.
+- **OFF:** placing an order never signs anyone out, whatever the connection is doing. Use it on an
+  unreliable network: what the safety checks cannot cover is the connection dropping *after* the
+  logout and *before* the waiter signs back in — login is server-only, so they would be stuck out
+  until the connection returns.
+- A flip applies the next time the sale screen is opened (a waiter already on it keeps the previous
+  behaviour until they reload or sign in again — with ON that is after their next order anyway).
+- Until migration `2026-09-20_01_waiter-auto-logout-switch.sql` has been applied the screen shows it
+  **ON** with *on by default until its row is installed* and no button; the code behaves as ON.
+
 ## 3. Who sees what — permissions
 
 The add-on registers three permission groups. Grant them per role under Settings › Roles (a user picks

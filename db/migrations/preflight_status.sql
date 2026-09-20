@@ -3,7 +3,7 @@
 --
 -- Run against live before a deploy:
 --     mysql -u <user> -p <livedb> < db/migrations/preflight_status.sql
--- Prints one row per migration: APPLIED or MISSING (12 migrations as of 2026-09-19). Apply the MISSING ones in
+-- Prints one row per migration: APPLIED or MISSING (13 migrations as of 2026-09-20). Apply the MISSING ones in
 -- the listed order, each with its own script (each prints PASS at the end).
 -- Nothing here writes. Every check uses information_schema or tables that
 -- exist in every install (tbl_access, tbl_roles, tbl_role_access, tbl_food_menus).
@@ -69,4 +69,8 @@ SELECT '2026-09-17_02_hotel-reports-permission', CASE WHEN
 UNION ALL
 SELECT '2026-09-19_01_pos-edit-placed-items', CASE WHEN
     (SELECT COUNT(*) FROM tbl_access WHERE parent_id=73 AND function_name='pos_26') = 1
+  THEN 'APPLIED' ELSE 'MISSING' END
+UNION ALL
+SELECT '2026-09-20_01_waiter-auto-logout-switch', CASE WHEN
+    (SELECT COUNT(*) FROM tbl_modules WHERE module_key='waiter_auto_logout') = 1
   THEN 'APPLIED' ELSE 'MISSING' END;

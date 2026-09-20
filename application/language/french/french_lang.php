@@ -2024,7 +2024,7 @@ $lang['ir_tp_switch_outlet'] = 'Switch to';
 $lang['ir_search']='Rechercher';
 /* Hotel Operations add-on - H0: module switches */
 $lang['modules']='Modules';
-$lang['modules_desc']='Switch add-on features on or off for the whole business. A change applies on the next page load - no sign-out needed.';
+$lang['modules_desc']='Switch add-on features and POS behaviour on or off for the whole business. A change applies on the next page load - no sign-out needed.';
 $lang['module']='Module';
 $lang['module_hotel']='Hotel Operations';
 $lang['module_hotel_desc']='Rooms, Front Desk (check-in / check-out log) and the Housekeeping board.';
@@ -2252,3 +2252,9 @@ $lang['ir_as_hint_details']='items, quantities and prices - read only';
 /* P2 (2026-09-19): placed items locked on Modify without pos_26 */
 $lang['ir_msg_item_locked']='Already placed - this item cannot be changed here. You can add more of it; ask a manager to change or remove it.';
 $lang['txt_pos_26']='Edit placed items when modifying an order';
+/* P4 (2026-09-20): waiter auto-logout as a Settings > Modules switch */
+$lang['modules_group_addons']='Add-ons';
+$lang['modules_group_switches']='POS behaviour';
+$lang['module_waiter_auto_logout']='Automatic waiter logout after order placement';
+$lang['module_waiter_auto_logout_desc']='ON: a waiter is signed out a few seconds after placing an order (never while offline). OFF: placing an order never signs anyone out - use this on an unreliable connection, where a waiter signed out by the feature could be unable to sign back in until the connection returns. Applies the next time the sale screen is opened.';
+$lang['module_default_until_installed']='On by default until its row is installed - apply';

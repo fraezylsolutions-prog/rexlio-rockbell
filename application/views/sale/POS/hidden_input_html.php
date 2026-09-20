@@ -245,8 +245,10 @@ foreach ($waiters as $waiter){
          (irIsWaiterForAutoLogout) rather than in JS, so the decision is made
          once, server-side, against authoritative data - designation plus a
          role_id -> role_name lookup. See the helper for why session 'role' and
-         'is_waiter' are both unusable here. */ ?>
-<input type="hidden" id="ir_waiter_auto_logout" value="<?php echo irIsWaiterForAutoLogout() ? '1' : '0'; ?>">
+         'is_waiter' are both unusable here.
+         P4 (2026-09-20): AND the business-wide switch (Settings > Modules, default ON). Read here,
+         at page load, so a flip applies the next time the sale screen opens. */ ?>
+<input type="hidden" id="ir_waiter_auto_logout" value="<?php echo (irIsWaiterForAutoLogout() && irModuleEnabled('waiter_auto_logout')) ? '1' : '0'; ?>">
 <input type="hidden" id="ir_order_placed_msg" value="<?php echo lang('order_placed_logging_out'); ?>">
 <input type="hidden" id="ir_logout_url" value="<?php echo base_url(); ?>authentication/logout">
 <input type="hidden" id="ir_offline_stay_msg" value="<?php echo lang('offline_stay_signed_in'); ?>">

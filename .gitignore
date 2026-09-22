@@ -65,3 +65,7 @@ Thumbs.db
 
 # deploy-generated build stamp (written by .cpanel.yml on live)
 /build.txt
+
+# hybrid sync: local settings, key, logs (never in git)
+/tools/sync_config.php
+/tools/sync_logs/

@@ -14,7 +14,7 @@ return array(
         'host'      => 'rockbell.fraezyl.app',      // the cPanel host name (or its IP)
         'port'      => 22,                          // cPanel usually 22; some hosts use 2222
         'user'      => 'rockbell1',                 // the cPanel user name (cPanel home > General Information > Current User)
-        'key'       => 'C:/rexlio_sync/id_rsa',     // the PRIVATE key file downloaded from cPanel > SSH Access (never share it)
+        'key'       => 'C:/rexlio_sync/id_rsa_pem', // the PRIVATE key file made on this PC in PEM format (never share it)
         'remote_dir'=> '~/rexlio_sync',             // a folder in the cPanel home, OUTSIDE the website folder
         'online_db' => 'rockbell1_rexlio',          // the online database name (cPanel > MySQL Databases)
     ),

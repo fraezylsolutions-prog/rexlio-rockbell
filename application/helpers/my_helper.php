@@ -4909,6 +4909,44 @@ if (!function_exists('isSalesEnabledOutlet')) {
     }
 }
 
+if (!function_exists('irResolveCounterId')) {
+    /**
+     * The counter a completed sale is recorded against, for sessions that have none.
+     *
+     * counter_id only ever enters a session when a register is OPENED (Register.php)
+     * or restored for the register's owner (Common_model::isOpenRegister). A Waiter
+     * never opens a register - they trade while any register at the outlet is open -
+     * so their session carries no counter_id at all. Sale::push_online wrote that
+     * NULL straight into tbl_sale_payments.counter_id (NOT NULL): the insert threw,
+     * the transaction rolled back, the browser got a 500 it never showed, and the
+     * sale stayed queued on the device while the receipt had already printed
+     * (P5, 2026-09-22 - reproduced on rexlio_scratch as a Waiter).
+     *
+     * Resolution order: the session's counter -> the counter the order was placed
+     * on (payload) -> the outlet's currently open register (the one the Waiter is
+     * trading under; lowest id if several) -> 0, the column's own default. Never
+     * NULL, never ''.
+     *
+     * @param mixed $payload_counter_id counter_id carried by the order payload
+     * @return int
+     */
+    function irResolveCounterId($payload_counter_id = '') {
+        $CI = &get_instance();
+        $session = (int) $CI->session->userdata('counter_id');
+        if ($session > 0) { return $session; }
+        $payload = (int) $payload_counter_id;
+        if ($payload > 0) { return $payload; }
+        $outlet_id = (int) $CI->session->userdata('outlet_id');
+        if ($outlet_id > 0) {
+            $CI->db->reset_query();
+            $row = $CI->db->select('counter_id')->from('tbl_register')
+                          ->where('outlet_id', $outlet_id)->where('register_status', 1)
+                          ->order_by('id', 'ASC')->limit(1)->get()->row();
+            if (isset($row->counter_id) && (int) $row->counter_id > 0) { return (int) $row->counter_id; }
+        }
+        return 0;
+    }
+}
 if (!function_exists('irIsWaiterForAutoLogout')) {
     /**
      * Is the signed-in user a Waiter, for the auto-logout-after-order feature?

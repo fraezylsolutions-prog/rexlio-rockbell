@@ -2076,7 +2076,9 @@ class Sale extends Cl_Controller {
         $data = array();
         $data['split_sale_id'] = $sale_id_old_sale_id;
         $data['customer_id'] = trim_checker($order_details->customer_id);
-        $data['counter_id'] = trim_checker($order_details->counter_id);
+        //P5 (2026-09-22): resolved, never NULL/'' - a Waiter session carries no counter (irResolveCounterId)
+        $ir_counter_id = irResolveCounterId(isset($order_details->counter_id) ? $order_details->counter_id : '');
+        $data['counter_id'] = $ir_counter_id;
         $data['delivery_partner_id'] = trim_checker($order_details->delivery_partner_id);
         $data['rounding_amount_hidden'] = trim_checker($order_details->rounding_amount_hidden);
         $data['previous_due_tmp'] = trim_checker($order_details->previous_due_tmp);
@@ -2368,7 +2370,9 @@ class Sale extends Cl_Controller {
         $data = array();
         $data['self_order_content'] = $this->input->post('orders');
         $data['customer_id'] = trim_checker($order_details->customer_id);
-        $data['counter_id'] = trim_checker($order_details->counter_id);
+        //P5 (2026-09-22): resolved, never NULL/'' - a Waiter session carries no counter (irResolveCounterId)
+        $ir_counter_id = irResolveCounterId(isset($order_details->counter_id) ? $order_details->counter_id : '');
+        $data['counter_id'] = $ir_counter_id;
         $data['delivery_partner_id'] = trim_checker($order_details->delivery_partner_id);
         $data['total_items'] = trim_checker($order_details->total_items_in_cart);
         $data['sub_total'] = trim_checker($order_details->sub_total);
@@ -2671,7 +2675,7 @@ class Sale extends Cl_Controller {
                     $data['currency_type'] = $currency_type;
                     $data['date_time'] = date('Y-m-d H:i:s',strtotime($order_details->date_time));
                     $data['sale_id'] = $sales_id;
-                    $data['counter_id'] = $this->session->userdata('counter_id');
+                    $data['counter_id'] = $ir_counter_id;   //P5
                     $data['user_id'] = $this->session->userdata('user_id');
                     $data['outlet_id'] = $this->session->userdata('outlet_id');
                     $this->Common_model->insertInformation($data, "tbl_sale_payments");
@@ -2692,7 +2696,7 @@ class Sale extends Cl_Controller {
                         $data['amount'] = $value->amount;
                         $data['date_time'] = date('Y-m-d H:i:s',strtotime($order_details->date_time));
                         $data['sale_id'] = $sales_id;
-                        $data['counter_id'] = $this->session->userdata('counter_id');
+                        $data['counter_id'] = $ir_counter_id;   //P5
                         $data['user_id'] = $this->session->userdata('user_id');
                         $data['outlet_id'] = $this->session->userdata('outlet_id');
                         $this->Common_model->insertInformation($data, "tbl_sale_payments");
@@ -3485,7 +3489,7 @@ We hope to see you again!";
                 $data['currency_type'] = $currency_type;
                 $data['date_time'] = $sale->date_time;
                 $data['sale_id'] = $sale->id;
-                $data['counter_id'] = $this->session->userdata('counter_id');
+                $data['counter_id'] = irResolveCounterId(isset($sale->counter_id) ? $sale->counter_id : '');   //P5
                 $data['user_id'] = $this->session->userdata('user_id');
                 $data['outlet_id'] = $this->session->userdata('outlet_id');
                 $this->Common_model->insertInformation($data, "tbl_sale_payments");
@@ -3505,7 +3509,7 @@ We hope to see you again!";
                     $data['amount'] = $value->amount;
                     $data['date_time'] = $sale->date_time;
                     $data['sale_id'] = $sale->id;
-                    $data['counter_id'] = $this->session->userdata('counter_id');
+                    $data['counter_id'] = irResolveCounterId(isset($sale->counter_id) ? $sale->counter_id : '');   //P5
                     $data['user_id'] = $this->session->userdata('user_id');
                     $data['outlet_id'] = $this->session->userdata('outlet_id');
                     $this->Common_model->insertInformation($data, "tbl_sale_payments");

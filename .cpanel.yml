@@ -17,13 +17,19 @@ deployment:
     - export DEPLOYPATH=/home/citytjgo/rockbell.fraezyl.app/
     - /bin/mkdir -p "$DEPLOYPATH"
     # Never copy: .git (source exposure), the local test harness (auth bypass),
-    # live's own DB credentials, user uploads, or runtime dirs.
+    # live's own DB credentials, user uploads, runtime dirs, or the installer's
+    # per-site activation files. assets/blueimp/REST_API*.json record the
+    # installation_url (ROT13) of the machine that ran /install - copying this
+    # machine's copies told live it was installed at http://localhost/rexlio/,
+    # which is why every manual update needed /install re-run afterwards
+    # (confirmed 2026-09-22).
     - >
       /usr/bin/rsync -a
       --exclude '.git'
       --exclude '.gitignore'
       --exclude 'pw.php'
       --exclude 'application/config/database.php'
+      --exclude 'assets/blueimp/REST_API*.json'
       --exclude 'application/config/testing/'
       --exclude 'images/'
       --exclude 'uploads/'

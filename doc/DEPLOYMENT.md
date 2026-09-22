@@ -50,8 +50,19 @@ installation, which is precisely what makes it so expensive to diagnose.
 `/install` fixed it. That is the operative fact and the reason for this
 procedure.
 
-**Reported during that work, and worth recording even though it is not fully
-pinned down:** the generated state was identified as files under
+**CONFIRMED 2026-09-22 (supersedes the caveat below).** The generated state is
+`assets/blueimp/REST_API*.json`. `REST_API_I.json` holds `username`,
+`purchase_code` and `installation_url`, all ROT13-encoded; the installation_url
+is the address of whichever machine ran `/install`. The folder is spelled
+**blueimp**, not bluezimp, which is why the earlier code search found nothing.
+Deploying this machine's copies set live's installation_url to
+`http://localhost/rexlio/`, and the application then refuses to run until
+`/install` rewrites them - exactly the "every manual update needs /install"
+behaviour seen on this project. The three JSON files are now git-ignored and
+excluded in `.cpanel.yml`, so a deploy never touches them and no re-install is
+needed. `assets/blueimp/index.php` and `index.html` (the 403 stubs) stay tracked.
+
+**Originally reported, before it was pinned down:** the generated state was identified as files under
 `assets/bluezimp/`. Two caveats on that specific, so nobody over-trusts it
 later — `assets/bluezimp/` does not exist in the local working tree and is not
 tracked in git (consistent with it being generated rather than shipped), but a

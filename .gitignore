@@ -69,3 +69,9 @@ Thumbs.db
 # hybrid sync: local settings, key, logs (never in git)
 /tools/sync_config.php
 /tools/sync_logs/
+
+# per-installation activation state written by the vendor installer (holds the
+# installation_url of whichever machine ran /install) - never shared between sites
+/assets/blueimp/REST_API.json
+/assets/blueimp/REST_API_I.json
+/assets/blueimp/REST_API_UV.json

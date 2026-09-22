@@ -1974,7 +1974,11 @@ class Sale extends Cl_Controller {
         $order_info['outlet_id'] = $this->session->userdata('outlet_id');
 
         if(isset($sale_d) && $sale_d){
-            $order_info['persons'] = ($sale_d->persons + $persons);
+            //The seat count arrives as text and is '' when nobody typed one. PHP 8
+            //refuses to add two such strings ("Unsupported operand types: string +
+            //string"), so the request died with a 500 and the table content was never
+            //stored - seen in the local log on 2026-09-22. Added as numbers instead.
+            $order_info['persons'] = ((int) $sale_d->persons + (int) $persons);
             $this->db->where('id', $sale_d->id);
             $this->db->update("tbl_running_order_tables", $order_info);
         }else{

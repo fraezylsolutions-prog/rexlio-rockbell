@@ -37,3 +37,8 @@ deployment:
     # Directories the app writes to at runtime must exist and be writable.
     - /bin/mkdir -p "$DEPLOYPATH"images "$DEPLOYPATH"uploads/category "$DEPLOYPATH"application/logs "$DEPLOYPATH"application/cache
     - /bin/chmod -R 755 "$DEPLOYPATH"images "$DEPLOYPATH"uploads "$DEPLOYPATH"application/logs "$DEPLOYPATH"application/cache
+    # Build stamp: which commit live is running, readable at https://<site>/build.txt.
+    # Used by people checking a deploy and by the hybrid sync tool (it refuses to
+    # push data into an online copy running a different version than the local one).
+    - /usr/bin/git rev-parse --short HEAD > "$DEPLOYPATH"build.txt
+    - /bin/date -u +"deployed %Y-%m-%d %H:%M UTC" >> "$DEPLOYPATH"build.txt

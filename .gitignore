@@ -62,3 +62,6 @@ Thumbs.db
 [Dd]esktop.ini
 .DS_Store
 *.sql.gz
+
+# deploy-generated build stamp (written by .cpanel.yml on live)
+/build.txt

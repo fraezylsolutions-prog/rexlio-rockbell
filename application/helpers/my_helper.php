@@ -5298,3 +5298,60 @@ if (!function_exists('irHousekeepingLanding')) {
         return $id && checkAccess((string) $id, 'view');
     }
 }
+
+if (!function_exists('irInstallId')) {
+    /**
+     * This installation's own id, from tbl_sync_identity (migration 2026-09-23_01).
+     *
+     * A venue that also sells online runs two databases, and both take orders.
+     * Every row either side creates has to say which installation made it, or a
+     * sync cannot tell two genuinely different orders apart - sale numbers come
+     * from a per-installation device tag, so the same number really can appear
+     * on both sides for different orders.
+     *
+     * Returns '' on an installation that has not had the migration applied, or
+     * that does not sync at all. Nothing else changes when it is ''.
+     * Read once per request.
+     * @return string
+     */
+    function irInstallId() {
+        static $id = NULL;
+        if ($id !== NULL) { return $id; }
+        $id = '';
+        $CI = &get_instance();
+        if ($CI->db->table_exists('tbl_sync_identity')) {
+            $row = $CI->db->select('install_id')->from('tbl_sync_identity')->limit(1)->get()->row();
+            if ($row && isset($row->install_id)) { $id = (string) $row->install_id; }
+        }
+        return $id;
+    }
+}
+if (!function_exists('irStampOrigin')) {
+    /**
+     * Mark a row being created as made by THIS installation.
+     *
+     * Call it on the $data array just before inserting a sale or a running
+     * order. It adds nothing at all when the table has no origin_id column
+     * (the migration has not been applied) or when this installation has no
+     * identity, so it is safe on every existing site. It never overwrites an
+     * origin already in $data - a row arriving from the other side keeps the
+     * origin it was created with, for ever.
+     *
+     * @param array  $data  the insert payload
+     * @param string $table tbl_sales or tbl_kitchen_sales
+     * @return array the payload, stamped or untouched
+     */
+    function irStampOrigin($data, $table = 'tbl_sales') {
+        if (isset($data['origin_id']) && trim((string) $data['origin_id']) !== '') { return $data; }
+        $install = irInstallId();
+        if ($install === '') { return $data; }
+        static $has = array();
+        if (!isset($has[$table])) {
+            $CI = &get_instance();
+            $has[$table] = $CI->db->table_exists($table) && in_array('origin_id', $CI->db->list_fields($table), TRUE);
+        }
+        if (!$has[$table]) { return $data; }
+        $data['origin_id'] = $install;
+        return $data;
+    }
+}

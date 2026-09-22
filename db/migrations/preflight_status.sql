@@ -3,7 +3,7 @@
 --
 -- Run against live before a deploy:
 --     mysql -u <user> -p <livedb> < db/migrations/preflight_status.sql
--- Prints one row per migration: APPLIED or MISSING (15 migrations as of 2026-09-23). Apply the MISSING ones in
+-- Prints one row per migration: APPLIED or MISSING (16 migrations as of 2026-09-24). Apply the MISSING ones in
 -- the listed order, each with its own script (each prints PASS at the end).
 -- Nothing here writes. Every check uses information_schema or tables that
 -- exist in every install (tbl_access, tbl_roles, tbl_role_access, tbl_food_menus).
@@ -82,4 +82,9 @@ UNION ALL
 SELECT '2026-09-23_01_sync-origin', CASE WHEN
     (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tbl_sync_identity') = 1
     AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tbl_sales' AND COLUMN_NAME='origin_id') = 1
+  THEN 'APPLIED' ELSE 'MISSING' END
+UNION ALL
+SELECT '2026-09-24_01_kitchen-origin', CASE WHEN
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tbl_kitchen_sales' AND COLUMN_NAME='origin_id') = 1
+    AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tbl_kitchen_sales' AND INDEX_NAME='idx_kitchen_fingerprint') >= 1
   THEN 'APPLIED' ELSE 'MISSING' END;

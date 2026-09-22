@@ -188,6 +188,9 @@ class Waiter_app extends Cl_Controller {
             $sales_id = $sale_id;
             $sale_no = str_pad($sales_id, 6, '0', STR_PAD_LEFT);
         }else{
+            //S7: mark the installation that created this order, so the two sides of a
+            //hybrid venue can sync without either overwriting the other's rows
+            $data = irStampOrigin($data, 'tbl_sales');
             $query = $this->db->insert('tbl_sales', $data);
             $sales_id = $this->db->insert_id();
             $sale_no = str_pad($sales_id, 6, '0', STR_PAD_LEFT);

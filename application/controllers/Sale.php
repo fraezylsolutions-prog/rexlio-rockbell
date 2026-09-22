@@ -763,6 +763,9 @@ class Sale extends Cl_Controller {
         /////////////////////
         $i = 0;
         $this->db->trans_begin();
+        //S7: mark the installation that created this order, so the two sides of a
+        //hybrid venue can sync without either overwriting the other's rows
+        $data = irStampOrigin($data, 'tbl_sales');
         $query = $this->db->insert('tbl_sales', $data);
         $sales_id = $this->db->insert_id();
 
@@ -1577,6 +1580,9 @@ class Sale extends Cl_Controller {
             }else{
                 $data['user_id'] = $this->session->userdata('user_id');
                 $data['random_code'] = trim_checker(isset($order_details->random_code) && $order_details->random_code?$order_details->random_code:'');
+                //S7: mark the installation that created this order, so the two sides of a
+                //hybrid venue can sync without either overwriting the other's rows
+                $data = irStampOrigin($data, 'tbl_kitchen_sales');
                 $this->db->insert('tbl_kitchen_sales', $data);
                 $sale_id = $this->db->insert_id();
 
@@ -2125,6 +2131,9 @@ class Sale extends Cl_Controller {
         $data['price_tier'] = isset($split_sale->price_tier) && $split_sale->price_tier ? trim_checker($split_sale->price_tier) : 1;
         $this->db->trans_begin();
         $data['random_code'] = getRandomCode(15);
+        //S7: mark the installation that created this order, so the two sides of a
+        //hybrid venue can sync without either overwriting the other's rows
+        $data = irStampOrigin($data, 'tbl_sales');
         $query = $this->db->insert('tbl_sales', $data);
         $sales_id = $this->db->insert_id();
 
@@ -2466,6 +2475,9 @@ class Sale extends Cl_Controller {
                non-Cash sale ended up with both it and the real row (double counted),
                and an edited sale ended up with only it (real method destroyed). */
         }else{
+            //S7: mark the installation that created this order, so the two sides of a
+            //hybrid venue can sync without either overwriting the other's rows
+            $data = irStampOrigin($data, 'tbl_sales');
             $this->db->insert('tbl_sales', $data);
             $sales_id = $this->db->insert_id();
             $sale_no_update_array = array('sale_no' => $sale_no);

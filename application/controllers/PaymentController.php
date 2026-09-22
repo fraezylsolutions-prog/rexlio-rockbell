@@ -127,6 +127,9 @@ class PaymentController extends Cl_Controller
         }else{
             $data['user_id'] = 0;
             $data['random_code'] = trim(isset($order_details->random_code) && $order_details->random_code?$order_details->random_code:'');
+            //S7: mark the installation that created this order, so the two sides of a
+            //hybrid venue can sync without either overwriting the other's rows
+            $data = irStampOrigin($data, 'tbl_kitchen_sales');
             $this->db->insert('tbl_kitchen_sales', $data);
             $sale_id = $this->db->insert_id();    
         }

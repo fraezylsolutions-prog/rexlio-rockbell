@@ -2262,3 +2262,5 @@ $lang['modules_group_switches']='POS behaviour';
 $lang['module_waiter_auto_logout']='Automatic waiter logout after order placement';
 $lang['module_waiter_auto_logout_desc']='ON: a waiter is signed out a few seconds after placing an order (never while offline). OFF: placing an order never signs anyone out - use this on an unreliable connection, where a waiter signed out by the feature could be unable to sign back in until the connection returns. Applies the next time the sale screen is opened.';
 $lang['module_default_until_installed']='On by default until its row is installed - apply';
+/* P5 (2026-09-22): completion push failures are shown */
+$lang['ir_msg_sale_not_uploaded']='Sale NOT uploaded to the server - it is still queued on this device and will be retried. Do not clear browser data; tell a manager.';

@@ -360,6 +360,8 @@ $self_order_table_id = $this->session->userdata('self_order_table_id');
 <?php /* P2 (2026-09-19): may this role edit / remove / reduce items that were ALREADY placed when modifying an order? Without it those rows are visible but locked. */ ?>
 <input type="hidden" id="pos_26" value="<?php echo getPOSChecker("73","pos_26"); ?>">
 <input type="hidden" id="ir_msg_item_locked" value="<?php echo lang('ir_msg_item_locked'); ?>">
+<?php /* P5 (2026-09-22): a completed sale the server refuses stays queued; the till now says so */ ?>
+<input type="hidden" id="ir_msg_sale_not_uploaded" value="<?php echo lang('ir_msg_sale_not_uploaded'); ?>">
 <input type="hidden" id="pos_8" value="<?php echo getPOSChecker("73","pos_8"); ?>">
 <input type="hidden" id="pos_9" value="<?php echo getPOSChecker("73","pos_9"); ?>">
 <input type="hidden" id="pos_10" value="<?php echo getPOSChecker("73","pos_10"); ?>">

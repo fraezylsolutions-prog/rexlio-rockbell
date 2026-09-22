@@ -1810,13 +1810,15 @@
                               irNoteCompletionConflict(sale_no);
                               return;
                           }
+                          if(!irPushAnswerOk(response)){ irNoteCompletionFailure(sale_no, "unexpected reply"); return; }   //P5
+                          irClearCompletionFailure(sale_no);   //P5
                           if(!is_offline_system){
                               notify_online(sale_no);
                           }
                           update_online_push(response);
                       },
-                      error:function(){
-
+                      error:function(xhr){
+                          irNoteCompletionFailure(sale_no, xhr && xhr.status ? "HTTP " + xhr.status : "no response");   //P5
                       }
                   });
                   cursor.continue();
@@ -1860,11 +1862,13 @@
                           csrf_name_: csrf_value_
                       },
                       success:function(response) {
+                          if(!irPushAnswerOk(response)){ irNoteCompletionFailure(sale_no, "unexpected reply"); return; }   //P5
+                          irClearCompletionFailure(sale_no);   //P5
                           notify_online(sale_no);
                           update_online_push(response);
                       },
-                      error:function(){
-
+                      error:function(xhr){
+                          irNoteCompletionFailure(sale_no, xhr && xhr.status ? "HTTP " + xhr.status : "no response");   //P5
                       }
                   });
                   cursor.continue();
@@ -2201,6 +2205,27 @@
          this number. The sale stays queued locally (money was taken - never drop
          it); tell the operator once per order so it can be sorted out. */
       var ir_completion_conflicts = {};
+      /* P5 (2026-09-22): a completed sale that the server refuses stays queued in
+         recent_sales (online_push 0) and is retried every 7 s - which is right - but
+         until now nothing on screen said so: the receipt had printed, the modal had
+         closed, and the till looked done while tbl_sales had nothing. Reproduced
+         with a Waiter (no counter in session -> 500 on every retry, forever).
+         One persistent toast per sale, cleared the moment a retry succeeds. */
+      let ir_completion_failures = {};
+      function irNoteCompletionFailure(sale_no, detail){
+          if(ir_completion_failures[sale_no]){ return; }
+          let msg = $("#ir_msg_sale_not_uploaded").val() || "Sale NOT uploaded to the server - it is still queued on this device and will be retried. Do not clear browser data; tell a manager.";
+          ir_completion_failures[sale_no] = toastr['error'](msg + " (" + sale_no + (detail ? ", " + detail : "") + ")", '', {timeOut: 0, extendedTimeOut: 0, closeButton: true, tapToDismiss: false});
+      }
+      function irClearCompletionFailure(sale_no){
+          if(ir_completion_failures[sale_no]){
+              try{ toastr.clear(ir_completion_failures[sale_no]); }catch(e){}
+              delete ir_completion_failures[sale_no];
+          }
+      }
+      /* the server answers a completion push with the local row id (digits) - anything
+         else that still came back as HTTP 200 (a login page, a PHP notice) is a failure */
+      function irPushAnswerOk(response){ return typeof response !== "undefined" && /^\d+$/.test($.trim(String(response))); }
       function irNoteCompletionConflict(sale_no){
           if(ir_completion_conflicts[sale_no]){ return; }
           ir_completion_conflicts[sale_no] = 1;

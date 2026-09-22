@@ -228,7 +228,7 @@ $config['allow_get_array'] = TRUE;
 | your log files will fill up very fast.
 |
 */
-$config['log_threshold'] = 0;
+$config['log_threshold'] = 1; // 2026-09-22: error-only logging kept ON (was 0). A silent completion failure (P5) was only diagnosable with it; application/logs/ is excluded from deploys.
 
 /*
 |--------------------------------------------------------------------------

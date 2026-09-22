@@ -13759,7 +13759,10 @@
                         method: "post",
                         dataType: "json",
                         data: {
-                            sale_id: sale_id,
+                            //P6: was sale_id - a variable that does not exist here, so this threw
+                            //ReferenceError and the rest of the finish-sale sequence never ran
+                            //(the server only uses it to tell that a sale was supplied).
+                            sale_id: sale_no,
                             data_order: order_info,
                         },
                         success: function (data) {
@@ -13804,7 +13807,10 @@
                         method: "post",
                         dataType: "json",
                         data: {
-                            sale_id: sale_id,
+                            //P6: was sale_id - a variable that does not exist here, so this threw
+                            //ReferenceError and the rest of the finish-sale sequence never ran
+                            //(the server only uses it to tell that a sale was supplied).
+                            sale_id: sale_no,
                             data_order: order_info,
                         },
                         success: function (data) {
@@ -15565,12 +15571,20 @@
           clearInterval(time2);
           clearInterval(time15);
           $("#order_" + get_plan_string(sale_no)).css("backgroundColor", "white");
-          $(".main_left").toggleClass("active");
-          $(".overlayForCalculator").fadeToggle(100);
-          if ($(this).attr("data-isActive") === "false") {
-            $(this).attr("data-isActive", "true");
-          } else {
-            $(this).attr("data-isActive", "false");
+          /* P6 (2026-09-22): this slide-out of the running-order list belongs to the
+             PHONE layout. On a till it ran anyway, about five seconds after a sale was
+             completed, dropping .overlayForCalculator over the whole page: every click
+             then landed on the overlay and the screen looked frozen until the tab was
+             closed. Reproduced on rexlio_scratch at 1366 px, where .show_running_order
+             (the phone control) is hidden and yet the overlay was shown.
+             It now runs only when that phone control is actually on screen. The old
+             code also read $(this) inside setTimeout, where it is the window, so the
+             button's own state was never updated either. */
+          if ($(".show_running_order:visible").length > 0) {
+            $(".main_left").toggleClass("active");
+            $(".overlayForCalculator").fadeToggle(100);
+            let ir_ro_btn = $(".show_running_order:visible").first();
+            ir_ro_btn.attr("data-isActive", ir_ro_btn.attr("data-isActive") === "false" ? "true" : "false");
           }
         }, 4300);
       }, 500);

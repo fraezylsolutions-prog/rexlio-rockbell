@@ -34,6 +34,11 @@ deployment:
       --exclude 'doc/'
       --exclude '_temp/'
       ./ "$DEPLOYPATH"
+    # rsync -a with a trailing slash also copies the SOURCE directory's own mode onto
+    # DEPLOYPATH. cPanel creates the repository folder 0700, which silently made the
+    # docroot unreadable to the web server: every file 404'd while the folder still
+    # listed (2026-09-22). Put the docroot back to 0755 on every deploy.
+    - /bin/chmod 755 "$DEPLOYPATH"
     # Directories the app writes to at runtime must exist and be writable.
     - /bin/mkdir -p "$DEPLOYPATH"images "$DEPLOYPATH"uploads/category "$DEPLOYPATH"application/logs "$DEPLOYPATH"application/cache
     - /bin/chmod -R 755 "$DEPLOYPATH"images "$DEPLOYPATH"uploads "$DEPLOYPATH"application/logs "$DEPLOYPATH"application/cache

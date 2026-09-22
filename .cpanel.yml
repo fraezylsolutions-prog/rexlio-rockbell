@@ -4,8 +4,8 @@
 # The repository lives OUTSIDE the docroot; these tasks copy the application
 # into it. That keeps .git unreachable from the web.
 #
-# BEFORE FIRST USE: replace <cpaneluser> and <docroot> below with the real
-# values from cPanel. DEPLOYPATH must end with a trailing slash.
+# DEPLOYPATH is set for the Rockbell host (cPanel user citytjgo). On a new host replace it with that
+# host's /home/<user>/<docroot>/ from cPanel. It must end with a trailing slash.
 #
 # Deliberately NOT using --delete. It would make the docroot an exact mirror of
 # the repo, which sounds tidy but would delete live's images/ and uploads/ the
@@ -14,7 +14,7 @@
 # those by hand when it happens.
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/<cpaneluser>/<docroot>/
+    - export DEPLOYPATH=/home/citytjgo/rockbell.fraezyl.app/
     - /bin/mkdir -p "$DEPLOYPATH"
     # Never copy: .git (source exposure), the local test harness (auth bypass),
     # live's own DB credentials, user uploads, or runtime dirs.

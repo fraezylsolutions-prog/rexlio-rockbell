@@ -2357,3 +2357,6 @@ $lang['module_waiter_auto_logout_desc']='ON: a waiter is signed out a few second
 $lang['module_default_until_installed']='On by default until its row is installed - apply';
 /* P5 (2026-09-22): completion push failures are shown */
 $lang['ir_msg_sale_not_uploaded']='Sale NOT uploaded to the server - it is still queued on this device and will be retried. Do not clear browser data; tell a manager.';
+/* P5-3 (2026-09-22): the two Quick Invoice permission rows, told apart */
+$lang['quick_invoice_button']='Quick Invoice (sale screen button)';
+$lang['quick_invoice_unused']='Quick Invoice (unused - kept for compatibility)';

@@ -507,3 +507,31 @@ connectivity check; with it ON every existing guard runs as before. Migration
 | JS (6) running the real `irWaiterAutoLogout` text with stubs: flag 0 online/offline → no connectivity check, no timer, no request, no navigation; flag 1 offline → stopped by the polled flag; flag 1 online + server answers → toast, 3 s, live re-check, navigate; flag 1 online + server gone → stays with the warning; function identical to HEAD | PASS |
 | Real browser (Admin): screen as above; *Switch off* click → row OFF, "Module updated", *Switch On*; waiter's POS page carries `ir_waiter_auto_logout` 0 while OFF and 1 after switching back | PASS |
 | Regression: 5a 55, 5b 22, 5c 28, deep link 16, Part B 18 + 21, menu/POS 6, P2 12; hotel h0 16, h1 35, h2 47, h3 60, h4 33 (two assertions scoped to the hotel row now that the screen lists two rows), h5 35, h6 20, h7 18, h8 13, h9 15, h10 20, h11 16 | green |
+
+### P5 — a Waiter's completed sale was never recorded (2026-09-22). Three commits. Local only; not on live.
+**Reported:** a Waiter holding Invoice completes an order from the table panel, the receipt prints, but the order
+stays on the panel and the sale never reaches the Dashboard. Separately, Quick Invoice / Print Invoice on the sale
+screen say "You haven't permission" for the same user.
+**Root cause 1 (revenue):** `counter_id` only enters a session when a register is opened or restored for its
+owner; Waiters never open one, so their session has none. `Sale::push_online` wrote that NULL into
+`tbl_sale_payments.counter_id` (NOT NULL) → exception → transaction rolled back → HTTP 500 every 7 s, and the
+JS error handler was empty. Reproduced in a real browser on rexlio_scratch: `push_online → 500`, `tbl_sales` 0
+rows, kitchen row still Live, `tbl_orders_table` still booked. Same payload replayed as a Cashier → 200, rows
+written. Scope: **every Waiter, every invoice path**; Cashier/Manager/Admin unaffected. Vendor code.
+**Root cause 2 (permissions):** two `tbl_access` rows both labelled `direct_invoice` — `pos_24` gates the real
+Quick Invoice button (granted to nobody), `pos_25` gates an element that does not exist (granted to all). Print
+Last Invoice is `pos_13`, not granted to Waiter. Different keys from Invoice (`pos_11`), the pos_7 pattern again.
+Not the same bug as #1; they meet only because the panel's Invoice action bypassed the `pos_11` gate entirely.
+
+| Commit | Change | Verified |
+|---|---|---|
+| `43241262` P5-1 | `irResolveCounterId()`: session → payload → the outlet's open register → 0; used at every counter_id write on the completion paths (`push_online` sales + payments, `add_sale_by_ajax_split`, `update_order_status_ajax`) | HTTP replay of the queued payload as the Waiter: 500 → **200**, sale + Cash payment recorded against counter 4; real browser: the same Waiter invoices from the panel → `push_online 200`, `tbl_sales` row (paid 20 000, status 3), kitchen row gone, Table 2 back to *Free*, no error toast |
+| `41ad0987` P5-2 | `push_online` / `push_online_sync`: one persistent error toast per sale on an HTTP error or a 200 that is not a sale id; cleared when a retry succeeds | JS suite (7) on the real function text: 500×3 → one toast, row stays queued; 500 then 200 → toast cleared, row pushed; 200 with a login page → failure, not marked pushed; happy path and SALE_NO_CONFLICT unchanged |
+| P5-3 | migration `2026-09-22_01_pos-invoice-permissions.sql`: `pos_24` wherever `pos_25`, `pos_13` wherever `pos_11`, relabels the two Quick Invoice rows; the sheet's Invoice / Split Bill ask `pos_11` first; pos_script 6.0 | migration PASS, re-run PASS, preflight row; Waiter page now carries `pos_24 = 1`, `pos_13 = 1`; sheet Invoice with `pos_11` blanked → refused with the toast, no payment modal |
+| Regression | 5a 55, 5b 22, 5c 28, deep link 16, Part B 18 + 21, menu/POS 6, P2 12, P4 21 + 6, P5 7, hotel h0–h11 | green |
+
+**Queued sales on live devices are not lost:** they sit in that browser's IndexedDB `recent_sales` with
+`online_push = 0` and upload by themselves once P5-1 is on the server. Nothing must clear browser data on a
+waiter device until the till shows "Sale No … has been uploaded" for them (or the Dashboard shows the sales).
+Orphan `tbl_orders_table` rows after completion are the vendor's normal leftover (135 on scratch, 153 on local),
+harmless to the panel; not touched here.

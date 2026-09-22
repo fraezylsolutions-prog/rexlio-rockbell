@@ -2674,10 +2674,11 @@
                   $("#update_sale_id").val(sale_no);
                   get_details_of_a_particular_order(sale_no);
                   setTimeout(function(){ update_kitchen_status(sale_no); }, 1000);
-              }else if(action === "invoice"){
-                  irCloseTablesPanel(); card.trigger("click"); $(".invoice_btn_class").eq(1).click();
-              }else if(action === "split"){
-                  irCloseTablesPanel(); card.trigger("click"); $(".invoice_btn_class").eq(0).click();
+              }else if(action === "invoice" || action === "split"){
+                  /* P5-3: same gate as the sale screen's Invoice button (pos_11, create_invoice). The sheet
+                     used to click the pay buttons directly, past that gate. */
+                  if(Number($("#pos_11").val()) !== 1){ toastr['error']((menu_not_permit_access + "!"), ''); return; }
+                  irCloseTablesPanel(); card.trigger("click"); $(".invoice_btn_class").eq(action === "invoice" ? 1 : 0).click();
               }else if(action === "bill"){
                   card.trigger("click"); $("#create_bill_and_close").click();
               }else if(action === "cancel"){

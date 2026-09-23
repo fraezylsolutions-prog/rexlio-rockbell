@@ -122,6 +122,21 @@
          alreadyPrints=true for the popups whose injected HTML already calls
          window.print(), so they are not printed twice. print_bill's HTML has
          no print call at all, so it is printed from here. */
+      /* A print window opened from an AJAX callback is not a trusted user
+         gesture, so the browser's pop-up blocker can refuse it - and
+         window.open then returns null. The code went straight on to
+         popup.document.write(), which threw, and the till simply printed
+         nothing with no message at all. Restarting the browser can lose the
+         "allow pop-ups" exception, which is exactly when this bites
+         (Rockbell, 2026-09-23). Now it says so, and says what to do. */
+      function irPopupBlocked(){
+          let msg = "The print window was blocked by this browser. Allow pop-ups for this site (click the blocked-pop-up icon in the address bar, choose Always allow), then print again.";
+          if(typeof toastr !== "undefined"){
+              toastr['error'](msg, 'Nothing was printed', {timeOut: 0, extendedTimeOut: 0, closeButton: true, preventDuplicates: true});
+          }else{
+              alert(msg);
+          }
+      }
       function irAutoPrintAndClose(popup, alreadyPrints){
           if(!popup){ return; }
           /* The close logic is INJECTED INTO the popup rather than attached
@@ -1676,10 +1691,12 @@
             if(no_print!=1){
                 reset_finalize_modal();
                 let popup = window.open("", "popup","width=100","height=600");
+                if(!popup){ irPopupBlocked(); } else {
                 popup.document.write(invoice_print);
                 popup.document.close();
                 popup.focus();
                 irAutoPrintAndClose(popup, true);
+                }
             }
           
           } 
@@ -3241,10 +3258,12 @@
           update_kot_print(order_info,order.sale_no);     
           reset_finalize_modal();
           var popup = window.open("", "popup","width=100","height=600");
+          if(!popup){ irPopupBlocked(); } else {
           popup.document.write(invoice_print);
           popup.document.close();
           popup.focus();
           irAutoPrintAndClose(popup, true);
+          }
       }
       function call_print_invoice(order_info,inv_qr_code_enable_status) {
         let order = JSON.parse(order_info);
@@ -3592,10 +3611,12 @@
                 </html>`;
         reset_finalize_modal();
         var popup = window.open("", "popup","width=100","height=600");
+        if(!popup){ irPopupBlocked(); } else {
         popup.document.write(invoice_print);
         popup.document.close();
         popup.focus();
         irAutoPrintAndClose(popup, true);
+        }
     }
      
     function print_bill(order_info, sale_no) {
@@ -3849,10 +3870,12 @@
                 </html>`;
         reset_finalize_modal();
         var popup = window.open("", "popup","width=100","height=600");
+        if(!popup){ irPopupBlocked(); } else {
         popup.document.write(invoice_print);
         popup.document.close();
         popup.focus();
         irAutoPrintAndClose(popup, false);
+        }
     }
   
       $(document).on("click", ".edit_customer", function (e) {

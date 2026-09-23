@@ -1572,3 +1572,26 @@ a.ir_rail_search:active{transform:translateY(1px)}
 #ir_action_sheet .ir-as-merge-list .ir-as-btn{padding:12px 14px}
 #ir_action_sheet .ir-as-merge-empty{grid-column:1/-1; color:var(--rx-muted); font-size:14px; padding:8px 0}
 @media (max-width:767.98px){ #ir_action_sheet{padding:10px} #ir_action_sheet .ir-as-grid, #ir_action_sheet .ir-as-merge-list{grid-template-columns:1fr; gap:8px; padding:12px} #ir_action_sheet .ir-as-btn{padding:12px} }
+
+/* ==========================================================================
+   Cart list must scroll
+   .order_table_holder is overflow:hidden with a fixed height, and the list
+   inside it had no scroll of its own - so on a big order everything below the
+   fold was simply unreachable (reported at Rockbell, 2026-09-23). The list
+   scrolls now, with a thumb wide enough to drag with a finger on a till.
+   ========================================================================== */
+.order_table_holder .order_holder{
+    max-height:calc(100% - 38px) !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    -webkit-overflow-scrolling:touch;
+}
+.order_table_holder .order_holder::-webkit-scrollbar{width:10px}
+.order_table_holder .order_holder::-webkit-scrollbar-track{background:transparent}
+.order_table_holder .order_holder::-webkit-scrollbar-thumb{
+    background:var(--rx-accent, #C9A227);
+    border-radius:6px;
+    border:2px solid transparent;
+    background-clip:content-box;
+}
+.order_table_holder .order_holder{scrollbar-width:thin; scrollbar-color:var(--rx-accent, #C9A227) transparent}

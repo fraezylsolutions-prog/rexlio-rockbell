@@ -1509,20 +1509,35 @@
               let tmp_header_html = ``;
               let tmp_footer_html = ``;
 
-              tmp_header_html+=`<div class="text-center">`;
-              tmp_header_html+=`<h3>`+txt_kot+`: `+order.kitchen_name+`</h3>`;
+              /* The docket header used to run to five stacked headings and a paragraph,
+                 which ate a third of every ticket. Same facts, three tight lines:
+                 the order number is what the kitchen calls out, so it stays big;
+                 everything else drops to small type on shared lines. The columns
+                 are labelled, which they never were. (Rockbell, 2026-09-23) */
+              let ir_kot_where = [];
+              if(order.customer_table != undefined && order.customer_table){ ir_kot_where.push(inv_table+": "+order.customer_table); }
+              if(order_type){ ir_kot_where.push(inv_order_type+": "+order_type); }
+              let ir_kot_who = [];
+              if(order.customer_name != undefined && order.customer_name){ ir_kot_who.push(inv_customer+": "+order.customer_name); }
+              if(order.waiter_name != undefined && order.waiter_name){ ir_kot_who.push(inv_waiter+": "+order.waiter_name); }
+              let ir_item_label = ($("#inv_item").val() || "ITEM");
+              let ir_qty_label = ($("#inv_qty").val() || "QTY");
+              tmp_header_html+=`<div class="text-center" style="line-height:1.25">`;
+              tmp_header_html+=`<h3 style="margin:0 0 2px;font-size:16px">`+txt_kot+`: `+order.kitchen_name+`</h3>`;
+              tmp_header_html+=`<div style="font-size:15px;font-weight:bold;margin:0 0 3px">`+inv_order_number+`: `+order.sale_no_p+`</div>`;
+              if(ir_kot_where.length){ tmp_header_html+=`<div style="font-size:12px">`+ir_kot_where.join(" &nbsp;|&nbsp; ")+`</div>`; }
+              if(ir_kot_who.length){ tmp_header_html+=`<div style="font-size:11px">`+ir_kot_who.join(" &nbsp;|&nbsp; ")+`</div>`; }
+              tmp_header_html+=`<div style="font-size:11px;margin-bottom:3px">`+order.date+` `+order.time_inv+`</div>`;
               tmp_header_html+=`
-                                      `+inv_p_table+`
-                                      <h4 style="margin: 0px"> `+inv_order_type+`: `+order_type+`</h4>
-                                      <h4 style="margin: 0px"> `+inv_order_number+`: `+order.sale_no_p+`</h4>
-                                      <p>
-                                      <b>`+inv_customer+`: </b>`+order.customer_name+` &nbsp;`
-                                      +inv_p_waiter+`
-                                          <b>`+inv_date+`: </b>`+ order.date+` `+order.time_inv+`<br><br>
-                                      </p>
                                   </div>
                                   <div class="ir_clear"></div>
-                                  <table class="table table-condensed">
+                                  <table class="table table-condensed" style="margin-bottom:0">
+                                      <thead>
+                                          <tr>
+                                              <th class="no-border" style="text-align:left;font-size:11px;padding:0 0 2px;border-bottom:1px solid #000">`+ir_item_label+`</th>
+                                              <th class="no-border" style="text-align:right;font-size:11px;padding:0 0 2px;border-bottom:1px solid #000">`+ir_qty_label+`</th>
+                                          </tr>
+                                      </thead>
                                       <tbody>`;
 
                                   let sl=1;
@@ -1581,7 +1596,7 @@
                                         let i = 1;
                                         total_item_counter+=Number(this_item.qty);
                                         item_html+=`<tr>`;
-                                        item_html+=`<td class="no-border border-bottom ir_wid_90"># <span class="sn_counter">`+sl+`</span>: `+this_item.menu_name+alternative_name;
+                                        item_html+=`<td class="no-border border-bottom ir_wid_90">`+this_item.menu_name+alternative_name;
                                         if (this_item.menu_combo_items != "" && this_item.menu_combo_items!=undefined  && this_item.menu_combo_items!=null && this_item.menu_combo_items!="undefined") {
                                             item_html+= `<br><span  style="padding-left: 30px;">`+combo_txt+": "+this_item.menu_combo_items+`</span>`;
                                         }
@@ -3141,7 +3156,7 @@
                   let i = 1;
                   total_item_counter+=Number(this_item.qty);
                   row_of_item+=`<tr>`;
-                  row_of_item+=`<td class="no-border border-bottom ir_wid_90"># <span class="sn_counter">`+sl+`</span>: `+this_item.menu_name+alternative_name;
+                  row_of_item+=`<td class="no-border border-bottom ir_wid_90">`+this_item.menu_name+alternative_name;
                   if (this_item.menu_combo_items != "" && this_item.menu_combo_items!=undefined  && this_item.menu_combo_items!=null && this_item.menu_combo_items!="undefined") {
                       row_of_item+= `<br><span  style="padding-left: 30px;">`+combo_txt+": "+this_item.menu_combo_items+`</span>`;
                   }
@@ -18204,6 +18219,7 @@
         return v ? v : fallback;
     }
     function irLocalVersionOf(sale_no){
+        if(ir_applied_version[sale_no] !== undefined){ return String(ir_applied_version[sale_no]); }
         let span = $('.holder .order_details > .single_order[data-sale_no="' + sale_no + '"] .running_order_order_number');
         let v = span.length ? span.attr("data-ir_version") : "";
         return v ? String(v) : "";
@@ -18231,15 +18247,35 @@
             }
         };
     }
+    /* What this till has already taken from the server, per order. The 7 s poll
+       compares the version in the DOM with the server's; if for any reason that
+       attribute does not end up updated - the list is drawn in more than one
+       place, the IndexedDB record is not found, the redraw has not finished yet -
+       the same "changed on another till" answer comes back every 7 seconds for
+       ever. On a busy waiter's till that buried the screen in warnings and
+       nothing could be pressed until F5 (reported 2026-09-23). Remembering what
+       has been applied makes a repeat impossible whatever the cause. */
+    var ir_applied_version = {};
     function irApplyServerCopy(sale_no, content, version, message, clear_cart){
+        let already = ir_applied_version[sale_no];
+        let repeat = (already !== undefined && String(already) === String(version));
+        ir_applied_version[sale_no] = String(version);
         updateOrderForWaiter(sale_no, irWithVersion(content, version));
+        /* update every copy of this order number on screen, not just the one in
+           the running-orders list, so the next poll sends the new version */
+        $(".running_order_order_number").each(function(){
+            if($(this).text().trim() === String(sale_no)){ $(this).attr("data-ir_version", version); }
+        });
         if(clear_cart){
             $(".order_table_holder .order_holder").empty();
             $("#update_sale_id").val("");
             $("#ir_version_hidden").val("");
             if(typeof clearFooterCartCalculation === "function"){ clearFooterCartCalculation(); }
         }
-        toastr['warning']((message ? message : irMsg("ir_msg_refreshed", "Order was changed on another till - refreshed")) + " (" + sale_no + ")", '', {timeOut: 6000, closeButton: true});
+        /* the copy is still refreshed on a repeat - only the warning is held back,
+           because saying it again tells the waiter nothing and hides the till */
+        if(repeat){ return; }
+        toastr['warning']((message ? message : irMsg("ir_msg_refreshed", "Order was changed on another till - refreshed")) + " (" + sale_no + ")", '', {timeOut: 6000, closeButton: true, preventDuplicates: true});
     }
     function irAdoptOrder(sale_no, done){
         if(!checkInternetConnection()){
@@ -18284,7 +18320,9 @@
         let pairs = [];
         $(".running_order_order_number").each(function(){
             if(Number($(this).attr("data-added_offline_status")) === 2){
-                pairs.push($(this).text() + ":" + ($(this).attr("data-ir_version") || ""));
+                let sn = $(this).text().trim();
+                let known = ir_applied_version[sn];
+                pairs.push(sn + ":" + (known !== undefined ? known : ($(this).attr("data-ir_version") || "")));
             }
         });
         if(!pairs.length){ return; }

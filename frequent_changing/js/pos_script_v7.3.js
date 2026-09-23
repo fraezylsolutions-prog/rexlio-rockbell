@@ -129,6 +129,39 @@
          nothing with no message at all. Restarting the browser can lose the
          "allow pop-ups" exception, which is exactly when this bites
          (Rockbell, 2026-09-23). Now it says so, and says what to do. */
+      /* Jump to the newest line. The cart scrolls now, which means the item a
+         waiter has just added can sit below the fold on a long order. The button
+         shows only while the list actually overflows and is out of the way
+         otherwise. Checked whenever the cart is redrawn and on resize. */
+      function irCartScrollState(){
+          let list = document.querySelector(".order_table_holder .order_holder");
+          let btn = document.getElementById("ir_cart_to_bottom");
+          if(!list || !btn){ return; }
+          let overflows = list.scrollHeight - list.clientHeight > 12;
+          let at_bottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 12;
+          if(overflows && !at_bottom){ btn.classList.add("ir_show"); }
+          else{ btn.classList.remove("ir_show"); }
+      }
+      function irCartScrollToBottom(){
+          let list = document.querySelector(".order_table_holder .order_holder");
+          if(!list){ return; }
+          try{ list.scrollTo({top: list.scrollHeight, behavior: "smooth"}); }
+          catch(e){ list.scrollTop = list.scrollHeight; }
+          setTimeout(irCartScrollState, 400);
+      }
+      $(document).on("click", "#ir_cart_to_bottom", function(e){ e.preventDefault(); irCartScrollToBottom(); });
+      $(document).on("scroll", ".order_table_holder .order_holder", irCartScrollState);
+      $(window).on("resize", irCartScrollState);
+      /* the cart is redrawn by many different paths, so watch the list itself
+         rather than trying to hook every one of them */
+      $(function(){
+          let list = document.querySelector(".order_table_holder .order_holder");
+          if(list && typeof MutationObserver !== "undefined"){
+              new MutationObserver(function(){ setTimeout(irCartScrollState, 60); })
+                  .observe(list, {childList: true, subtree: true});
+          }
+          setTimeout(irCartScrollState, 800);
+      });
       function irPopupBlocked(){
           let msg = "The print window was blocked by this browser. Allow pop-ups for this site (click the blocked-pop-up icon in the address bar, choose Always allow), then print again.";
           if(typeof toastr !== "undefined"){
@@ -3365,6 +3398,12 @@
                                 <div class="ir_clear"></div>
                                 <hr style="border-bottom:1px solid black;margin: 0px;">
                                 <table class="table table-condensed">
+                                    <thead>
+                                        <tr>
+                                            <th class="no-border" style="text-align:left;font-size:11px;padding:0 0 2px;border-bottom:1px solid #000">`+(($("#inv_item").val()) || "ITEM")+`</th>
+                                            <th class="no-border" style="text-align:right;font-size:11px;padding:0 0 2px;border-bottom:1px solid #000">`+(($("#inv_total").val()) || "TOTAL")+`</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>`;
         let sl=1;
         for (let key in order.items) {
@@ -3388,7 +3427,7 @@
             let discount_value = Number(this_item.item_discount_amount) ? "(-"+getAmount(this_item.item_discount_amount)+")": '';
             let alternative_name = getAlternativeNameById(this_item.food_menu_id, window.items);
             invoice_print+=`<tr>`;
-            invoice_print+=`<td class="no-border border-bottom ir_wid_90"># `+sl+`:`+this_item.menu_name+alternative_name;
+            invoice_print+=`<td class="no-border border-bottom ir_wid_90">`+this_item.menu_name+alternative_name;
             invoice_print+=`<small></small> &nbsp;&nbsp;`+ this_item.qty + `&nbsp;X&nbsp;`+getAmount(this_item.menu_unit_price)+discount_value ;
             if (this_item.menu_combo_items != "" && this_item.menu_combo_items!=undefined  && this_item.menu_combo_items!=null && this_item.menu_combo_items!="undefined") {
                 invoice_print+= `<br><span  style="padding-left: 30px;">`+combo_txt+this_item.menu_combo_items+`</span>`;
@@ -3709,6 +3748,12 @@
                                 <div class="ir_clear"></div>
                                 <hr style="border-bottom:1px solid black;margin: 0px;">
                                 <table class="table table-condensed">
+                                    <thead>
+                                        <tr>
+                                            <th class="no-border" style="text-align:left;font-size:11px;padding:0 0 2px;border-bottom:1px solid #000">`+(($("#inv_item").val()) || "ITEM")+`</th>
+                                            <th class="no-border" style="text-align:right;font-size:11px;padding:0 0 2px;border-bottom:1px solid #000">`+(($("#inv_total").val()) || "TOTAL")+`</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>`;
         let sl=1;
         for (let key in order.items) {
@@ -3733,7 +3778,7 @@
             let alternative_name = getAlternativeNameById(this_item.food_menu_id, window.items);
            
             invoice_print+=`<tr>`;
-            invoice_print+=`<td class="no-border border-bottom ir_wid_90"># `+sl+`:`+this_item.menu_name+alternative_name;
+            invoice_print+=`<td class="no-border border-bottom ir_wid_90">`+this_item.menu_name+alternative_name;
             invoice_print+=`<small></small> &nbsp;&nbsp;`+ this_item.qty + `&nbsp;X&nbsp;`+getAmount(this_item.menu_unit_price)+discount_value ;
             if (this_item.menu_combo_items != "" && this_item.menu_combo_items!=undefined  && this_item.menu_combo_items!=null && this_item.menu_combo_items!="undefined") {
                 invoice_print+= `<br><span  style="padding-left: 30px;">`+combo_txt+this_item.menu_combo_items+`</span>`;

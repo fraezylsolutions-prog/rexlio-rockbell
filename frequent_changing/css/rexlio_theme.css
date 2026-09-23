@@ -1595,3 +1595,29 @@ a.ir_rail_search:active{transform:translateY(1px)}
     background-clip:content-box;
 }
 .order_table_holder .order_holder{scrollbar-width:thin; scrollbar-color:var(--rx-accent, #C9A227) transparent}
+
+/* Jump to the newest line. On a long order the cart is scrolled to the top
+   while the item just added sits at the bottom, out of sight. The button only
+   appears when the list actually overflows, and sits clear of the scrollbar. */
+.order_table_holder{position:relative}
+#ir_cart_to_bottom{
+    display:none;
+    position:absolute;
+    right:16px;
+    bottom:10px;
+    z-index:6;
+    width:40px;
+    height:40px;
+    border:none;
+    border-radius:50%;
+    background:var(--rx-accent, #C9A227);
+    color:#1F3864;
+    font-size:17px;
+    line-height:40px;
+    text-align:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.28);
+    cursor:pointer;
+    padding:0;
+}
+#ir_cart_to_bottom:active{transform:translateY(1px)}
+#ir_cart_to_bottom.ir_show{display:block}

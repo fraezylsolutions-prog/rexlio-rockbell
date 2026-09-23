@@ -695,7 +695,7 @@ foreach ($notifications as $single_notification){
          rather than the real cut. Same family and host as the existing import,
          so this adds a weight - not another typeface. */ ?>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap">
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.4">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.5">
 </head>
 
 <body>
@@ -1404,6 +1404,8 @@ foreach ($notifications as $single_notification){
                                 <div class="single_header_column" id="single_order_total"><?php echo lang('total'); ?>
                                 </div>
                             </div>
+                            <!-- jump to the newest line on a long order -->
+                            <button type="button" id="ir_cart_to_bottom" title="Go to the last item"><i class="fal fa-arrow-down"></i></button>
                             <div class="order_holder cardIsEmpty">
                                 
                             </div>
@@ -4761,7 +4763,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=6.2"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=6.3"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">

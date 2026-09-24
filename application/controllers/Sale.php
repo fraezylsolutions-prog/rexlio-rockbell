@@ -603,7 +603,16 @@ class Sale extends Cl_Controller {
         //is switched off stops being selectable for NEW orders but never rewrites
         //the tier already recorded against an existing order.
         $data['price_tiers'] = $this->Sale_model->getActivePriceTiers($company_id);
-        $data['default_price_tier'] = $this->Sale_model->getCounterDefaultPriceTier($this->session->userdata('counter_id'));
+        //Waiters never open a register, so their session carries no counter and this
+        //came back empty for them - the sale screen then pre-selected Regular however
+        //the outlet's counter was set. getLockedPriceTier() was already given a
+        //fallback to the outlet's counter for exactly this reason; this sibling call
+        //was missed at the time. Same fallback, same reason. (Rockbell, 2026-09-24)
+        $ir_tier_counter = $this->session->userdata('counter_id');
+        if(!$ir_tier_counter){
+            $ir_tier_counter = irOutletSingleCounterId($this->session->userdata('outlet_id'));
+        }
+        $data['default_price_tier'] = $this->Sale_model->getCounterDefaultPriceTier($ir_tier_counter);
         //Counter lock: non-zero means this user is pinned to that tier and the whole
         //order-type row is fixed. Admin/Manager get 0 (free selection) via the helper.
         $data['locked_price_tier'] = getLockedPriceTier();

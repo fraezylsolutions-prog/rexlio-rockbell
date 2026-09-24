@@ -1177,7 +1177,22 @@ foreach ($notifications as $single_notification){
                 <div class="main_middle" style="<?php echo escape_output($is_self_order_class)?'width: 100%;':'' ?>">
                     <div class="main_top">
                         <!-- Top Btn -->
-                        <div class="button_holder <?php echo escape_output($is_self_order_class) ?> <?php echo isset($is_self_order_class) && $is_self_order_class?'':'no-need-for-waiter' ?>">
+                        <?php
+                        /* This row used to carry no-need-for-waiter, which the waiter
+                           stylesheet hides outright - so a waitress could not see, let
+                           alone press, Regular / Take away / Delivery / VIP / Club. She
+                           took every order at whatever tier the server had pre-selected,
+                           which for a waiter was always Regular. Reported from the floor
+                           on 2026-09-24: "can only access regular price tier".
+
+                           The row is shown to waiters now. Nothing about who may use a
+                           tier changes: a counter that pins a tier still renders every
+                           button disabled and pinned ($lock_attr below), and the server
+                           still overrides the tier on save for a locked counter
+                           (Sale::add_kitchen_sale_by_ajax). This only restores the
+                           choice where there was never a restriction to begin with. */
+                        ?>
+                        <div class="button_holder <?php echo escape_output($is_self_order_class) ?>">
                             <?php
                                 /* Counter price tier lock.
                                    When the counter this user is on has a default_price_tier

@@ -14,6 +14,14 @@ $place_order_tooltip = $this->session->userdata('place_order_tooltip');
 $waiter_app_status=isset($waiter_app_status) && $waiter_app_status?$waiter_app_status:'';
 $is_self_order_class =isset($is_self_order) && $is_self_order?"self_order_skip":'';
 
+/* The price tier this screen opens at, worked out BEFORE the item tiles are
+   built because each tile prints a price and has to print the right one. A
+   counter that pins a tier wins; otherwise the counter's default; otherwise
+   Regular. Same three values the tier row further down uses. */
+$ir_active_tier = (isset($locked_price_tier) && (int) $locked_price_tier > 0)
+    ? (int) $locked_price_tier
+    : ((isset($default_price_tier) && (int) $default_price_tier > 0) ? (int) $default_price_tier : 1);
+
 
 $language_manifesto = $this->session->userdata('language_manifesto');
 $designation = $this->session->userdata('designation');
@@ -196,7 +204,20 @@ foreach($food_menus as $single_menus){
     $menu_to_show .= '<div class="single_item animate__animated animate__flipInX" data-price="'.$sale_price.'"  data-price_take="'.$sale_price_take.'"  data-price_delivery="'.$sale_price_delivery.'"  data-price_vip="'.$sale_price_vip.'"  data-price_club="'.$sale_price_club.'" data-is_variation="'.$is_variation.'"  id="item_'.$single_menus->id.'">';
     $menu_to_show .= '<img src="'.$image_path.'" alt="" width="142">';
         $menu_to_show .= '<p class="item_name '.$item_name_c.'" data-tippy-content="'.$single_menus->name.'">'.$single_menus->name.'</p>';
-    $menu_to_show .= '<p class="item_price">'.lang('price').': <span id="price_'.$single_menus->id.'">'.getAmtP($sale_price).'</span></p>';
+    /* The tile showed getAmtP($sale_price) - the REGULAR price - always, whatever
+       tier was in force, and nothing ever rewrote it afterwards. So a waitress
+       pinned to the Club counter read "Price: 500.00" on every tile while the
+       cart was charging 700, and with the buttons correctly disabled by the lock
+       she had no way to make the screen say anything else. That is the whole of
+       "the waiter can only see Regular prices" (Rockbell, 2026-09-25).
+       The tile is now printed at the tier actually in force; irRefreshTilePrices()
+       in pos_script keeps it right when the tier is switched. */
+    $ir_tile_price = $sale_price;
+    if($ir_active_tier == 2){ $ir_tile_price = $sale_price_take; }
+    elseif($ir_active_tier == 3){ $ir_tile_price = $sale_price_delivery; }
+    elseif($ir_active_tier == 4){ $ir_tile_price = $sale_price_vip; }
+    elseif($ir_active_tier == 5){ $ir_tile_price = $sale_price_club; }
+    $menu_to_show .= '<p class="item_price">'.lang('price').': <span id="price_'.$single_menus->id.'">'.getAmtP($ir_tile_price).'</span></p>';
     $menu_to_show .= '</div>';
     //if its the last content and there is no more category then set exit to last category
     if($is_new_category==false && $total_menus==$i){
@@ -4778,7 +4799,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=6.3"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=6.4"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">

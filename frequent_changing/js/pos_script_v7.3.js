@@ -663,6 +663,40 @@
           return value;
       }
 
+      /* Repaint every tile's printed price at the tier now in force.
+         The tile's price label was written once by the server and never
+         touched again, so switching tier changed what the cart charged but
+         not a single number on screen - and at a pinned counter the label
+         simply stayed at Regular for ever. Reads the same data-price*
+         attributes resolveItemPrice() uses, so the two can never disagree.
+         (Rockbell, 2026-09-25) */
+      function irRefreshTilePrices(){
+          let tier = getSelectedPriceTier();
+          let dp = (typeof ir_precision !== "undefined" && ir_precision !== null) ? Number(ir_precision) : 2;
+          $(".single_item").each(function(){
+              let tile = $(this);
+              let label = tile.find(".item_price span").first();
+              if(!label.length){ return; }
+              let value = resolveItemPrice(tile, tier);
+              if(value === undefined || value === null || value === ""){ return; }
+              label.text(Number(value).toFixed(dp));
+          });
+      }
+      /* tiles are rebuilt by search, category changes and the offline item
+         list, which are many separate paths - watch the container instead of
+         trying to hook each one, the same way the cart button does */
+      $(function(){
+          irRefreshTilePrices();
+          let holder = document.getElementById("main_item_holder") || document.querySelector(".main_right");
+          if(holder && typeof MutationObserver !== "undefined"){
+              let pending = null;
+              new MutationObserver(function(){
+                  clearTimeout(pending);
+                  pending = setTimeout(irRefreshTilePrices, 80);
+              }).observe(holder, {childList: true, subtree: true});
+          }
+      });
+
       /* Phase F item 15: zero stock block.
 
          ONE definition, called from every path that can put more of an item into the
@@ -854,6 +888,7 @@
               $("#selected_price_tier").val(new_tier);
               //order_type stays dine in, so the table button is left alone
               $("#table_button").attr("disabled", false);
+              irRefreshTilePrices();
           };
 
           let total_items_in_cart = $(".order_holder .single_order").length;
@@ -894,6 +929,7 @@
           }else{
               $("#selected_price_tier").val(1);
           }
+          irRefreshTilePrices();
       });
 
       function displayOrderList(){

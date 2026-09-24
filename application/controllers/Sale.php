@@ -603,19 +603,23 @@ class Sale extends Cl_Controller {
         //is switched off stops being selectable for NEW orders but never rewrites
         //the tier already recorded against an existing order.
         $data['price_tiers'] = $this->Sale_model->getActivePriceTiers($company_id);
-        //Waiters never open a register, so their session carries no counter and this
-        //came back empty for them - the sale screen then pre-selected Regular however
-        //the outlet's counter was set. getLockedPriceTier() was already given a
-        //fallback to the outlet's counter for exactly this reason; this sibling call
-        //was missed at the time. Same fallback, same reason. (Rockbell, 2026-09-24)
+        /* Which outlet's counter decides the tier.
+           A waiter opens this screen as /Sale/POS/<user>/<outlet>, and their session
+           carries neither a counter (they never open a register) nor, on that route,
+           an outlet. Reading either from the session alone gave nothing, so the
+           screen fell back to "not locked, Regular" - a waitress on the Club counter
+           sold at Regular prices. The outlet in the URL is the authority here; the
+           session is only the fallback for the cashier route, which has no segment.
+           (Rockbell, 2026-09-24) */
+        $ir_tier_outlet = $outlet_id ? (int) $outlet_id : (int) $this->session->userdata('outlet_id');
         $ir_tier_counter = $this->session->userdata('counter_id');
         if(!$ir_tier_counter){
-            $ir_tier_counter = irOutletSingleCounterId($this->session->userdata('outlet_id'));
+            $ir_tier_counter = irOutletSingleCounterId($ir_tier_outlet);
         }
         $data['default_price_tier'] = $this->Sale_model->getCounterDefaultPriceTier($ir_tier_counter);
         //Counter lock: non-zero means this user is pinned to that tier and the whole
         //order-type row is fixed. Admin/Manager get 0 (free selection) via the helper.
-        $data['locked_price_tier'] = getLockedPriceTier();
+        $data['locked_price_tier'] = getLockedPriceTier($ir_tier_outlet);
 
         //Phase F item 14: available stock per food menu, for window.items.
         //

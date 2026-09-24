@@ -4234,9 +4234,14 @@ if (!function_exists('hasPriceTierOverride')) {
 }
 if (!function_exists('getLockedPriceTier')) {
     /**
+     * @param int $outlet_id_override the outlet to resolve the counter from when
+     *        the session does not carry one. The waiter app is a separate
+     *        controller that takes its outlet from the query string and never
+     *        populates the session with it, so without this the lock could not
+     *        be worked out there at all. (Rockbell, 2026-09-24)
      * @return int 0 when nothing is locked, otherwise the tier this user is pinned to
      */
-    function getLockedPriceTier() {
+    function getLockedPriceTier($outlet_id_override = 0) {
         $CI = &get_instance();
         if (hasPriceTierOverride()) {
             return 0;
@@ -4247,7 +4252,8 @@ if (!function_exists('getLockedPriceTier')) {
             //counter and the lock silently did not apply to them (tested: a
             //Club-locked counter rendered a waiter's POS unlocked at Regular).
             //Each outlet has exactly one counter, so resolve it from the outlet.
-            $counter_id = irOutletSingleCounterId($CI->session->userdata('outlet_id'));
+            $outlet_for_lookup = (int) $outlet_id_override ? (int) $outlet_id_override : $CI->session->userdata('outlet_id');
+            $counter_id = irOutletSingleCounterId($outlet_for_lookup);
             if (!$counter_id) {
                 return 0;
             }

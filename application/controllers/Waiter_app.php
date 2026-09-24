@@ -112,6 +112,20 @@ class Waiter_app extends Cl_Controller {
         $data['notifications'] = $this->get_new_notification($outlet_id);
         $data['user_id_wp'] = $user_id;
         $data['waiter_app_status'] = "Yes";
+        /* Price tiers. The waiter app is a separate controller that loads the SAME
+           POS view, and it passed none of this - so the view fell back to its own
+           defaults, "nothing is locked" and "Regular", and a waitress on a Club
+           counter sold at Regular prices with no way to change it. Reported from
+           the floor on 2026-09-24.
+           The outlet here comes from the query string, not the session, so it has
+           to be handed to both lookups explicitly. */
+        $data['price_tiers'] = $this->Sale_model->getActivePriceTiers($company_id);
+        $ir_tier_counter = $this->session->userdata('counter_id');
+        if(!$ir_tier_counter){
+            $ir_tier_counter = irOutletSingleCounterId($outlet_id);
+        }
+        $data['default_price_tier'] = $this->Sale_model->getCounterDefaultPriceTier($ir_tier_counter);
+        $data['locked_price_tier'] = getLockedPriceTier($outlet_id);
         $this->load->view('sale/POS/main_screen', $data);
     }
     public function add_sale_by_ajax(){
@@ -158,6 +172,17 @@ class Waiter_app extends Cl_Controller {
         $data['vat'] = $total_tax;
         $data['sale_vat_objects'] = json_encode($order_details->sale_vat_objects);
         $data['order_type'] = trim_checker($order_details->order_type);
+        /* The tier the order was priced at has to be recorded, or the order says
+           Regular however it was actually sold - this method never set it at all.
+           And where the counter pins a tier, the server decides, not the screen:
+           the same rule Sale::add_kitchen_sale_by_ajax() applies. */
+        $data['price_tier'] = isset($order_details->price_tier) && $order_details->price_tier
+            ? trim_checker($order_details->price_tier) : 1;
+        $ir_locked_tier = getLockedPriceTier($outlet_id);
+        if($ir_locked_tier){
+            $data['price_tier'] = $ir_locked_tier;
+            $data['order_type'] = orderTypeForPriceTier($ir_locked_tier);
+        }
         $this->db->trans_begin();
         if($sale_id>0){
             $data['modified'] = 'Yes';

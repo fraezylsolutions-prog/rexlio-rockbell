@@ -673,13 +673,23 @@
       function irRefreshTilePrices(){
           let tier = getSelectedPriceTier();
           let dp = (typeof ir_precision !== "undefined" && ir_precision !== null) ? Number(ir_precision) : 2;
+          let label_txt = $("#price_txt").val() ? $("#price_txt").val() : "Price";
           $(".single_item").each(function(){
               let tile = $(this);
-              let label = tile.find(".item_price span").first();
-              if(!label.length){ return; }
+              let holder = tile.find(".item_price").first();
+              if(!holder.length){ return; }
               let value = resolveItemPrice(tile, tier);
               if(value === undefined || value === null || value === ""){ return; }
-              label.text(Number(value).toFixed(dp));
+              let shown = Number(value).toFixed(dp);
+              /* Two shapes of tile exist. The server writes the price inside a
+                 <span id="price_NN">; the seven places the script builds a tile
+                 write it as bare text with no span at all - which is why looking
+                 only for the span found nothing on searched or re-rendered tiles
+                 and the price never moved. Handle both rather than editing seven
+                 markup sites. (Rockbell, 2026-09-25) */
+              let span = holder.find("span").first();
+              if(span.length){ span.text(shown); }
+              else { holder.text(label_txt + ": " + shown); }
           });
       }
       /* tiles are rebuilt by search, category changes and the offline item

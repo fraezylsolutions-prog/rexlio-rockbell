@@ -2360,3 +2360,18 @@ $lang['ir_msg_sale_not_uploaded']='Sale NOT uploaded to the server - it is still
 /* P5-3 (2026-09-22): the two Quick Invoice permission rows, told apart */
 $lang['quick_invoice_button']='Quick Invoice (sale screen button)';
 $lang['quick_invoice_unused']='Quick Invoice (unused - kept for compatibility)';
+
+/* Waiter's Register Report (2026-09-25) */
+$lang['waiter_register_report'] = "Waiter's Register Report";
+$lang['wrr_view_button'] = 'View My Report';
+$lang['wrr_register_hint'] = 'Choose a register session. The report covers exactly the period that session was open.';
+$lang['wrr_pick_register'] = 'Please choose a register session first.';
+$lang['wrr_voided'] = 'Voided and cancelled orders';
+$lang['wrr_no_voids'] = 'Nothing was voided or cancelled in this period.';
+$lang['opened_by'] = 'Opened by';
+$lang['orders_value'] = 'Value of completed orders';
+$lang['credit_sales'] = 'Credit sales';
+$lang['completed_orders'] = 'Completed orders';
+$lang['something_went_wrong'] = 'Something went wrong. Please try again.';
+$lang['by'] = 'By';
+$lang['open'] = 'Open';

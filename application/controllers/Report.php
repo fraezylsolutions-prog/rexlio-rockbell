@@ -1573,4 +1573,97 @@ class Report extends Cl_Controller {
         $this->load->view('userHome', $data);
     }
 
+
+    /* ---------------------------------------------------------------------
+       Waiter's Register Report (2026-09-25).
+
+       One screen, two audiences. A waiter opens it and sees their own takings
+       for a register session; a manager opens the same screen and may pick any
+       waiter. Which of the two you get is decided HERE, from the role - never
+       from what the browser posted, because a waiter who edited the form would
+       otherwise read a colleague's figures.
+       --------------------------------------------------------------------- */
+
+    /** TRUE when this user may pull the report for somebody other than themselves. */
+    private function irWaiterReportSeesEveryone() {
+        if ($this->session->userdata('role') == "Admin") { return TRUE; }
+        $user_id = (int) $this->session->userdata('user_id');
+        if (!$user_id) { return FALSE; }
+        $row = $this->db->select('tbl_roles.role_name')->from('tbl_users')
+                        ->join('tbl_roles', 'tbl_roles.id = tbl_users.role_id', 'left')
+                        ->where('tbl_users.id', $user_id)->get()->row();
+        $role = isset($row->role_name) ? strtolower(trim($row->role_name)) : '';
+        /* a waiter sees only themselves; everyone else holding the permission
+           may choose. Kept as a name list to match how the rest of this project
+           already distinguishes the floor from the office. */
+        return !in_array($role, array('waiter', 'waitress'), TRUE);
+    }
+
+    public function waiterRegisterReport() {
+        $data = array();
+        $company_id = $this->session->userdata('company_id');
+        $outlet_id  = $this->input->post('outlet_id') ? $this->input->post('outlet_id') : $this->session->userdata('outlet_id');
+        $data['outlet_id'] = $outlet_id;
+
+        $can_pick = $this->irWaiterReportSeesEveryone();
+        $data['can_pick_waiter'] = $can_pick;
+        $data['own_user_id'] = (int) $this->session->userdata('user_id');
+
+        /* the register list comes from the ordinary Register Report, unchanged,
+           so both screens offer the same sessions over the same timeframe */
+        $start_date = $this->input->post('startDate') ? date("Y-m-d", strtotime($this->input->post('startDate'))) : date('Y-m-d', strtotime('-7 days'));
+        $end_date   = $this->input->post('endDate') ? date("Y-m-d", strtotime($this->input->post('endDate'))) : date('Y-m-d');
+        $data['start_date'] = $start_date;
+        $data['end_date'] = $end_date;
+        $data['register_info'] = $this->Report_model->getRegisterInformation($start_date, $end_date, '', $outlet_id);
+        $data['waiters'] = $this->Sale_model->getWaitersForThisCompany($company_id, 'tbl_users');
+
+        $data['main_content'] = $this->load->view('report/waiterRegisterReport', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
+
+    /** The report itself. Reads only. */
+    public function waiterRegisterReportAjax() {
+        $response = new stdClass();
+        $response->found = FALSE;
+
+        $register_id = (int) $this->input->post('register_id');
+        $asked_for   = (int) $this->input->post('waiter_id');
+        $own         = (int) $this->session->userdata('user_id');
+        /* the decision the whole screen rests on: a waiter is pinned to
+           themselves whatever the form said */
+        $waiter_id   = $this->irWaiterReportSeesEveryone() ? ($asked_for ? $asked_for : $own) : $own;
+
+        $summary = $this->Report_model->getWaiterRegisterSummary($register_id, $waiter_id);
+        if (!$summary) { echo json_encode($response); return; }
+        /* and the same outlet scope every other report obeys */
+        if (!in_array((int) $summary->outlet_id, getAccessibleOutletIds(), TRUE)) {
+            echo json_encode($response); return;
+        }
+
+        $sold  = $this->Report_model->getWaiterRegisterProductsSold($register_id, $waiter_id);
+        $voids = $this->Report_model->getWaiterRegisterVoids($register_id, $waiter_id);
+
+        $w = $this->db->select('full_name')->from('tbl_users')->where('id', $waiter_id)->get()->row();
+
+        $response->found          = TRUE;
+        $response->waiter_name    = isset($w->full_name) ? $w->full_name : ('user #' . $waiter_id);
+        $response->counter_name   = $summary->counter_name;
+        $response->outlet_name    = $summary->outlet_name;
+        $response->opened_by      = $summary->opened_by;
+        $response->window_start   = $summary->window_start;
+        $response->window_end     = $summary->window_end;
+        $response->is_open        = $summary->is_open;
+        $response->payments       = $summary->payments;
+        $response->total_sales    = $summary->total_sales_derived;
+        $response->total_orders   = $summary->total_orders;
+        $response->completed_orders = $summary->completed_orders;
+        $response->orders_value   = $summary->orders_value;
+        $response->credit_sales   = $summary->credit_sales;
+        $response->items_sold     = $summary->items_sold;
+        $response->items          = $sold['items'];
+        $response->categories     = $sold['categories'];
+        $response->voids          = $voids;
+        echo json_encode($response);
+    }
 }

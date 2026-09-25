@@ -2782,5 +2782,200 @@ FROM tbl_food_menus_ingredients i  LEFT JOIN (select * from tbl_ingredients wher
 
         return array("items" => $items, "categories" => $cats);
     }
-}
 
+    /* ---------------------------------------------------------------------
+       Waiter's Register Report (2026-09-25).
+
+       One waiter's own takings inside one register session. Deliberately reuses
+       the Register Report's window: a register runs from its opening timestamp
+       to its closing one, and an open register runs to now. Everything below is
+       that same window with "and this waiter" added, so the two reports can
+       never disagree about what a session covered.
+
+       READ ONLY throughout.
+       --------------------------------------------------------------------- */
+
+    /** The window and identity of a register, or NULL. Shared by the three below. */
+    public function getWaiterRegisterWindow($register_id) {
+        $register_id = (int) $register_id;
+        $q = $this->db->select("tbl_register.*, tbl_counters.name AS counter_name,
+                                tbl_users.full_name AS opened_by", FALSE)
+                      ->from("tbl_register")
+                      ->join("tbl_counters", "tbl_counters.id = tbl_register.counter_id", "left")
+                      ->join("tbl_users", "tbl_users.id = tbl_register.user_id", "left")
+                      ->where("tbl_register.id", $register_id)->get();
+        if (!$q) { return NULL; }
+        $reg = $q->row();
+        if (!isset($reg->id) || !$reg->id) { return NULL; }
+        $reg->window_start = $reg->opening_balance_date_time;
+        $reg->window_end = ($reg->closing_balance_date_time !== NULL && $reg->closing_balance_date_time !== "")
+            ? $reg->closing_balance_date_time : date("Y-m-d H:i:s");
+        $reg->is_open = ((int) $reg->register_status === 1);
+        $reg->outlet_name = getOutletNameById((int) $reg->outlet_id);
+        return $reg;
+    }
+
+    /** Payment breakdown and totals for ONE waiter inside a register's window. */
+    public function getWaiterRegisterSummary($register_id, $waiter_id) {
+        $reg = $this->getWaiterRegisterWindow($register_id);
+        if (!$reg) { return NULL; }
+        $waiter_id = (int) $waiter_id;
+        $counter = (int) $reg->counter_id;
+        $outlet  = (int) $reg->outlet_id;
+        $o = $this->db->escape($reg->window_start);
+        $c = $this->db->escape($reg->window_end);
+
+        /* Payments are joined through the sale, because a payment row carries no
+           waiter of its own - the waiter belongs to the order. */
+        $sql = "SELECT pm.id AS payment_id, pm.name AS method,
+                       COALESCE(SUM(sp.amount),0) AS sell
+                  FROM tbl_payment_methods pm
+                  LEFT JOIN tbl_sales s
+                         ON s.counter_id = $counter AND s.outlet_id = $outlet
+                        AND s.waiter_id = $waiter_id
+                        AND s.date_time >= $o AND s.date_time <= $c
+                        AND s.del_status = 'Live'
+                  LEFT JOIN tbl_sale_payments sp
+                         ON sp.sale_id = s.id AND sp.payment_id = pm.id
+                        AND sp.currency_type IS NULL AND sp.del_status = 'Live'
+                 WHERE pm.del_status = 'Live'
+                 GROUP BY pm.id, pm.name ORDER BY pm.id";
+        $q = $this->db->query($sql);
+        $reg->payments = $q ? $q->result() : array();
+
+        $sql = "SELECT COUNT(*) AS total_orders,
+                       SUM(CASE WHEN order_status = 3 THEN 1 ELSE 0 END) AS completed_orders,
+                       COALESCE(SUM(CASE WHEN order_status = 3 THEN total_payable ELSE 0 END),0) AS orders_value,
+                       COALESCE(SUM(CASE WHEN due_amount > 0 THEN due_amount ELSE 0 END),0) AS credit_sales,
+                       COALESCE(SUM(total_items),0) AS items_sold
+                  FROM tbl_sales
+                 WHERE counter_id = $counter AND outlet_id = $outlet
+                   AND waiter_id = $waiter_id
+                   AND date_time >= $o AND date_time <= $c
+                   AND del_status = 'Live'";
+        $q = $this->db->query($sql);
+        $t = $q ? $q->row() : NULL;
+        $reg->total_orders     = $t ? (int) $t->total_orders : 0;
+        $reg->completed_orders = $t ? (int) $t->completed_orders : 0;
+        $reg->orders_value     = $t ? (float) $t->orders_value : 0;
+        $reg->credit_sales     = $t ? (float) $t->credit_sales : 0;
+        $reg->items_sold       = $t ? (int) $t->items_sold : 0;
+
+        $derived = 0;
+        foreach ($reg->payments as $p) { $derived += (float) $p->sell; }
+        $reg->total_sales_derived = $derived;
+        return $reg;
+    }
+
+    /** What this waiter sold inside the window, by item and by category. */
+    public function getWaiterRegisterProductsSold($register_id, $waiter_id) {
+        $empty = array("items" => array(), "categories" => array());
+        $reg = $this->getWaiterRegisterWindow($register_id);
+        if (!$reg) { return $empty; }
+        $waiter_id = (int) $waiter_id;
+        $counter = (int) $reg->counter_id;
+        $outlet  = (int) $reg->outlet_id;
+        $o = $this->db->escape($reg->window_start);
+        $c = $this->db->escape($reg->window_end);
+
+        $q = $this->db->query("SELECT d.food_menu_id, d.menu_name,
+                                      COALESCE(SUM(d.qty),0) AS qty,
+                                      COALESCE(SUM(d.menu_price_with_discount),0) AS value
+                                 FROM tbl_sales_details d
+                                 JOIN tbl_sales s ON s.id = d.sales_id
+                                WHERE s.counter_id = $counter AND s.outlet_id = $outlet
+                                  AND s.waiter_id = $waiter_id
+                                  AND s.date_time >= $o AND s.date_time <= $c
+                                  AND s.del_status = 'Live' AND d.del_status = 'Live'
+                                GROUP BY d.food_menu_id, d.menu_name
+                                ORDER BY value DESC");
+        $items = $q ? $q->result() : array();
+
+        $q = $this->db->query("SELECT COALESCE(cat.name, 'Uncategorised') AS category,
+                                      COALESCE(SUM(d.qty),0) AS qty,
+                                      COALESCE(SUM(d.menu_price_with_discount),0) AS value
+                                 FROM tbl_sales_details d
+                                 JOIN tbl_sales s ON s.id = d.sales_id
+                            LEFT JOIN tbl_food_menus fm ON fm.id = d.food_menu_id
+                            LEFT JOIN tbl_food_menu_categories cat ON cat.id = fm.category_id
+                                WHERE s.counter_id = $counter AND s.outlet_id = $outlet
+                                  AND s.waiter_id = $waiter_id
+                                  AND s.date_time >= $o AND s.date_time <= $c
+                                  AND s.del_status = 'Live' AND d.del_status = 'Live'
+                                GROUP BY category ORDER BY value DESC");
+        $categories = $q ? $q->result() : array();
+        return array("items" => $items, "categories" => $categories);
+    }
+
+    /**
+     * Voided and cancelled work touching this waiter's orders inside the window.
+     *
+     * Read from tbl_audit_logs, which is where the product already records this -
+     * no new tracking was added. The log's user_id is whoever PERFORMED the
+     * cancellation, which is often a manager rather than the waiter, so matching
+     * on that alone would show the wrong person's work. The order number is
+     * pulled out of the details text instead and checked against the orders this
+     * waiter actually took; anything that cannot be tied to them is left out.
+     */
+    public function getWaiterRegisterVoids($register_id, $waiter_id) {
+        $reg = $this->getWaiterRegisterWindow($register_id);
+        if (!$reg) { return array(); }
+        $waiter_id = (int) $waiter_id;
+        $outlet = (int) $reg->outlet_id;
+        $o = $this->db->escape($reg->window_start);
+        $c = $this->db->escape($reg->window_end);
+
+        $q = $this->db->query("SELECT id, user_id, event_title, details, date_time
+                                 FROM tbl_audit_logs
+                                WHERE outlet_id = $outlet
+                                  AND date_time >= $o AND date_time <= $c
+                                  AND event_title IN ('Cancelled Sale','Remove Item','Deleted Sale','Refund Sale')
+                                  AND (del_status IS NULL OR del_status = 'Live')
+                                ORDER BY date_time ASC");
+        $rows = $q ? $q->result() : array();
+        if (!$rows) { return array(); }
+
+        /* every order number this waiter took in the window, from the completed
+           sales and from the running orders */
+        $nos = array();
+        foreach (array("tbl_sales", "tbl_kitchen_sales") as $table) {
+            $r = $this->db->query("SELECT DISTINCT sale_no FROM $table
+                                    WHERE waiter_id = $waiter_id AND outlet_id = $outlet
+                                      AND date_time >= $o AND date_time <= $c");
+            if ($r) { foreach ($r->result() as $x) { $nos[trim($x->sale_no)] = TRUE; } }
+        }
+
+        /* who did it, resolved once rather than per row */
+        $names = array();
+        $nr = $this->db->query("SELECT id, full_name FROM tbl_users");
+        if ($nr) { foreach ($nr->result() as $u) { $names[(int) $u->id] = $u->full_name; } }
+
+        $out = array();
+        foreach ($rows as $row) {
+            $text = (string) $row->details;
+            $sale_no = "";
+            if (preg_match('/Sale\s*No\s*:\s*([A-Za-z0-9._-]+)/i', $text, $m)) { $sale_no = trim($m[1]); }
+            $mine = ($sale_no !== "" && isset($nos[$sale_no]));
+            /* a log row with no order number in it can only be attributed by who
+               did it, and then only when that was the waiter themselves */
+            if (!$mine && $sale_no === "" && (int) $row->user_id === $waiter_id) { $mine = TRUE; }
+            if (!$mine) { continue; }
+            $reason = "";
+            if (preg_match('/Reason\s*:\s*([^<,]*)/i', $text, $m)) { $reason = trim($m[1]); }
+            $value = "";
+            if (preg_match('/Total\s*Payable\s*:\s*([0-9.,]+)/i', $text, $m)) { $value = trim($m[1]); }
+            $plain = trim(preg_replace('/\s+/', " ", strip_tags(str_replace(array("<br>", "<br/>"), " | ", $text))));
+            $out[] = (object) array(
+                "id" => (int) $row->id,
+                "event" => $row->event_title,
+                "sale_no" => $sale_no,
+                "reason" => $reason,
+                "value" => $value,
+                "date_time" => $row->date_time,
+                "by_user" => isset($names[(int) $row->user_id]) ? $names[(int) $row->user_id] : ("user #" . (int) $row->user_id),
+                "details" => $plain,
+            );
+        }
+        return $out;
+    }
+}

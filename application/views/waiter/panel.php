@@ -107,6 +107,15 @@ $mode = APPLICATION_lcl;
                 <?php echo escape_output($this->session->userdata('outlet_name')); ?></h1>
             </div>
 
+            <?php /* The waiter pulls their OWN takings for a register session. The
+                     screen pins them to themselves whatever the form says, so this
+                     link is safe to show to any waiter who holds the permission. */ ?>
+            <div class="text-center" style="margin:6px 0 10px">
+                <a class="btn bg-blue-btn" href="<?php echo base_url(); ?>Report/waiterRegisterReport">
+                    <i class="fal fa-file-chart-line"></i> <?php echo lang('waiter_register_report'); ?>
+                </a>
+            </div>
+
             <div class="header_button_div">
             <?php if($mode!='lcl'):?>
                 <?php echo form_open(base_url() . 'Authentication/setlanguage', $arrayName = array('id' => 'language')) ?>

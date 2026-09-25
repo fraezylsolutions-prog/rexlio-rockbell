@@ -2891,7 +2891,7 @@ FROM tbl_food_menus_ingredients i  LEFT JOIN (select * from tbl_ingredients wher
                                 ORDER BY value DESC");
         $items = $q ? $q->result() : array();
 
-        $q = $this->db->query("SELECT COALESCE(cat.name, 'Uncategorised') AS category,
+        $q = $this->db->query("SELECT COALESCE(cat.category_name, 'Uncategorised') AS category,
                                       COALESCE(SUM(d.qty),0) AS qty,
                                       COALESCE(SUM(d.menu_price_with_discount),0) AS value
                                  FROM tbl_sales_details d

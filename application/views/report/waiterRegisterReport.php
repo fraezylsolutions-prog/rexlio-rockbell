@@ -10,11 +10,17 @@
  */
 $can_pick = !empty($can_pick_waiter);
 ?>
-<div class="row">
-  <div class="col-md-12">
-    <div class="panel panel-default">
-      <div class="panel-heading"><h4 class="panel-title"><?php echo lang('waiter_register_report'); ?></h4></div>
-      <div class="panel-body">
+<link rel="stylesheet" href="<?php echo base_url(); ?>assets/dist/css/custom/report.css">
+<?php /* The same wrapper every other report uses. Without it the content sits
+         under the sidebar instead of beside it. */ ?>
+<section class="main-content-wrapper">
+  <section class="content-header px-0">
+    <div class="d-flex align-items-center">
+      <h3 class="top-left-header text-left"><?php echo lang('waiter_register_report'); ?></h3>
+    </div>
+  </section>
+  <div class="box-wrapper">
+    <div class="p-3">
 
         <form method="post" action="<?php echo base_url(); ?>Report/waiterRegisterReport" class="form-horizontal" id="wrr_filter">
           <div class="row">
@@ -76,10 +82,9 @@ $can_pick = !empty($can_pick_waiter);
         </div>
 
         <div id="wrr_result" style="margin-top:22px"></div>
-      </div>
     </div>
   </div>
-</div>
+</section>
 
 <style>
 #wrr_result table{width:100%;margin-bottom:18px}

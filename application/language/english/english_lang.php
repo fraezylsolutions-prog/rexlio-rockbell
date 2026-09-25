@@ -2375,3 +2375,4 @@ $lang['completed_orders'] = 'Completed orders';
 $lang['something_went_wrong'] = 'Something went wrong. Please try again.';
 $lang['by'] = 'By';
 $lang['open'] = 'Open';
+$lang['search'] = 'Search';

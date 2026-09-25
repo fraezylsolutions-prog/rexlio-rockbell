@@ -147,6 +147,15 @@ class Report extends Cl_Controller {
                 //the generic check below deny when they hold neither.
                 $function = "view";
                 $controller = checkAccess("378", "view") ? "378" : "167";
+            }elseif($segment_2=="waiterRegisterReport" || $segment_2=="waiterRegisterReportAjax"){
+                //Waiter's Register Report. Unlike every report above, its access id is
+                //assigned when migration 2026-09-25_01 runs rather than being fixed in
+                //the product, so it is looked up by name instead of hardcoded.
+                //A method missing from this chain falls into the else below and is
+                //refused outright - which is what produced "you haven't permission to
+                //access this function" on a brand new screen nobody had denied anyone.
+                $controller = (string) irAccessModuleId('waiter_register_report');
+                $function = "view";
             }else{
                 $this->session->set_flashdata('exception_er', lang('menu_not_permit_access'));
                 redirect('Authentication/userProfile');

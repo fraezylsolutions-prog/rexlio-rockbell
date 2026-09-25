@@ -1652,6 +1652,7 @@ class Report extends Cl_Controller {
 
         $sold  = $this->Report_model->getWaiterRegisterProductsSold($register_id, $waiter_id);
         $voids = $this->Report_model->getWaiterRegisterVoids($register_id, $waiter_id);
+        $orders = $this->Report_model->getWaiterRegisterOrders($register_id, $waiter_id);
 
         $w = $this->db->select('full_name')->from('tbl_users')->where('id', $waiter_id)->get()->row();
 
@@ -1672,6 +1673,7 @@ class Report extends Cl_Controller {
         $response->items_sold     = $summary->items_sold;
         $response->items          = $sold['items'];
         $response->categories     = $sold['categories'];
+        $response->orders         = $orders;
         $response->voids          = $voids;
         echo json_encode($response);
     }

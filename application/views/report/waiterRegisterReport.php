@@ -175,6 +175,29 @@ $can_pick = !empty($can_pick_waiter);
           h += '</tbody></table>';
         }
 
+        /* Every completed order, one line each: what it was, how it was paid and
+           what it came to. Sits above the voided section so the report reads as
+           what was sold, then what was not. */
+        h += '<h4><?php echo lang('wrr_completed_orders_list'); ?></h4><table><thead><tr>'
+           + '<th><?php echo lang('order_no'); ?></th><th><?php echo lang('date'); ?></th>'
+           + '<th><?php echo lang('payment_method'); ?></th>'
+           + '<th class="num"><?php echo lang('amount'); ?></th></tr></thead><tbody>';
+        if (!(d.orders || []).length) {
+          h += '<tr><td colspan="4"><?php echo lang('wrr_no_orders'); ?></td></tr>';
+        }
+        var orders_total = 0;
+        $.each(d.orders || [], function (i, o) {
+          orders_total += Number(o.total_payable || 0);
+          h += '<tr><td>' + esc(o.sale_no) + '</td><td>' + esc(o.date_time)
+             + '</td><td>' + (o.methods ? esc(o.methods) : '&mdash;')
+             + '</td><td class="num">' + money(o.total_payable) + '</td></tr>';
+        });
+        if ((d.orders || []).length) {
+          h += '<tr><th colspan="3"><?php echo lang('total'); ?></th>'
+             + '<th class="num">' + money(orders_total) + '</th></tr>';
+        }
+        h += '</tbody></table>';
+
         h += '<h4><?php echo lang('wrr_voided'); ?></h4><table><thead><tr>'
            + '<th><?php echo lang('date'); ?></th><th><?php echo lang('order_no'); ?></th>'
            + '<th><?php echo lang('type'); ?></th><th><?php echo lang('reason'); ?></th>'

@@ -2376,3 +2376,5 @@ $lang['something_went_wrong'] = 'Something went wrong. Please try again.';
 $lang['by'] = 'By';
 $lang['open'] = 'Open';
 $lang['search'] = 'Search';
+$lang['wrr_completed_orders_list'] = 'Completed orders';
+$lang['wrr_no_orders'] = 'No completed orders in this period.';

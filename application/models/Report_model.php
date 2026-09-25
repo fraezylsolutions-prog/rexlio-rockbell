@@ -2978,4 +2978,39 @@ FROM tbl_food_menus_ingredients i  LEFT JOIN (select * from tbl_ingredients wher
         }
         return $out;
     }
+
+    /**
+     * Every completed order this waiter took inside the register's window, one
+     * row each: order number, how it was paid, and what it came to.
+     *
+     * Payment methods are gathered per order rather than per payment row, so a
+     * bill settled part cash part card reads "Cash, POS Card" on one line
+     * instead of appearing twice and making the list look like two sales.
+     * An order with no payment row at all still appears, with its methods blank -
+     * leaving it out would make the list disagree with the totals above it.
+     */
+    public function getWaiterRegisterOrders($register_id, $waiter_id) {
+        $reg = $this->getWaiterRegisterWindow($register_id);
+        if (!$reg) { return array(); }
+        $waiter_id = (int) $waiter_id;
+        $counter = (int) $reg->counter_id;
+        $outlet  = (int) $reg->outlet_id;
+        $o = $this->db->escape($reg->window_start);
+        $c = $this->db->escape($reg->window_end);
+
+        $q = $this->db->query("SELECT s.id, s.sale_no, s.date_time, s.total_payable, s.due_amount,
+                                      COALESCE(GROUP_CONCAT(DISTINCT pm.name ORDER BY pm.name SEPARATOR ', '), '') AS methods,
+                                      COALESCE(SUM(sp.amount), 0) AS paid
+                                 FROM tbl_sales s
+                            LEFT JOIN tbl_sale_payments sp ON sp.sale_id = s.id
+                                  AND sp.del_status = 'Live' AND sp.currency_type IS NULL
+                            LEFT JOIN tbl_payment_methods pm ON pm.id = sp.payment_id
+                                WHERE s.counter_id = $counter AND s.outlet_id = $outlet
+                                  AND s.waiter_id = $waiter_id
+                                  AND s.date_time >= $o AND s.date_time <= $c
+                                  AND s.del_status = 'Live' AND s.order_status = 3
+                                GROUP BY s.id, s.sale_no, s.date_time, s.total_payable, s.due_amount
+                                ORDER BY s.date_time ASC");
+        return $q ? $q->result() : array();
+    }
 }

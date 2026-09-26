@@ -1,5 +1,5 @@
 /* @import url("https://fonts.googleapis.com/css?family=Poppins&display=swap"); */
-@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap");
+/* offline: was @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap"); - fonts are served locally, see assets/fonts/montserrat_local.css */
 
 :root {
   --color-for-sell-page: #2caccc;

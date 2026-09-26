@@ -202,7 +202,7 @@ foreach($food_menus as $single_menus){
     }
     //construct new single item content
     $menu_to_show .= '<div class="single_item animate__animated animate__flipInX" data-price="'.$sale_price.'"  data-price_take="'.$sale_price_take.'"  data-price_delivery="'.$sale_price_delivery.'"  data-price_vip="'.$sale_price_vip.'"  data-price_club="'.$sale_price_club.'" data-is_variation="'.$is_variation.'"  id="item_'.$single_menus->id.'">';
-    $menu_to_show .= '<img src="'.$image_path.'" alt="" width="142">';
+    $menu_to_show .= '<img loading="lazy" decoding="async" src="'.$image_path.'" alt="" width="142">';
         $menu_to_show .= '<p class="item_name '.$item_name_c.'" data-tippy-content="'.$single_menus->name.'">'.$single_menus->name.'</p>';
     /* The tile showed getAmtP($sale_price) - the REGULAR price - always, whatever
        tier was in force, and nothing ever rewrote it afterwards. So a waitress
@@ -710,13 +710,17 @@ foreach ($notifications as $single_notification){
             if(t!=='dark'&&t!=='light'){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
             document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
     </script>
-    <?php /* Montserrat 800 for the category rail (theme section 22). The app's
-         base @import (assets/POS/css/style.css:2) loads 300-700 only, so a
-         request for 800 would otherwise be met with a synthesised fake-bold
-         rather than the real cut. Same family and host as the existing import,
-         so this adds a weight - not another typeface. */ ?>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap">
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.5">
+    <?php /* Montserrat, served from this server. It used to be fetched from
+         fonts.googleapis.com on every load - measured at 1.43 seconds,
+         render-blocking, on a screen whose target is under a second, and at a
+         venue with no internet it stalls the page until the request gives up.
+         One variable file now covers 300-800, so the category rail still gets
+         the real 800 cut rather than a synthesised fake-bold.
+         Preloaded because it is needed for first paint. */ ?>
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href="<?php echo base_url(); ?>assets/fonts/montserrat/montserrat-variable.woff2">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>assets/fonts/montserrat_local.css?v=1">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.6">
 </head>
 
 <body>
@@ -4799,7 +4803,7 @@ foreach ($notifications as $single_notification){
 
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/POS/js/howler.min.js?v=7.5"></script>
     <script src="<?php echo base_url(); ?>assets/dist/js/feather.min.js?v=7.5"></script>
-    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=6.5"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>frequent_changing/js/pos_script_v7.3.js?v=6.6"></script>
     <script src="<?php echo base_url(); ?>assets/POS/js/media.js?v=7.5"></script>
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/plugins/notify/jquery.notifyBar.js?v=7.5"></script>
     <script type="text/javascript">

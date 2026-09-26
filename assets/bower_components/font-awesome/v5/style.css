@@ -1,5 +1,5 @@
 @charset "UTF-8";
-@import url("https://fonts.googleapis.com/css?family=Poppins&display=swap");
+/* offline: was @import url("https://fonts.googleapis.com/css?family=Poppins&display=swap"); - fonts are served locally, see assets/fonts/montserrat_local.css */
 * {
   box-sizing: border-box;
 }

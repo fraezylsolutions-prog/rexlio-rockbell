@@ -5,7 +5,7 @@
  *   License: Open source - MIT
  *           Please visit http://opensource.org/licenses/MIT for more information
  */
- @import url('https://fonts.googleapis.com/css?family=Lobster&display=swap');
+ /* offline: was @import url('https://fonts.googleapis.com/css?family=Lobster&display=swap'); - fonts are served locally, see assets/fonts/montserrat_local.css */
 html,
 body {
     height: 100%

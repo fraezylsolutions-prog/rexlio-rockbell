@@ -47,8 +47,8 @@
  9. Responsive
 ===========================*/
 /* Google Fonts */
-@import url("https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap");
-@import url("https://fonts.googleapis.com/css?family=Oswald:400,700&display=swap");
+/* offline: was @import url("https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap"); - see assets/fonts/montserrat_local.css */
+/* offline: was @import url("https://fonts.googleapis.com/css?family=Oswald:400,700&display=swap"); - see assets/fonts/montserrat_local.css */
 
 /*-------------------------------------------------------------------*/
 /* === Keyframes === */

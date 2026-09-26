@@ -1,0 +1,22 @@
+/* Montserrat, served from this server.
+
+   The POS screen used to request this family from fonts.googleapis.com on every
+   load. Measured on 2026-09-26: 1.43 seconds, render-blocking, on a screen whose
+   target is under a second - and at a venue with no internet it does not merely
+   slow the page, it stalls it until the request gives up.
+
+   Google serves the latin subset as a single VARIABLE font covering 300-800, so
+   one 37 KB file replaces the six separate weights the old import implied. Only
+   the latin subset is bundled: this is an English install and the cyrillic and
+   vietnamese cuts are dead weight on a local server.
+
+   Fetched once and committed. Nothing here touches the internet at run time. */
+@font-face{
+    font-family:'Montserrat';
+    font-style:normal;
+    font-weight:300 800;
+    font-display:swap;
+    src:url('montserrat/montserrat-variable.woff2') format('woff2-variations'),
+        url('montserrat/montserrat-variable.woff2') format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}

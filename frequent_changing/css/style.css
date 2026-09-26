@@ -37,7 +37,7 @@
 ##### Index of Stylesheet ##### /*
 
 /* :: 1.0 Import Fonts */
-@import url("https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700");
+/* offline: was @import url("https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700"); - fonts are served locally, see assets/fonts/montserrat_local.css */
 /* :: 2.0 Import All CSS */
 @import url(bootstrap.min.css);
 @import url(animate.css);

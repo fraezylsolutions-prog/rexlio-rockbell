@@ -1,3 +1,10 @@
+/* No animation anywhere on the sale screen. Every fade and slide in here is time
+   the operator waits after the work is already done - on a till through a busy
+   service that is dead time on every tap. Turning jQuery.fx off makes them
+   complete instantly while STILL firing their completion callbacks, so nothing
+   that depends on an animation finishing breaks. One switch, rather than hunting
+   some forty separate fade durations and missing one. (2026-09-26) */
+if (window.jQuery) { window.jQuery.fx.off = true; }
 (function ($) {
     "use strict";
       toastr.options = {
@@ -5857,7 +5864,7 @@
                             foundItems[key].item_id +
                             '">';
                         searched_category_items_to_show +=
-                            '<img src="' + foundItems[key].image + '" alt="" width="141">';
+                            '<img loading="lazy" decoding="async" src="' + foundItems[key].image + '" alt="" width="141">';
                         searched_category_items_to_show +=
                             '<p class="item_name" data-tippy-content="' +
                             foundItems[key].item_name +
@@ -5882,7 +5889,7 @@
                             foundItems[key].item_id +
                             '">';
                         searched_category_items_to_show +=
-                            '<img src="' + foundItems[key].image + '" alt="" width="141">';
+                            '<img loading="lazy" decoding="async" src="' + foundItems[key].image + '" alt="" width="141">';
                         searched_category_items_to_show +=
                             '<p class="item_name" data-tippy-content="' +
                             foundItems[key].item_name +
@@ -5932,7 +5939,7 @@
                           foundItems[key].item_id +
                           '">';
                       searched_category_items_to_show +=
-                          '<img src="' + foundItems[key].image + '" alt="" width="141">';
+                          '<img loading="lazy" decoding="async" src="' + foundItems[key].image + '" alt="" width="141">';
                       searched_category_items_to_show +=
                           '<p class="item_name" data-tippy-content="' +
                           foundItems[key].item_name +
@@ -7444,7 +7451,7 @@
                 foundItems[key].item_id +
                 '">';
               searched_category_items_to_show +=
-                '<img src="' + foundItems[key].image + '" alt="" width="141">';
+                '<img loading="lazy" decoding="async" src="' + foundItems[key].image + '" alt="" width="141">';
               searched_category_items_to_show +=
                 '<p class="item_name" data-tippy-content="' +
                 foundItems[key].item_name +
@@ -7486,7 +7493,7 @@
                                 foundItems[key].item_id +
                                 '">';
                             searched_category_items_to_show +=
-                                '<img src="' + foundItems[key].image + '" alt="" width="141">';
+                                '<img loading="lazy" decoding="async" src="' + foundItems[key].image + '" alt="" width="141">';
                             searched_category_items_to_show +=
                                 '<p class="item_name" data-tippy-content="' +
                                 foundItems[key].item_name +
@@ -11472,7 +11479,7 @@
                         foundItems[key].item_id +
                         '">';
                     searched_category_items_to_show +=
-                        '<img src="' + foundItems[key].image + '" alt="" width="141">';
+                        '<img loading="lazy" decoding="async" src="' + foundItems[key].image + '" alt="" width="141">';
                     searched_category_items_to_show +=
                         '<p class="item_name" data-tippy-content="' +
                         foundItems[key].item_name +

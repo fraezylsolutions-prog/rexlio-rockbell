@@ -1,3 +1,10 @@
+/* No animation anywhere. Every fade, slide and animate() in this app is
+   time the user waits after the work is already done - on a till during a
+   busy service that is dead time on every tap. Turning jQuery.fx off makes
+   them complete instantly while STILL firing their completion callbacks,
+   so nothing that depends on an animation finishing breaks. One switch,
+   rather than hunting some forty fade durations and missing one. */
+if (window.jQuery) { window.jQuery.fx.off = true; }
 (function ($) {
   "use strict";
   const win = $(window);
@@ -28,9 +35,11 @@
    */
 
   win.on("load", () => {
-    setTimeout(() => {
-      $(".main-preloader").fadeOut(500);
-    }, 500);
+    /* Straight to the screen. This used to wait 500ms and then fade for another
+       500ms - a full second of doing nothing, and all of it AFTER window.load,
+       so none of it covered any real work; it was added on top. On a till taking
+       orders through a busy service that is a second lost on every page. */
+    $(".main-preloader").hide();
   });
 
   /**

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@100;200;300;400;500;600;700;800;900&display=swap');
+/* offline: was @import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@100;200;300;400;500;600;700;800;900&display=swap'); - fonts are served locally, see assets/fonts/montserrat_local.css */
 
 .item_detail p.item_name {
     margin-bottom: 0rem !important;

@@ -1621,3 +1621,18 @@ a.ir_rail_search:active{transform:translateY(1px)}
 }
 #ir_cart_to_bottom:active{transform:translateY(1px)}
 #ir_cart_to_bottom.ir_show{display:block}
+
+/* ==========================================================================
+   No animation that costs time
+   jQuery's animations are switched off in script (jQuery.fx.off). These are the
+   CSS ones it cannot reach: animate.css runs a 1s flipInX on EVERY item tile,
+   so a category of forty items spends a second animating before the operator
+   can touch anything. The tiles appear immediately now.
+   Transitions on hover/active states are left alone - they cost nothing, run
+   after the screen is usable, and are what makes a button feel pressed.
+   ========================================================================== */
+.animate__animated{
+    animation-duration:0s !important;
+    animation-delay:0s !important;
+}
+.main-preloader{display:none !important}

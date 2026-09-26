@@ -124,7 +124,7 @@ $outlet_details = getOutletById($online_selected_outlet);
    <div class="section-map pb-0">
     <div class="ct-contact-map-wrapper">
       <div id="contactPageMap" class="ct-contact-map">
-        <iframe src="<?= escape_output($company_info->google_map) ?>" width="100%" height="450" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+        <iframe loading="lazy" src="<?= escape_output($company_info->google_map) ?>" width="100%" height="450" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
       </div>
     </div>
   </div>

@@ -1,6 +1,6 @@
 /* Google fonts */
-@import url(http://fonts.googleapis.com/css?family=Raleway:400,100,200,300,500,600,700,900,800);
-@import url(http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800);
+/* offline: was @import url(http://fonts.googleapis.com/css?family=Raleway:400,100,200,300,500,600,700,900,800); - fonts are served locally, see assets/fonts/montserrat_local.css */
+/* offline: was @import url(http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800); - fonts are served locally, see assets/fonts/montserrat_local.css */
 @import "variables.css";
 
 /* Global properties (body, common classes, vertical rhythm, structure etc)

@@ -211,7 +211,11 @@
             if(t!=='dark'&&t!=='light'){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
             document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
     </script>
-    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.5">
+    <?php /* Montserrat from this server rather than fonts.googleapis.com - see
+             assets/fonts/montserrat_local.css. Every page that includes this
+             layout gains it, so no dashboard or report has to ask for it. */ ?>
+    <link rel="stylesheet" href="<?php echo base_url(); ?>assets/fonts/montserrat_local.css?v=1">
+    <link rel="stylesheet" href="<?php echo base_url(); ?>frequent_changing/css/rexlio_theme.css?v=7.9.6">
 <div class="loader"></div>
 <!-- ADD THE CLASS sidebar-collapse TO HIDE THE SIDEBAR PRIOR TO LOADING THE SITE -->
 

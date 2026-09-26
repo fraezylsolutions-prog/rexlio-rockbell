@@ -144,7 +144,7 @@ $explore_menu_section = isset($company_info->explore_menu_section) && $company_i
   <div class="section-map pb-0">
     <div class="ct-contact-map-wrapper">
       <div id="contactPageMap" class="ct-contact-map">
-        <iframe src="<?= escape_output($company_info->google_map) ?>" width="100%" height="450"  allowfullscreen="" loading="lazy"></iframe>
+        <iframe loading="lazy" src="<?= escape_output($company_info->google_map) ?>" width="100%" height="450"  allowfullscreen="" loading="lazy"></iframe>
       </div>
     </div>
   </div>

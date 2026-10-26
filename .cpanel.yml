@@ -14,26 +14,30 @@
 # those by hand when it happens.
 deployment:
   tasks:
-    # Where this server deploys to is read from the SERVER, not from this file.
+    # Where this clone deploys to is read from THE CLONE, not from this file.
     #
     # It used to be hardcoded here as Rockbell's docroot. That is fine while one
-    # client exists and dangerous the moment a second one does: both clients are
-    # served from this same repository, so a pull on Goloviana would have brought
-    # down Rockbell's path and the next deploy would have written one client's
-    # code into the other client's website.
+    # client exists and dangerous the moment a second one does: every client is
+    # served from this same repository, so a pull would have brought one client's
+    # path onto another client's server and the next deploy there would have
+    # written one venue's code into another venue's website.
     #
-    # ~/.rexlio_deploypath holds one line - that account's docroot. It lives
-    # outside the repository, so it cannot travel between clients, and each
-    # server states its own answer. Create it once per client:
+    # The first attempt put the answer in ~/.rexlio_deploypath. That was wrong:
+    # Rockbell and Goloviana are two sites on ONE cPanel account, so they share a
+    # home directory and would have shared that single file - fixing nothing.
+    # The answer has to be per CLONE, so it lives in the clone's own root and is
+    # gitignored, which means it never travels when the repo is pulled.
     #
-    #     echo /home/<cpanel-user>/<docroot> > ~/.rexlio_deploypath
+    # Create it once per clone, from inside that clone's repository folder:
+    #
+    #     echo /home/<cpanel-user>/<docroot> > .rexlio_deploypath
     #
     # If it is missing, or names a folder that is not there, the deploy STOPS.
     # Refusing is the whole point: the alternative is deploying somewhere wrong
     # and finding out from the client.
-    - export DEPLOYPATH="$(cat ~/.rexlio_deploypath 2>/dev/null | head -1 | tr -d '[:space:]')"
-    - if [ -z "$DEPLOYPATH" ]; then echo "REFUSING TO DEPLOY: ~/.rexlio_deploypath is missing or empty on this server. Create it with: echo /home/<user>/<docroot> > ~/.rexlio_deploypath"; exit 1; fi
-    - case "$DEPLOYPATH" in /home/*) ;; *) echo "REFUSING TO DEPLOY: ~/.rexlio_deploypath does not look like a docroot: $DEPLOYPATH"; exit 1;; esac
+    - export DEPLOYPATH="$(cat .rexlio_deploypath 2>/dev/null | head -1 | tr -d '[:space:]')"
+    - if [ -z "$DEPLOYPATH" ]; then echo "REFUSING TO DEPLOY: .rexlio_deploypath is missing or empty in this repository folder. Create it with: echo /home/<user>/<docroot> > .rexlio_deploypath"; exit 1; fi
+    - case "$DEPLOYPATH" in /home/*) ;; *) echo "REFUSING TO DEPLOY: .rexlio_deploypath does not look like a docroot: $DEPLOYPATH"; exit 1;; esac
     - if [ ! -d "$DEPLOYPATH" ]; then echo "REFUSING TO DEPLOY: $DEPLOYPATH does not exist on this server"; exit 1; fi
     # every later task concatenates onto this, so the trailing slash is required
     - case "$DEPLOYPATH" in */) ;; *) export DEPLOYPATH="$DEPLOYPATH/";; esac
@@ -50,6 +54,7 @@ deployment:
       /usr/bin/rsync -a
       --exclude '.git'
       --exclude '.gitignore'
+      --exclude '.rexlio_deploypath'
       --exclude 'pw.php'
       --exclude 'application/config/database.php'
       --exclude 'assets/blueimp/REST_API*.json'

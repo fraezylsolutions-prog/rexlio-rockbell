@@ -75,3 +75,11 @@ Thumbs.db
 /assets/blueimp/REST_API.json
 /assets/blueimp/REST_API_I.json
 /assets/blueimp/REST_API_UV.json
+
+# --- per-clone deploy target -------------------------------------------------
+# .rexlio_deploypath holds the docroot THIS clone deploys to. It must never be
+# committed: every client is served from this one repository, so a committed
+# path would follow a pull onto another client's server and the next deploy
+# there would write one venue's code into another venue's website. Each clone
+# states its own answer; .cpanel.yml refuses to deploy without it.
+/.rexlio_deploypath

@@ -83,3 +83,15 @@ Thumbs.db
 # there would write one venue's code into another venue's website. Each clone
 # states its own answer; .cpanel.yml refuses to deploy without it.
 /.rexlio_deploypath
+
+# --- the vendor installer ----------------------------------------------------
+# install.zip is the iRestora installer archive. It belongs on a machine exactly
+# once, while it is being set up, and never on a trading site: the zip hands out
+# install/config/database.php to anyone who asks for it. Found publicly
+# downloadable on a client site, 2026-10-28.
+#
+# NOTE: the install/ FOLDER is already tracked in this repository, so listing it
+# here would do nothing - an ignore rule does not apply to a file git is already
+# tracking. What keeps it off a docroot is the exclude in .cpanel.yml. Whether
+# to untrack install/ altogether is a separate decision, not made here.
+/install.zip

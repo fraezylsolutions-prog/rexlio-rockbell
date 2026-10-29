@@ -206,6 +206,38 @@ if (!function_exists('irNotifyDriverEmail')) {
     }
 }
 
+if (!function_exists('irNotifyDriverSms')) {
+    /**
+     * SMS, through the product's own smsSendOnly(). That function is bounded
+     * and returns a real boolean as of N3.5 - before that it returned nothing
+     * and could wait for ever, which is exactly why sending moved in here.
+     *
+     * The provider setting is still the legacy one for now. N4 gives the
+     * module its own, as agreed, because the two legacy columns contradict
+     * each other.
+     *
+     * @return array ok, error
+     */
+    function irNotifyDriverSms($row) {
+        $to = trim((string) $row->actual_recipient);
+        if ($to === '') { return array('ok' => FALSE, 'error' => 'no number'); }
+        /* digits, + and spaces only - a stray name here would be sent to a
+           provider and charged for */
+        if (!preg_match('/^[0-9+][0-9 ()-]{5,}$/', $to)) {
+            return array('ok' => FALSE, 'error' => 'not a phone number: ' . $to);
+        }
+        try {
+            $sent = smsSendOnly($row->body, $to);
+            if ($sent === FALSE) {
+                return array('ok' => FALSE, 'error' => 'the SMS provider did not accept it - see the sms lines in this log');
+            }
+            return array('ok' => TRUE, 'error' => '');
+        } catch (Throwable $e) {
+            return array('ok' => FALSE, 'error' => substr($e->getMessage(), 0, 480));
+        }
+    }
+}
+
 if (!function_exists('irNotifyDriver')) {
     /**
      * The driver for a channel, or NULL when that channel has none yet.

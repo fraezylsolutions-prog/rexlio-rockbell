@@ -2796,7 +2796,36 @@ class Sale extends Cl_Controller {
                 $sms_content = "Hi ".$customer->name.", thank you for visiting '.$outlet_name.'. Total bill of your order on '.$order_details->date_time.' is ".getAmtCustom($order_details->total_payable).". Paid amount is: ".getAmtCustom($order_details->paid_amount).", Due Amount is: ".getAmtCustom($order_details->due_amount)."
 We hope to see you again!";
                 if($customer->phone){
-                    smsSendOnly($sms_content,$customer->phone);
+                    /* N3.5: the customer's receipt SMS used to be sent from right
+                       here, on the thread completing the order, while the till sat
+                       on a synchronous XHR. A slow provider froze the screen; a
+                       provider that accepted the connection and then went quiet
+                       froze it indefinitely, because nothing set a timeout.
+
+                       It goes in the outbox now and the worker sends it, so the
+                       till returns as soon as the sale is saved.
+
+                       The inline call stays as the fallback for when the module or
+                       the SMS channel is off - which is every installation until
+                       somebody turns them on. Dropping it would silently stop
+                       customers getting their receipts. smsSendOnly() is bounded
+                       and reports failure now, so even that path cannot hang a
+                       till the way it could before. */
+                    $ir_queued = irNotifyEnqueue(array(
+                        'event_key' => 'customer_receipt_sms',
+                        'channel' => 'sms',
+                        'intended_recipient' => $customer->phone,
+                        'subject' => 'Receipt',
+                        'body' => $sms_content,
+                        'payload' => array(
+                            'sale_no' => isset($sale_no) ? $sale_no : '',
+                            'customer_id' => trim_checker($order_details->customer_id),
+                        ),
+                        'outlet_id' => $this->session->userdata('outlet_id'),
+                    ));
+                    if(!$ir_queued){
+                        smsSendOnly($sms_content,$customer->phone);
+                    }
                 }
             }
             if($select_kitchen_row){

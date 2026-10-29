@@ -3676,46 +3676,116 @@ function removeCountryCode($phone){
     }
 }
 function smsSendOnly($msg,$to){
+    /* N3.5 (2026-10-29). This function used to return nothing, time out never,
+       and send silently into the void. All three mattered, because it is called
+       from the order-completion path: Sale::push_online() reaches it while the
+       till is sitting on a synchronous XHR, so every second spent here is a
+       second the operator cannot touch the screen.
+          - the mShastra branch set no CURLOPT_TIMEOUT and no CONNECTTIMEOUT at
+            all, so a provider that accepted the connection and then went quiet
+            could hold the till indefinitely;
+          - the Twilio branch had the SDK's own defaults and no error handling,
+            so a failure surfaced as a PHP exception in the middle of saving;
+          - and nothing ever knew whether a message had been sent.
+       It now bounds both paths, returns TRUE or FALSE, and says why in the
+       notification log. The caller decides what to do about a failure.
+       @return bool */
     $CI = &get_instance();
     $company_id = $CI->session->userdata('company_id');
     $company = companyInformation($company_id);
-    if(isset($company) && $company){
-        $company_info = isset($company->sms_details) && $company->sms_details?json_decode($company->sms_details):'';
 
-        if($company->sms_service_provider==1){
-            require './Twilio/autoload.php';
-            // Your Account SID and Auth Token from twilio.com/console
-            $sid = (isset($company_info) && $company_info->field_1_0?$company_info->field_1_0:'');
-            $token = (isset($company_info) && $company_info->field_1_1?$company_info->field_1_1:'');
+    $log = function ($line) {
+        /* the notification log if it is loaded, otherwise nowhere - this helper
+           is older than that one and must not depend on it */
+        if (function_exists('irNotifyLog')) { irNotifyLog('sms: ' . $line); }
+    };
+
+    if (!isset($company) || !$company) {
+        $log('no company record - not sent');
+        return FALSE;
+    }
+
+    /* A REAL enable check. There was none: if credentials happened to exist it
+       sent, and if they did not it failed silently halfway through. */
+    $provider = isset($company->sms_service_provider) ? (int) $company->sms_service_provider : 0;
+    if ($provider !== 1 && $provider !== 2) {
+        $log('no SMS provider configured (sms_service_provider=' . $provider . ') - not sent');
+        return FALSE;
+    }
+    $company_info = (isset($company->sms_details) && $company->sms_details) ? json_decode($company->sms_details) : NULL;
+    if (!$company_info) {
+        $log('provider ' . $provider . ' selected but no credentials stored - not sent');
+        return FALSE;
+    }
+
+    $to = trim((string) $to);
+    if ($to === '') { $log('no destination number - not sent'); return FALSE; }
+
+    if ($provider == 1) {
+        $sid   = !empty($company_info->field_1_0) ? $company_info->field_1_0 : '';
+        $token = !empty($company_info->field_1_1) ? $company_info->field_1_1 : '';
+        $twilio_number = !empty($company_info->field_1_2) ? $company_info->field_1_2 : '';
+        if ($sid === '' || $token === '' || $twilio_number === '') {
+            $log('Twilio selected but the SID, token or sending number is blank - not sent');
+            return FALSE;
+        }
+        try {
+            require_once './Twilio/autoload.php';
+            /* Bounded on purpose. Without these the SDK waits on its own
+               defaults while a till is frozen behind it. */
             $client = new Twilio\Rest\Client($sid, $token);
-
-            $twilio_number = (isset($company_info) && $company_info->field_1_2?$company_info->field_1_2:'');
-            // Use the client to do fun stuff like send text messages!
-            $client->messages->create(
-            // the number you'd like to send the message to
-                $to,
-                array(
-                    // A Twilio phone number you purchased at twilio.com/console
-                    'from' => $twilio_number,
-                    // the body of the text message you'd like to send
-                    'body' => $msg
-                )
-            );
-        }else if($company->sms_service_provider==2){
-            // load library
-            $profile_id = (isset($company_info) && $company_info->field_2_0?$company_info->field_2_0:'');
-            $password = (isset($company_info) && $company_info->field_2_1?$company_info->field_2_1:'');
-            $sender_id = (isset($company_info) && $company_info->field_2_2?$company_info->field_2_2:'');
-            $country_code = (isset($company_info) && $company_info->field_2_3?$company_info->field_2_3:'');
-            $phone = removeCountryCode($to);
-
-            $url = "http://mshastra.com/sendurlcomma.aspx?user=".$profile_id."&pwd=".$password."&senderid=".$sender_id."&CountryCode=".$country_code."&mobileno=".$phone."&msgtext=".$msg;
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_exec($ch);
-            curl_close($ch);
+            $client->setHttpClient(new Twilio\Http\CurlClient(array(
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT        => 10,
+            )));
+            $client->messages->create($to, array('from' => $twilio_number, 'body' => $msg));
+            return TRUE;
+        } catch (Throwable $e) {
+            $log('Twilio refused: ' . $e->getMessage());
+            return FALSE;
         }
     }
+
+    /* provider 2 - mShastra */
+    $profile_id   = !empty($company_info->field_2_0) ? $company_info->field_2_0 : '';
+    $password     = !empty($company_info->field_2_1) ? $company_info->field_2_1 : '';
+    $sender_id    = !empty($company_info->field_2_2) ? $company_info->field_2_2 : '';
+    $country_code = !empty($company_info->field_2_3) ? $company_info->field_2_3 : '';
+    if ($profile_id === '' || $password === '') {
+        $log('mShastra selected but the profile or password is blank - not sent');
+        return FALSE;
+    }
+    $phone = removeCountryCode($to);
+
+    /* https, not http. This request carries the account password in its query
+       string; over plain http it is readable by anything between here and the
+       provider. If the provider cannot do TLS the send now FAILS and says so,
+       rather than succeeding insecurely without anybody knowing. */
+    $url = 'https://mshastra.com/sendurlcomma.aspx'
+         . '?user=' . rawurlencode($profile_id)
+         . '&pwd=' . rawurlencode($password)
+         . '&senderid=' . rawurlencode($sender_id)
+         . '&CountryCode=' . rawurlencode($country_code)
+         . '&mobileno=' . rawurlencode($phone)
+         . '&msgtext=' . rawurlencode($msg);
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    $body = curl_exec($ch);
+    $err  = curl_error($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($body === FALSE || $err !== '') {
+        $log('mShastra unreachable: ' . ($err !== '' ? $err : 'no response'));
+        return FALSE;
+    }
+    if ($code < 200 || $code >= 300) {
+        $log('mShastra returned HTTP ' . $code);
+        return FALSE;
+    }
+    return TRUE;
 }
 function getWidth100(){
     return "width: 100%";

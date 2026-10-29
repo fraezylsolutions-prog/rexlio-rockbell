@@ -37,7 +37,7 @@ class Sale extends Cl_Controller {
             $this->session->set_flashdata('exception_2', 'Please click on green Enter button of an outlet');
             redirect('Outlet/outlets');
         }
-        
+
         $is_waiter = $this->session->userdata('is_waiter');
         $designation = $this->session->userdata('designation');
 
@@ -393,7 +393,7 @@ class Sale extends Cl_Controller {
         $this->db->delete('tbl_kitchen_sales', array('outlet_id ' => $outlet_id));
         $this->db->delete('tbl_kitchen_sales_details', array('outlet_id ' => $outlet_id));
         $this->db->delete('tbl_kitchen_sales_details_modifiers', array('outlet_id ' => $outlet_id));
-        
+
         $this->session->set_flashdata('exception', lang('truncate_sale_update_success'));
         redirect('Sale/sales');
     }
@@ -476,7 +476,7 @@ class Sale extends Cl_Controller {
                     echo "<h1 style='color:red;padding:10px;text-align:center'>".lang('self_order_scan_error_1')."</h1>";exit;
               }
         }
-       
+
         if($counter_id){
                    $counter_details = $this->Common_model->getPrinterIdByCounterId($counter_id);
                    $printer_info = $this->Common_model->getPrinterInfoById($counter_details->invoice_printer_id);
@@ -497,7 +497,7 @@ class Sale extends Cl_Controller {
                    }
                    //bill
                    $printer_info_bill = $this->Common_model->getPrinterInfoById($counter_details->bill_printer_id);
-              
+
                    $print_arr['bill_printer_id'] = $counter_details->bill_printer_id;
                    if($printer_info_bill){
                         $print_arr['path_bill'] = $printer_info_bill->path;
@@ -515,7 +515,7 @@ class Sale extends Cl_Controller {
         }
 
         if(isset($is_waiter) && $is_waiter!="Yes" && $is_online_order!="Yes"){
-          
+
             //start check access function
             $segment_2 = $this->uri->segment(2);
             $segment_3 = $this->uri->segment(3);
@@ -550,7 +550,7 @@ class Sale extends Cl_Controller {
             }
 
         }
-        
+
         $company_id = $this->session->userdata('company_id');
 
         $outlet_id = $this->session->userdata('outlet_id');
@@ -684,7 +684,7 @@ class Sale extends Cl_Controller {
             $this->db->where("tbl_kitchen_sales.table_id", $table_id);
             $this->db->where("tbl_kitchen_sales_details.del_status", "Live");
             $data =  $this->db->get()->result();
-          
+
             $return_josn = array();
             $str = '';
             $sale_no = '';
@@ -707,7 +707,7 @@ class Sale extends Cl_Controller {
                     if($value->cooking_status=="Done"){
                         $times = timeElapsed($value->cooking_done_time);
                     }
-        
+
                     if($value->cooking_status=="Started Cooking"){
                         $times = timeElapsed($value->cooking_start_time);
                     }
@@ -715,7 +715,7 @@ class Sale extends Cl_Controller {
                     $i++;
                 }
             }
-        
+
              $return_josn['html_content'] = $str;
              $return_josn['self_order_content'] = $self_order_content;
              $return_josn['sale_id'] = $sale_id;
@@ -1499,7 +1499,7 @@ class Sale extends Cl_Controller {
                 $data['self_order_ran_code'] = $this->session->userdata('self_order_ran_code');
                 $data['online_self_order_receiving_id'] = getOnlineSelfOrderReceivingId($this->session->userdata('outlet_id'));
             }
-          
+
             if($is_online_order=="Yes"){
                 $data['is_online_order'] = "Yes";
                 $data['is_accept'] = 2;
@@ -1854,7 +1854,7 @@ class Sale extends Cl_Controller {
                             $single_item_by_sale_id->modifiers_id = $modifiers_id;
                             $single_item_by_sale_id->modifiers_name = $modifiers_name;
                             $single_item_by_sale_id->modifiers_price = $modifiers_price;
-                            
+
                         }
                         if($sale_items){
                             $printers_popup_print[$ky]->ipvfour_address = "Yes";
@@ -1916,7 +1916,7 @@ class Sale extends Cl_Controller {
                                 $single_item_by_sale_id->modifiers_id = $modifiers_id;
                                 $single_item_by_sale_id->modifiers_name = $modifiers_name;
                                 $single_item_by_sale_id->modifiers_price = $modifiers_price;
-                                
+
                         }
                         if($sale_items){
                             $printers_direct_print[$ky]->ipvfour_address = getIPv4WithFormat($value->ipvfour_address);
@@ -2011,7 +2011,7 @@ class Sale extends Cl_Controller {
                     }
                     }
                     }
-        
+
 
     }
     public function pull_running_order(){
@@ -2072,7 +2072,7 @@ class Sale extends Cl_Controller {
         echo json_encode($data);
     }
 
-   
+
     public function add_cancel_audit_report(){
         /*This variable could not be escaped because this is json data*/
         $order = $this->input->post('order');
@@ -2616,7 +2616,7 @@ class Sale extends Cl_Controller {
                 $item_data['discount_amount'] = $item->item_discount_amount;
                 $item_data['item_type'] = ($this->Sale_model->getItemType($item->food_menu_id)->item_type=="Bar No")?"Kitchen Item":"Bar Item";
                 $item_data['cooking_status'] = ($item->item_cooking_status=="")?NULL:$item->item_cooking_status;
-                
+
                 if(isset($select_kitchen_row->id) && $select_kitchen_row->id){
                     $kitchen_data = getKitchenItemDetails($select_kitchen_row->id,$item->food_menu_id);
                     $item_data['cooking_start_time'] = isset($kitchen_data->cooking_start_time) && $kitchen_data->cooking_start_time?$kitchen_data->cooking_start_time:'0000-00-00 00:00:00';
@@ -2625,7 +2625,7 @@ class Sale extends Cl_Controller {
                     $item_data['cooking_start_time'] = ($item->item_cooking_start_time=="" || $item->item_cooking_start_time=="0000-00-00 00:00:00")?'0000-00-00 00:00:00':date('Y-m-d H:i:s',strtotime($item->item_cooking_start_time));
                     $item_data['cooking_done_time'] = ($item->item_cooking_done_time=="" || $item->item_cooking_done_time=="0000-00-00 00:00:00")?'0000-00-00 00:00:00':date('Y-m-d H:i:s',strtotime($item->item_cooking_done_time));
                 }
-               
+
                 $item_data['previous_id'] = ($item->item_previous_id=="")?0:$item->item_previous_id;
                 $item_data['sales_id'] = $sales_id;
                 $item_data['user_id'] = $this->session->userdata('user_id');
@@ -2763,7 +2763,7 @@ class Sale extends Cl_Controller {
             $multi_currency = trim_checker($order_details->multi_currency);
             $multi_currency_rate = trim_checker($order_details->multi_currency_rate);
             $multi_currency_amount = trim_checker($order_details->multi_currency_amount);
-           
+
 
             if($currency_type==1){
                 $check_existing_payment = getPaymentInfo($sales_id,1);
@@ -2803,7 +2803,7 @@ class Sale extends Cl_Controller {
                         $data['outlet_id'] = $this->session->userdata('outlet_id');
                         $this->Common_model->insertInformation($data, "tbl_sale_payments");
                     }
-                  
+
                 }
             }
         }
@@ -2859,39 +2859,87 @@ We hope to see you again!";
                        customers getting their receipts. smsSendOnly() is bounded
                        and reports failure now, so even that path cannot hang a
                        till the way it could before. */
-                    $ir_queued = irNotifyEnqueue(array(
-                        'event_key' => 'customer_receipt_sms',
-                        'channel' => 'sms',
-                        'intended_recipient' => $customer->phone,
-                        'subject' => 'Receipt',
-                        'body' => $sms_content,
-                        'payload' => array(
-                            'sale_no' => isset($sale_no) ? $sale_no : '',
-                            'customer_id' => trim_checker($order_details->customer_id),
-                        ),
-                        'outlet_id' => $this->session->userdata('outlet_id'),
-                        /* One receipt per order, however many times the till
-                           retries. The POS re-posts this completion every 7
-                           seconds until it sees a success, and the enqueue is
-                           gated only on send_sms_status and the customer having
-                           a number - not on whether THIS attempt was the one
-                           that created the sale. So a dropped response used to
-                           cost the customer a second text. Reproduced over real
-                           HTTP: two attempts, one sale, two receipt rows.
+                    /* The choice between the outbox and the inline send is made
+                       HERE, explicitly, and no longer inferred from whether
+                       irNotifyEnqueue() returned 0. It returns 0 for several
+                       different reasons and only one of them means "the module
+                       is off, use the old path":
 
-                           Keyed on random_code rather than the order number:
-                           random_code is per order and never changes, while the
-                           number can be reassigned by the clash guard. Orders
-                           placed before random_code existed fall back to the
-                           number, which is the best identity they have. */
-                        'dedupe_key' => 'receipt:' . (
-                            trim((string) $data['random_code']) !== ''
-                                ? 'rc:' . $data['random_code']
-                                : 'no:' . $sale_no
-                        ),
-                    ));
-                    if(!$ir_queued){
-                        smsSendOnly($sms_content,$customer->phone);
+                         - module or SMS channel off  -> the inline path is right
+                         - test mode on with no test  -> send NOTHING. The whole
+                           recipient configured          point of test mode is
+                                                         that no customer is
+                                                         contacted.
+                         - the outbox write failed    -> fall back inline, because
+                                                         a receipt must not be
+                                                         lost in silence.
+
+                       Reading all three as "not queued" meant that a site in
+                       TEST MODE with no test recipient texted the real customer.
+                       Reproduced: the outbox correctly queued nothing, and the
+                       next line then sent to the customer anyway. */
+                    if (irNotifyOn() && irNotifyChannelOn('sms')) {
+                        $ir_queued = irNotifyEnqueue(array(
+                            'event_key' => 'customer_receipt_sms',
+                            'channel' => 'sms',
+                            'intended_recipient' => $customer->phone,
+                            'subject' => 'Receipt',
+                            'body' => $sms_content,
+                            'payload' => array(
+                                'sale_no' => isset($sale_no) ? $sale_no : '',
+                                'customer_id' => trim_checker($order_details->customer_id),
+                            ),
+                            'outlet_id' => $this->session->userdata('outlet_id'),
+                            /* One receipt per order, however many times the till
+                               retries. The POS re-posts this completion every 7
+                               seconds until it sees a success, and the enqueue is
+                               gated only on send_sms_status and the customer having
+                               a number - not on whether THIS attempt was the one
+                               that created the sale. So a dropped response used to
+                               cost the customer a second text. Reproduced over real
+                               HTTP: two attempts, one sale, two receipt rows.
+
+                               Keyed on random_code rather than the order number:
+                               random_code is per order and never changes, while the
+                               number can be reassigned by the clash guard. Orders
+                               placed before random_code existed fall back to the
+                               number, which is the best identity they have. */
+                            'dedupe_key' => 'receipt:' . (
+                                trim((string) $data['random_code']) !== ''
+                                    ? 'rc:' . $data['random_code']
+                                    : 'no:' . $sale_no
+                            ),
+                        ));
+                        if(!$ir_queued){
+                            /* The module and the channel are both ON, so test mode
+                               has already been honoured inside the enqueue.
+                               Reaching here means either the outbox write failed,
+                               or test mode is on with nowhere to send. */
+                            if (irNotifySetting('test_mode')) {
+                                irNotifyLog('receipt NOT sent for sale ' . $sale_no
+                                    . ': test mode is on and no test recipient is set.'
+                                    . ' Set one on Settings > Notifications.');
+                            } else {
+                                irNotifyLog('receipt could not be queued for sale '
+                                    . $sale_no . ', sending inline instead');
+                                if (!smsSendOnly($sms_content, $customer->phone)) {
+                                    irNotifyLog('receipt LOST for sale ' . $sale_no
+                                        . ': the outbox refused it and the inline send failed too');
+                                }
+                            }
+                        }
+                    } else {
+                        /* Module or SMS channel off - which is every installation
+                           until somebody turns them on. Behaviour is deliberately
+                           unchanged here, except that smsSendOnly() is now
+                           bounded (5s connect, 10s total on both provider paths)
+                           and reports failure instead of returning nothing.
+                           A failure is recorded rather than swallowed: never lose
+                           a customer SMS silently. */
+                        if (!smsSendOnly($sms_content, $customer->phone)) {
+                            irNotifyLog('receipt NOT sent for sale ' . $sale_no
+                                . ' (notifications module off, inline send failed)');
+                        }
                     }
                 }
             }
@@ -2929,7 +2977,7 @@ We hope to see you again!";
         $this->db->where('id', $sale_details->id);
         $this->db->update('tbl_kitchen_sales', $data);
 
-        
+
         $sale_object = $this->get_all_information_of_a_sale($sale_no);
         echo json_encode($sale_object);
 
@@ -3029,7 +3077,7 @@ We hope to see you again!";
      */
     public function get_all_information_of_a_sale($sale_no){
         $sales_information = $this->get_all_information_of_a_sale_kitchen($sale_no);
-       
+
 
         $sales_information->sub_total = getAmtP(isset($sales_information->sub_total) && $sales_information->sub_total?$sales_information->sub_total:0);
         $sales_information->paid_amount = getAmtP(isset($sales_information->paid_amount) && $sales_information->paid_amount?$sales_information->paid_amount:0);
@@ -3071,7 +3119,7 @@ We hope to see you again!";
             $single_item_by_sale_id->modifiers_id = $modifiers_id;
             $single_item_by_sale_id->modifiers_name = $modifiers_name;
             $single_item_by_sale_id->modifiers_price = $modifiers_price;
-            
+
         }
         $sales_details_objects = $items_by_sales_id;
         if(isset($sales_details_objects[0]) && $sales_details_objects[0]){
@@ -3080,7 +3128,7 @@ We hope to see you again!";
             $sales_details_objects[0]->menu_unit_price = getAmtP(isset($sales_details_objects[0]->menu_unit_price) && $sales_details_objects[0]->menu_unit_price?$sales_details_objects[0]->menu_unit_price:0);
             $sales_details_objects[0]->menu_vat_percentage = getAmtP(isset($sales_details_objects[0]->menu_vat_percentage) && $sales_details_objects[0]->menu_vat_percentage?$sales_details_objects[0]->menu_vat_percentage:0);
             $sales_details_objects[0]->discount_amount = getAmtP(isset($sales_details_objects[0]->discount_amount) && $sales_details_objects[0]->discount_amount?$sales_details_objects[0]->discount_amount:0);
-    
+
             $this_value = $sales_details_objects[0]->menu_discount_value;
             $disc_fields = explode('%',$this_value);
             $discP = isset($disc_fields[1]) && $disc_fields[1]?$disc_fields[1]:'';
@@ -3088,9 +3136,9 @@ We hope to see you again!";
             } else {
                 $sales_details_objects[0]->menu_discount_value = getAmtP(isset($sales_details_objects[0]->menu_discount_value) && $sales_information->menu_discount_value?$sales_details_objects[0]->menu_discount_value:0);
             }
-    
+
         }
-      
+
         $sale_object = $sales_information;
         $sale_object->items = $sales_details_objects;
         $sale_object->tables_booked = '';
@@ -3108,7 +3156,7 @@ We hope to see you again!";
      */
     public function get_all_information_of_a_sale_modify($sales_id){
         $sales_information = $this->Sale_model->getSaleBySaleId($sales_id);
-       
+
         $sales_information[0]->sub_total = getAmtP(isset($sales_information[0]->sub_total) && $sales_information[0]->sub_total?$sales_information[0]->sub_total:0);
         $sales_information[0]->paid_amount = getAmtP(isset($sales_information[0]->paid_amount) && $sales_information[0]->paid_amount?$sales_information[0]->paid_amount:0);
         $sales_information[0]->due_amount = getAmtP(isset($sales_information[0]->due_amount) && $sales_information[0]->due_amount?$sales_information[0]->due_amount:0);
@@ -3126,16 +3174,16 @@ We hope to see you again!";
           } else {
               $sales_information[0]->sub_total_discount_value = getAmtP(isset($sales_information[0]->sub_total_discount_value) && $sales_information[0]->sub_total_discount_value?$sales_information[0]->sub_total_discount_value:0);
           }
-          
+
         $items_by_sales_id = $this->Sale_model->getAllItemsFromSalesDetailBySalesIdModify($sales_id);
-        
+
         foreach($items_by_sales_id as $single_item_by_sale_id){
             $modifier_information = $this->Sale_model->getModifiersBySaleAndSaleDetailsId($sales_id,$single_item_by_sale_id->sales_details_id);
             $single_item_by_sale_id->modifiers = $modifier_information;
             $free_items = $this->Sale_model->getAllItemsFromSalesDetailBySalesIdModifyChild($single_item_by_sale_id->id,$sales_id);
             $single_item_by_sale_id->free_items = $free_items;
         }
-        
+
         $sales_details_objects = $items_by_sales_id;
         $sales_details_objects[0]->menu_price_without_discount = getAmtP(isset($sales_details_objects[0]->menu_price_without_discount) && $sales_details_objects[0]->menu_price_without_discount?$sales_details_objects[0]->menu_price_without_discount:0);
         $sales_details_objects[0]->menu_price_with_discount = getAmtP(isset($sales_details_objects[0]->menu_price_with_discount) && $sales_details_objects[0]->menu_price_with_discount?$sales_details_objects[0]->menu_price_with_discount:0);
@@ -3163,14 +3211,14 @@ We hope to see you again!";
      * @param int
      */
     public function print_invoice($sale_id){
-        
+
         $data['sale_object'] = $this->get_all_information_of_a_sale_modify($sale_id);
-        
+
         $inv_qr_code_enable_status = $this->session->userdata('inv_qr_code_enable_status');
         $data['inv_qr_code_enable_status'] = $inv_qr_code_enable_status;
-        
+
         $print_format = $this->session->userdata('print_format');
-    
+
         //remove all old qrcode
         removeQrCode();
         //generate qrcode
@@ -3188,7 +3236,7 @@ We hope to see you again!";
             $this->load->view('sale/print_invoice_56mm', $data);
         }
     }
-      
+
      /**
      * print bill
      * @access public
@@ -3660,13 +3708,13 @@ We hope to see you again!";
                 $this->Common_model->insertInformation($data, "tbl_sale_payments");
             }else{
                 foreach ($payment_details as $value){
-    
+
                     $data = array();
                     $data['payment_id'] = $value->payment_id;
                     $data['payment_name'] = $value->payment_name;
                         if($value->payment_id==5){
                             $data['usage_point'] = $value->usage_point;
-    
+
                             $previous_id_update_array = array('loyalty_point_earn' => 0);
                             $this->db->where('sales_id', $sale->id);
                             $this->db->update('tbl_sales_details', $previous_id_update_array);
@@ -3685,7 +3733,7 @@ We hope to see you again!";
             $total_payable = 0;
             $sub_total_discount_amount = 0;
             $total_discount_amount = 0;
-    
+
             $sale_details = $this->Common_model->getDataById($sale->id, "tbl_sales");
             if((int)$sub_total_discount_finalize){
                 $sub_total_discount_type = "fixed";
@@ -3698,7 +3746,7 @@ We hope to see you again!";
                 $sub_total_discount_amount = $sale_details->sub_total_discount_amount;
                 $total_discount_amount = $sale_details->total_discount_amount;
             }
-    
+
             if($close_order=='true'){
                 $this->Sale_model->delete_status_orders_table($sale->id);
                 if($is_just_cloase){
@@ -3715,7 +3763,7 @@ We hope to see you again!";
 
 
         }
-     
+
 
 
     }
@@ -4018,7 +4066,7 @@ We hope to see you again!";
                 $total_due_payment = $this->Sale_model->getAllDuePaymentByPayment($opening_date_time,$payments[0]);
                 $total_expense = $this->Sale_model->getAllExpenseByPayment($opening_date_time,$payments[0]);
                 $refund_amount = $this->Sale_model->getAllRefundByPayment($opening_date_time,$payments[0]);
-                 
+
                 $total_sale =  $this->Sale_model->getAllSaleByPayment($opening_date_time,$payments[0]);
 
                 $inline_total = $payments[2] - $total_purchase + $total_sale  + $total_due_receive - $total_due_payment - $total_expense - $refund_amount;
@@ -4032,7 +4080,7 @@ We hope to see you again!";
                             <td>'.lang('register_detail_1').'</td>
                             <td class="text_right">'.getAmtPCustom($payments[2]).'</td>
                         </tr>
-                        
+
                         <tr>
                             <td></td>
                             <td></td>
@@ -4206,7 +4254,7 @@ We hope to see you again!";
         foreach ($opening_details_decode as $key=>$value){
             $payments = explode("||",$value);
 
-            
+
             $total_sale =  $this->Sale_model->getAllSaleByPayment($opening_date_time,$payments[0]);
             $total_purchase = $this->Sale_model->getAllPurchaseByPayment($opening_date_time,$payments[0]);
             $total_due_receive = $this->Sale_model->getAllDueReceiveByPayment($opening_date_time,$payments[0]);
@@ -4385,7 +4433,7 @@ We hope to see you again!";
         }
         return $assets;
     }
- 
+
     /**
      * get Waiter Orders
      * @access public
@@ -5016,7 +5064,7 @@ We hope to see you again!";
                             $txt_point = " (Usage Point:".$payment->usage_point.")";
                         }
                         $payment_details.=(escape_output($payment->payment_name.$txt_point).":".escape_output(getAmtPCustom($payment->amount)));
-                        
+
                         if($ky<(sizeof($salePaymentDetails))-1){
                             $payment_details.=" - ";
                         }

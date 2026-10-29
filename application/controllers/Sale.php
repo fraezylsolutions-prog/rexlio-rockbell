@@ -1620,21 +1620,36 @@ class Sale extends Cl_Controller {
                 $sale_id = $this->db->insert_id();
                 /* N3: order placed. The hook does NOT run here, even though this
                    is where the order comes into being. It is fired after
-                   trans_complete() instead - see irNotifyFire below - for two
-                   reasons, the second of which is the serious one:
+                   trans_complete() instead - see irNotifyFire below.
 
-                     1. A rollback further down would leave a queued message for
-                        an order that never existed.
-                     2. Far worse: irNotifyFire runs its own queries, and
-                        CodeIgniter sets _trans_status = FALSE on ANY failed
-                        query while a transaction is open
-                        (system/database/DB_driver.php:662-665). A notification
-                        problem - most likely a missing table, because code is
-                        deployed before migrations are run - would therefore roll
-                        back the customer's ORDER at trans_complete(). The
-                        try/catch and the @ inside the helper cannot prevent that:
-                        they suppress the PHP error, not the flag CodeIgniter has
-                        already set on the connection.
+                   The reason is NOT the obvious one. A rollback further down
+                   would NOT have left a stray queued message: the outbox insert
+                   went through the same $this->db connection inside the same
+                   transaction, both tables are InnoDB, so the queued row rolled
+                   back with the sale. Tested both ways - pre-fix the outbox
+                   AUTO_INCREMENT moved (the insert was attempted) and post-fix
+                   it did not, and both ended with the sale absent and the
+                   outbox empty. Worth writing down because it reads like a bug
+                   and is not one; the hook simply should not depend on sharing
+                   the sale's transaction to be safe.
+
+                   The real reason: irNotifyFire runs its own queries, and
+                   CodeIgniter sets _trans_status = FALSE on ANY failed query
+                   while a transaction is open
+                   (system/database/DB_driver.php:662-665). A notification
+                   problem - most likely a missing table, because code is
+                   deployed before migrations are run - would therefore take the
+                   customer's ORDER down with it. The try/catch and the @ inside
+                   the helper cannot prevent that: they suppress the PHP error,
+                   not the flag CodeIgniter has already set on the connection.
+
+                   Measured, with tbl_notification_rules renamed away:
+                     before - the order row was written with ZERO items and the
+                              request died on "Column 'sale_id' cannot be null",
+                              because the hook ran before insert_id() and its
+                              failed query took insert_id() with it. A corrupt
+                              order, which is worse than no order.
+                     after  - order and items intact, no fatal error.
 
                    So only the facts are collected here, while $data is in scope. */
                 $ir_order_placed_ctx = array(

@@ -46,6 +46,7 @@ class Notification_worker extends CI_Controller {
                cron job that shouts about it every minute trains people to ignore
                the log. Said once, quietly. */
             $this->out('master switch off - nothing to do');
+            $this->markRun('master switch off - nothing to do');
             return;
         }
 
@@ -65,6 +66,7 @@ class Notification_worker extends CI_Controller {
 
         if (!$rows) {
             $this->out('nothing due');
+            $this->markRun('nothing due');
             return;
         }
 
@@ -134,6 +136,33 @@ class Notification_worker extends CI_Controller {
         /* Only write a run line to the log when something happened. A minute-by
            -minute "nothing due" would bury the lines that matter. */
         if ($sent || $failed || $held) { irNotifyLog($line); }
+        $this->markRun($line);
+    }
+
+    /**
+     * Overwrite a one-line "last run" marker.
+     *
+     * The dated log deliberately stays quiet on an idle run, which leaves no way
+     * to answer the first question anybody asks after adding the cron entry:
+     * did it run at all? Appending a line a minute would answer it and bury
+     * everything else, so this file is OVERWRITTEN each time - it never grows
+     * past one line, and `cat` on it is the whole check.
+     *
+     * Written on EVERY path out of run(), including "master switch off" and
+     * "nothing due". Those two are the common cases on a healthy site and were
+     * the first version's blind spot: it only marked the path where work had
+     * been done, so the file stayed missing exactly when somebody was trying to
+     * find out whether cron was firing at all.
+     *
+     * Not the N5 heartbeat. That one has to notice when the worker STOPS, which
+     * needs something outside this process; this is just a timestamp the worker
+     * leaves behind.
+     */
+    private function markRun($line) {
+        $dir = APPPATH . 'logs/notifications';
+        if (!is_dir($dir)) { @mkdir($dir, 0755, TRUE); }
+        @file_put_contents($dir . '/last-run.txt',
+            date('Y-m-d H:i:s') . '  ' . $line . PHP_EOL);
     }
 
     /** A summary. Writes nothing - safe to run at any time. */

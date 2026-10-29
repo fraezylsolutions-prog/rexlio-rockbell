@@ -1034,9 +1034,12 @@ class Setting extends Cl_Controller {
                 $recipients_in = $this->input->post('rec');
                 $enabled_in = $this->input->post('en');
                 $critical_in = $this->input->post('cr');
+                //N5(b): minutes between escalation rungs, per rule
+                $escalate_in = $this->input->post('esc');
                 if(!is_array($recipients_in)){ $recipients_in = array(); }
                 if(!is_array($enabled_in)){ $enabled_in = array(); }
                 if(!is_array($critical_in)){ $critical_in = array(); }
+                if(!is_array($escalate_in)){ $escalate_in = array(); }
                 $company_id = (int) $this->session->userdata('company_id');
                 $saved = 0;
 
@@ -1056,7 +1059,8 @@ class Setting extends Cl_Controller {
                             !empty($enabled_in[$field]),
                             !empty($critical_in[$field]),
                             isset($recipients_in[$field]) ? htmlspecialcharscustom($recipients_in[$field]) : '',
-                            $company_id, $me
+                            $company_id, $me,
+                            isset($escalate_in[$field]) ? (int) $escalate_in[$field] : 0
                         );
                         if($rule_id){ $saved++; }
                     }

@@ -307,12 +307,13 @@ $has_key    = isset($sms_cfg['api_key']) && $sms_cfg['api_key'] !== '';
                             <th><?php echo lang('notify_recipients'); ?></th>
                             <th style="width:90px"><?php echo lang('notify_on'); ?></th>
                             <th style="width:90px"><?php echo lang('notify_critical'); ?></th>
+                            <th style="width:120px"><?php echo lang('notify_escalate'); ?></th>
                         </tr>
                     </thead>
                     <tbody>
                     <?php foreach ($events as $event_key => $event): ?>
                         <tr class="table-light">
-                            <td colspan="4">
+                            <td colspan="5">
                                 <b><?php echo escape_output($event['label']); ?></b>
                                 <code class="ms-2" style="font-size:12px"><?php echo escape_output($event_key); ?></code>
                             </td>
@@ -327,6 +328,11 @@ $has_key    = isset($sms_cfg['api_key']) && $sms_cfg['api_key'] !== '';
                             $rule = isset($rules[$k]) ? $rules[$k] : NULL;
                             $on = $rule ? ((int) $rule['row']->is_enabled === 1) : FALSE;
                             $crit = $rule ? ((int) $rule['row']->is_critical === 1) : FALSE;
+                            /* N5(b): 0 means no ladder. isset() because a site whose
+                               migration has not run has no such column and must still
+                               render the screen. */
+                            $esc = ($rule && isset($rule['row']->escalate_after_minutes))
+                                 ? (int) $rule['row']->escalate_after_minutes : 0;
                             /* a channel that is switched off is still listed: the rule is
                                worth setting up before the switch is flipped, and hiding
                                the row is how a venue ends up wondering why nothing
@@ -352,6 +358,19 @@ $has_key    = isset($sms_cfg['api_key']) && $sms_cfg['api_key'] !== '';
                             <td class="text-center">
                                 <input type="checkbox" name="cr[<?php echo escape_output($field); ?>]" value="1"
                                        <?php echo $crit ? 'checked' : ''; ?> <?php echo $can_update ? '' : 'disabled'; ?>>
+                            </td>
+                            <td>
+                                <?php /* N5(b): minutes between rungs. 0 (the default, and
+                                         every rule that already exists) means tell everyone
+                                         at once. Above 0 means the recipients are a ladder
+                                         in the order they are typed above, and the next one
+                                         is only told if nobody has acknowledged. Only does
+                                         anything on a CRITICAL rule - there is nothing to
+                                         acknowledge otherwise. */ ?>
+                                <input type="number" min="0" max="1440" step="1"
+                                       name="esc[<?php echo escape_output($field); ?>]"
+                                       class="form-control form-control-sm" <?php echo $can_update ? '' : 'disabled'; ?>
+                                       value="<?php echo $esc; ?>">
                             </td>
                         </tr>
                         <?php endforeach; ?>

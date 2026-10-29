@@ -56,6 +56,12 @@ class Notification_worker extends CI_Controller {
 
         $this->expireHeld($s);
 
+        /* N5(b): climb any ladder that is due BEFORE picking up what to send,
+           so a new rung goes out on this run rather than waiting for the next
+           one. At a minute apart that would be a minute of needless silence on
+           an alert nobody has answered. */
+        $escalated = irNotifyEscalate($batch);
+
         /* due = pending, and either never tried or past its backoff */
         $rows = $this->db->query(
             "SELECT * FROM tbl_notification_outbox
@@ -65,8 +71,11 @@ class Notification_worker extends CI_Controller {
               LIMIT " . $batch)->result();
 
         if (!$rows) {
-            $this->out('nothing due');
-            $this->markRun('nothing due');
+            /* Escalating and then finding nothing to send would mean the new
+               rung sat unsent until the next run, so say what happened. */
+            $line = $escalated ? ('nothing due (escalated ' . $escalated . ')') : 'nothing due';
+            $this->out($line);
+            $this->markRun($line);
             return;
         }
 
@@ -133,12 +142,12 @@ class Notification_worker extends CI_Controller {
         }
 
         $took = round(microtime(TRUE) - $started, 2);
-        $line = sprintf('run: %d sent, %d failed, %d held, %d waiting for a driver (%ss)',
-            $sent, $failed, $held, $skipped, $took);
+        $line = sprintf('run: %d sent, %d failed, %d held, %d escalated, %d waiting for a driver (%ss)',
+            $sent, $failed, $held, $escalated, $skipped, $took);
         $this->out($line);
         /* Only write a run line to the log when something happened. A minute-by
            -minute "nothing due" would bury the lines that matter. */
-        if ($sent || $failed || $held) { irNotifyLog($line); }
+        if ($sent || $failed || $held || $escalated) { irNotifyLog($line); }
         $this->markRun($line);
     }
 

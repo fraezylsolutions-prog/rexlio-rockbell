@@ -2448,7 +2448,7 @@ $lang['notify_no_test_recipient'] = 'Enter a test recipient first.';
 $lang['notify_switch_off_first'] = 'That channel is switched off. Switch it on before testing it.';
 $lang['notify_no_driver'] = 'That channel has no delivery built yet.';
 $lang['notify_rules'] = 'Rules';
-$lang['notify_rules_hint'] = 'For each event, tick the channels that should carry it and say who it reaches. Recipients are resolved when the message is sent, so a staff change never leaves a rule pointing at somebody who has left.';
+$lang['notify_rules_hint'] = 'For each event, tick the channels that should carry it and say who it reaches. Recipients are resolved when the message is sent, so a staff change never leaves a rule pointing at somebody who has left. On a Critical rule with an Escalate time, the recipients become a ladder in the order you type them: the first is told straight away, and the next one only if nobody has acknowledged in time.';
 $lang['notify_recipients_placeholder'] = 'role:2, user:11, boss@example.com, 08031234567';
 $lang['notify_roles_available'] = 'Roles you can use:';
 $lang['notify_event'] = 'Event';
@@ -2487,3 +2487,7 @@ $lang['notify_ack_post_only']        = 'Acknowledging has to be confirmed with t
 $lang['notify_ack_email_line']       = 'Acknowledge this alert so it is not escalated:';
 $lang['notify_ack_expiry_hours']     = 'Acknowledge link valid for (hours)';
 $lang['notify_ack_expiry_hint']      = 'How long an Acknowledge link keeps working. Short is safer: an old SMS should not be able to silence a new alert.';
+
+/* Notifications - N5(b): the escalation ladder */
+$lang['notify_escalate']        = 'Escalate after (min)';
+$lang['notify_escalate_hint']   = 'Minutes to wait for an Acknowledge before telling the next person on the list. 0 tells everybody at once. Only applies to a Critical rule.';

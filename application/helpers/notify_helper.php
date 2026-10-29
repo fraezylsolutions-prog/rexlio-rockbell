@@ -149,9 +149,10 @@ if (!function_exists('irNotifyEnqueue')) {
             'created_at'         => irNotifyNow(),
         );
         if ($dedupe !== '') { $data['dedupe_key'] = $dedupe; }
-        /* N5(a): only set when there is one, so the column stays absent from the
-           INSERT on a site whose migration has not run yet. */
+        /* N5(a)/(b): only set when there is one, so the column stays absent from
+           the INSERT on a site whose migration has not run yet. */
         if (!empty($m['ack_group'])) { $data['ack_group'] = substr((string) $m['ack_group'], 0, 40); }
+        if (!empty($m['escalation_tier'])) { $data['escalation_tier'] = (int) $m['escalation_tier']; }
 
         /* Suppressed on purpose: a missing table (code deployed before the
            migration) must not fatal the sale that triggered it. */
@@ -173,8 +174,8 @@ if (!function_exists('irNotifyEnqueue')) {
                key risks a duplicate, losing ack_group costs an Acknowledge
                button, and losing the row costs the alert itself. Retried even
                when there was no dedupe key, which the first version skipped. */
-            if (isset($data['dedupe_key']) || isset($data['ack_group'])) {
-                unset($data['dedupe_key'], $data['ack_group']);
+            if (isset($data['dedupe_key']) || isset($data['ack_group']) || isset($data['escalation_tier'])) {
+                unset($data['dedupe_key'], $data['ack_group'], $data['escalation_tier']);
                 if (@$CI->db->insert('tbl_notification_outbox', $data)) {
                     @irNotifyLog('queued ' . $data['event_key']
                         . ' without dedupe_key/ack_group - are the N3/N5 migrations applied?');
@@ -403,13 +404,20 @@ if (!function_exists('irNotifyRecipientsFor')) {
      * is correct and silent - the alternative is a rule that looks configured
      * and quietly reaches no one.
      */
-    function irNotifyRecipientsFor($rule_id, $channel) {
+    function irNotifyRecipientsFor($rule_id, $channel, $tier = NULL) {
         $CI = &get_instance();
         $field = in_array($channel, array('sms', 'whatsapp', 'voice'), TRUE) ? 'phone' : 'email_address';
         $out = array();
 
+        /* N5(b): $tier NULL means every tier at once, which is what a rule with
+           no ladder has always done and must keep doing. A number means that one
+           rung only - the ladder asks for rung 0 first and the worker asks for
+           the next one when nobody has answered. */
+        $only = ($tier === NULL) ? '' : ' AND escalation_order = ' . (int) $tier;
+
         $rows = @$CI->db->query("SELECT recipient_type, recipient_value FROM tbl_notification_recipients
-                                  WHERE rule_id = " . (int) $rule_id . " AND del_status = 'Live'
+                                  WHERE rule_id = " . (int) $rule_id . " AND del_status = 'Live'"
+                                  . $only . "
                                   ORDER BY escalation_order ASC, id ASC");
         if (!$rows) { return $out; }
 
@@ -460,10 +468,22 @@ if (!function_exists('irNotifyFire')) {
             $outlet = isset($ctx['outlet_id']) ? (int) $ctx['outlet_id'] : 0;
             /* outlet_id 0 on a rule means every outlet */
             $rules = @$CI->db->query(
-                "SELECT id, channel, is_critical FROM tbl_notification_rules
+                "SELECT id, channel, is_critical,
+                        COALESCE(escalate_after_minutes, 0) AS escalate_after_minutes
+                   FROM tbl_notification_rules
                   WHERE event_key = " . $CI->db->escape($event_key) . "
                     AND is_enabled = 1 AND del_status = 'Live'
                     AND (outlet_id = 0 OR outlet_id = " . $outlet . ")");
+            if (!$rules) {
+                /* the N5(b) column is missing, so this is a site whose migration
+                   has not run. Ask again without it rather than lose the alert. */
+                $rules = @$CI->db->query(
+                    "SELECT id, channel, is_critical, 0 AS escalate_after_minutes
+                       FROM tbl_notification_rules
+                      WHERE event_key = " . $CI->db->escape($event_key) . "
+                        AND is_enabled = 1 AND del_status = 'Live'
+                        AND (outlet_id = 0 OR outlet_id = " . $outlet . ")");
+            }
             if (!$rules || !$rules->num_rows()) { return 0; }
 
             if (!isset($ctx['when'])) { $ctx['when'] = date('Y-m-d H:i'); }
@@ -509,7 +529,18 @@ if (!function_exists('irNotifyFire')) {
                 $is_crit   = ((int) $rule->is_critical === 1);
                 $rule_body = irNotifyAckAppend($body, $rule->channel, $is_crit ? $ack_url : '');
 
-                foreach (irNotifyRecipientsFor($rule->id, $rule->channel) as $to) {
+                /* N5(b): a rule with a ladder notifies rung 0 and nobody else.
+                   The rest are reached by the worker, one rung at a time, and
+                   only while nobody has acknowledged.
+
+                   A rule with NO ladder (interval 0, which is every rule that
+                   exists today) still notifies everybody at once - passing NULL
+                   is literally the old call. Getting this backwards would have
+                   quietly stopped telling people things. */
+                $ladder = ((int) $rule->escalate_after_minutes > 0) && $is_crit;
+                $tier   = $ladder ? 0 : NULL;
+
+                foreach (irNotifyRecipientsFor($rule->id, $rule->channel, $tier) as $to) {
                     $queued += irNotifyEnqueue(array(
                         'event_key' => $event_key,
                         'channel' => $rule->channel,
@@ -523,6 +554,7 @@ if (!function_exists('irNotifyFire')) {
                         /* only the critical rows join the group, so settling it
                            cannot mark a non-critical message as answered */
                         'ack_group' => $is_crit ? $ack_group : '',
+                        'escalation_tier' => 0,
                     )) ? 1 : 0;
                 }
             }
@@ -773,13 +805,20 @@ if (!function_exists('irNotifyRuleSave')) {
      *
      * @return int the rule id, or 0 when there was nothing to save
      */
-    function irNotifyRuleSave($event_key, $channel, $enabled, $critical, $raw, $company_id, $user_id) {
+    function irNotifyRuleSave($event_key, $channel, $enabled, $critical, $raw, $company_id, $user_id, $escalate_minutes = 0) {
         $CI = &get_instance();
         $events = irNotifyEvents();
         if (!isset($events[$event_key])) { return 0; }
 
         $enabled = $enabled ? 1 : 0;
         $critical = $critical ? 1 : 0;
+        /* N5(b): 0 means no ladder - tell everyone at once, which is what every
+           rule did before this existed. Capped at a day; an interval longer
+           than that is not an escalation, it is a reminder nobody will act on.
+           Added as an optional argument so the existing seven-argument calls
+           keep working unchanged. */
+        $escalate_minutes = (int) $escalate_minutes;
+        if ($escalate_minutes < 0 || $escalate_minutes > 1440) { $escalate_minutes = 0; }
         $company_id = (int) $company_id ? (int) $company_id : 1;
         $people = irNotifyParseRecipients($raw);
 
@@ -793,6 +832,7 @@ if (!function_exists('irNotifyRuleSave')) {
             $CI->db->where('id', $row->id)->update('tbl_notification_rules', array(
                 'is_enabled' => $enabled,
                 'is_critical' => $critical,
+                'escalate_after_minutes' => $escalate_minutes,
                 'del_status' => 'Live',
                 'updated_by' => (int) $user_id,
                 'updated_at' => $now,
@@ -804,6 +844,7 @@ if (!function_exists('irNotifyRuleSave')) {
                 'channel' => $channel,
                 'is_enabled' => $enabled,
                 'is_critical' => $critical,
+                'escalate_after_minutes' => $escalate_minutes,
                 'outlet_id' => 0,
                 'company_id' => $company_id,
                 'created_at' => $now,
@@ -1031,9 +1072,13 @@ if (!function_exists('irNotifyAckAppend')) {
         $body = rtrim($body);
         $room = 160 - strlen($tail);
         if (strlen($body) > $room) {
-            $body = rtrim(substr($body, 0, $room - 1)) . "\xE2\x80\xA6";
-            /* the ellipsis is 3 bytes in UTF-8, so take the room back */
-            while (strlen($body) > $room) { $body = substr($body, 0, -4) . "\xE2\x80\xA6"; }
+            /* "..." and NOT the single-character ellipsis. U+2026 is not in the
+               GSM 03.38 alphabet, so one of them forces the whole message into
+               UCS-2 - where a single SMS holds 70 characters, not 160. The
+               pretty ellipsis would have caused the exact split this trimming
+               exists to prevent. Three dots are three GSM characters. */
+            $body = rtrim(substr($body, 0, $room - 3)) . '...';
+            while (strlen($body) > $room) { $body = substr($body, 0, -4) . '...'; }
         }
         return $body . $tail;
     }
@@ -1071,5 +1116,155 @@ if (!function_exists('irNotifyNow')) {
      */
     function irNotifyNow($offset_seconds = 0) {
         return date('Y-m-d H:i:s', time() + (int) $offset_seconds);
+    }
+}
+
+/* ------------------------------------------- N5(b): the escalation ladder -- */
+
+if (!function_exists('irNotifyEscalate')) {
+    /**
+     * Move unanswered critical alerts up to the next rung. Returns how many new
+     * messages were queued. Called by the worker on every run.
+     *
+     * NEW ROWS, NEVER MUTATED ONES. The outbox is the send log as well as the
+     * queue - "who was told, when, and did it arrive" has to stay answerable
+     * afterwards. Rewriting tier 0's row to point at tier 1 would destroy the
+     * record of the first attempt, which is exactly the record you want when
+     * somebody asks why nobody reacted for forty minutes.
+     *
+     * A ladder stops for any of four reasons, and three of them are endings
+     * rather than failures:
+     *   - somebody acknowledged      -> the alert is handled
+     *   - the last rung is reached   -> there is nobody else to tell
+     *   - the ack token expired      -> nobody can answer it any more, so
+     *                                   climbing would only make noise
+     *   - the rule was switched off or deleted since it fired
+     *
+     * The interval is per RULE, not per alert: "SMS the manager every 10
+     * minutes" and "email the owner after an hour" are different undertakings
+     * about the same incident. Acknowledging settles the incident and therefore
+     * stops both.
+     */
+    function irNotifyEscalate($limit = 50) {
+        if (!irNotifyOn()) { return 0; }
+        $CI = &get_instance();
+        $queued = 0;
+
+        /* Candidates: the newest rung of every unanswered critical alert whose
+           rule has a ladder. Grouped per (alert, rule) because each rule climbs
+           its own. */
+        $rows = @$CI->db->query(
+            "SELECT o.ack_group,
+                    o.rule_id,
+                    MAX(o.escalation_tier)                      AS tier,
+                    MAX(COALESCE(o.sent_at, o.created_at))      AS last_at,
+                    SUM(o.status = 'pending')                   AS still_pending,
+                    MAX(o.event_key)                            AS event_key,
+                    MAX(o.subject)                              AS subject,
+                    MAX(o.body)                                 AS body,
+                    MAX(o.payload)                              AS payload,
+                    MAX(o.outlet_id)                            AS outlet_id,
+                    MAX(o.company_id)                           AS company_id,
+                    MAX(r.channel)                              AS channel,
+                    MAX(r.escalate_after_minutes)               AS mins
+               FROM tbl_notification_outbox o
+               JOIN tbl_notification_rules r
+                 ON r.id = o.rule_id AND r.is_enabled = 1 AND r.del_status = 'Live'
+               JOIN tbl_notification_acks a
+                 ON a.ack_group = o.ack_group
+              WHERE o.is_critical = 1
+                AND o.ack_group IS NOT NULL AND o.ack_group <> ''
+                AND a.acknowledged_at IS NULL
+                AND a.expires_at > " . $CI->db->escape(irNotifyNow()) . "
+                AND COALESCE(r.escalate_after_minutes, 0) > 0
+              GROUP BY o.ack_group, o.rule_id
+              LIMIT " . (int) $limit);
+        if (!$rows || !$rows->num_rows()) { return 0; }
+
+        foreach ($rows->result() as $g) {
+            /* A rung that has not finished sending is not a rung nobody
+               answered - it is a rung nobody has been TOLD about yet, usually
+               because cron is behind or a gateway is slow. Escalating past it
+               would punish the recipient for the system's own delay. */
+            if ((int) $g->still_pending > 0) { continue; }
+
+            /* The clock starts when the previous rung actually went out, not
+               when the alert was raised. A failed rung still counts as gone
+               out: nobody is coming, so the next person should hear sooner,
+               not never. */
+            $due_at = strtotime($g->last_at) + ((int) $g->mins * 60);
+            if ($due_at > time()) { continue; }
+
+            $next = (int) $g->tier + 1;
+            $to_list = irNotifyRecipientsFor($g->rule_id, $g->channel, $next);
+            if (!$to_list) { continue; }          /* top of the ladder: done */
+
+            if (!irNotifyChannelOn($g->channel)) { continue; }
+
+            $payload = json_decode((string) $g->payload, TRUE);
+            if (!is_array($payload)) { $payload = array(); }
+
+            foreach ($to_list as $to) {
+                $queued += irNotifyEnqueue(array(
+                    'event_key'          => $g->event_key,
+                    'channel'            => $g->channel,
+                    'rule_id'            => $g->rule_id,
+                    'intended_recipient' => $to,
+                    'subject'            => $g->subject,
+                    /* The same words, with the rung named. Somebody on tier 2
+                       needs to know they are the backstop and not the first to
+                       hear, or they will assume it is already being handled. */
+                    'body'               => irNotifyEscalateBody($g->body, $next),
+                    'payload'            => $payload,
+                    'is_critical'        => 1,
+                    'outlet_id'          => $g->outlet_id,
+                    'company_id'         => $g->company_id,
+                    'ack_group'          => $g->ack_group,
+                    'escalation_tier'    => $next,
+                    /* One rung per alert per rule, however many times the worker
+                       runs. Two overlapping cron runs would otherwise both see
+                       the same due rung and both send it. */
+                    'dedupe_key'         => 'esc:' . $g->ack_group . ':' . $g->rule_id . ':' . $next . ':' . $to,
+                )) ? 1 : 0;
+            }
+
+            if ($queued) {
+                @irNotifyLog(sprintf('escalated %s (%s) rule %d to tier %d, %d recipient(s)',
+                    $g->event_key, substr($g->ack_group, 0, 8), $g->rule_id, $next, count($to_list)));
+            }
+        }
+        return $queued;
+    }
+}
+
+if (!function_exists('irNotifyEscalateBody')) {
+    /**
+     * Mark a message as an escalation without pushing an SMS over 160.
+     *
+     * The prefix goes at the FRONT, because that is the part a phone shows in
+     * the notification shade, and "NOT ACKNOWLEDGED" is the whole reason this
+     * person is being woken up. The Acknowledge link is at the end and must
+     * survive, so if the result is too long the middle of the sentence gives
+     * way - never the prefix and never the link.
+     */
+    function irNotifyEscalateBody($body, $tier) {
+        $body   = (string) $body;
+        $prefix = 'ESCALATED (no reply): ';
+        $out    = $prefix . $body;
+        if (strlen($out) <= 160 || strpos($body, ' Ack: ') === FALSE) { return $out; }
+
+        $at   = strrpos($body, ' Ack: ');
+        $text = substr($body, 0, $at);
+        $link = substr($body, $at);
+        $room = 160 - strlen($prefix) - strlen($link);
+        if ($room < 20) { return $prefix . $link; }   /* nothing sensible left to say */
+        if (strlen($text) > $room) {
+            /* "..." not the ellipsis character - see irNotifyAckAppend: U+2026
+               is outside GSM 03.38 and would force UCS-2, capping the message
+               at 70 characters and splitting it. */
+            $text = rtrim(substr($text, 0, $room - 3)) . '...';
+            while (strlen($text) > $room) { $text = substr($text, 0, -4) . '...'; }
+        }
+        return $prefix . $text . $link;
     }
 }

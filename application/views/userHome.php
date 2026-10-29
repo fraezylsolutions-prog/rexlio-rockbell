@@ -601,7 +601,16 @@
                                 <?php /* Module switches (H0): business-wide ON/OFF per add-on, read per request */ ?>
                                 <li data-access="update-<?php echo irAccessModuleId('modules'); ?>" class="menu_assign_class" data-menu__cid="irp_32"><a class="child-menu" href="<?php echo base_url()?>setting/modules">
                                         <?php echo lang('modules'); ?></a></li>
-                                 
+                                <?php /* Notifications (N4.5): shown on 'view', and deliberately NOT gated
+                                         on the module switch - the master switch lives on this very
+                                         screen, so hiding the link while it is off would leave nowhere
+                                         to turn it on. Skipped entirely until the N1 migration has run. */
+                                $ir_notify_access = irAccessModuleId('notifications');
+                                if($ir_notify_access): ?>
+                                <li data-access="view-<?php echo $ir_notify_access; ?>" class="menu_assign_class" data-menu__cid="irp_32"><a class="child-menu" href="<?php echo base_url()?>setting/notifications">
+                                        <?php echo lang('notifications'); ?></a></li>
+                                <?php endif; ?>
+
                                 <?php
                                 if(!isFoodCourt()):
                                 $wlb = $this->session->userdata('wlb');

@@ -63,6 +63,14 @@ class Setting extends Cl_Controller {
             //module switches (H0): own access row, looked up by name
             $controller = (string) irAccessModuleId('modules');
             $function = "update";
+        }else if($segment_2=="notifications" || $segment_2=="notificationTest"){
+            //Notifications (N4.5): own access row, looked up by name because the
+            //id is assigned when migration 2026-10-29_01 runs rather than being
+            //fixed in the product. 'view' gets you the screen; the write paths
+            //check 'update' themselves and the provider keys check
+            //'view_credentials' separately again.
+            $controller = (string) irAccessModuleId('notifications');
+            $function = "view";
         }else{
            $this->session->set_flashdata('exception_er', lang('menu_not_permit_access'));
             redirect('Authentication/userProfile');
@@ -919,4 +927,280 @@ class Setting extends Cl_Controller {
         $this->load->view('userHome', $data);
     }
 
+
+    /**
+     * Settings > Notifications (N4.5): the screen that makes the module usable.
+     *
+     * Until this existed nothing could be turned on without hand-editing JSON in
+     * tbl_modules. It carries the master switch, the per-channel switches, test
+     * mode, each channel's provider settings, the rules that decide who hears
+     * about what, and the last 25 rows of the outbox so "was it even queued?"
+     * has an answer on the same page.
+     *
+     * Three permissions, deliberately separate:
+     *   view              see the screen
+     *   update            change anything
+     *   view_credentials  read a provider key in the clear rather than masked
+     * Deciding which events fire is a different act from reading an API key, so
+     * a manager who needs the first does not get the second. The access row id
+     * is looked up by name because migrations do not fix ids.
+     * @access public
+     * @return void
+     */
+    public function notifications() {
+        $access_id = (string) irAccessModuleId('notifications');
+        if(!$access_id){
+            //no access row means migration 2026-10-29_01 has not been applied here
+            $this->session->set_flashdata('exception_er', lang('notify_not_installed'));
+            redirect('Authentication/userProfile');
+        }
+        $can_update = checkAccess($access_id, "update");
+        $can_see_keys = checkAccess($access_id, "view_credentials");
+        $me = (int) $this->session->userdata('user_id');
+        $action = htmlspecialcharscustom($this->input->post($this->security->xss_clean('ir_action')));
+
+        if($action != ''){
+            if(!$can_update){
+                $this->session->set_flashdata('exception_1', lang('menu_not_permit_access'));
+                redirect('setting/notifications');
+            }
+
+            if($action == 'toggle'){
+                $key = htmlspecialcharscustom($this->input->post($this->security->xss_clean('module_key')));
+                $enabled = htmlspecialcharscustom($this->input->post($this->security->xss_clean('enabled'))) === '1';
+                //only this module's own keys: this form must not be able to flip
+                //the hotel add-on, which has its own screen and its own permission
+                if(strpos($key, 'notif') !== 0){
+                    $this->session->set_flashdata('exception_1', lang('menu_not_permit_access'));
+                    redirect('setting/notifications');
+                }
+                if(irModuleSet($key, $enabled, $me)){
+                    $this->session->set_flashdata('exception', lang('module_updated'));
+                }else{
+                    $this->session->set_flashdata('exception_1', lang('module_not_installed'));
+                }
+                redirect('setting/notifications');
+            }
+
+            if($action == 'general'){
+                $settings = irNotifySettings();
+                $settings['test_mode'] = $this->input->post('test_mode') ? 1 : 0;
+                $settings['test_recipient'] = trim(htmlspecialcharscustom($this->input->post($this->security->xss_clean('test_recipient'))));
+                $attempts = (int) $this->input->post($this->security->xss_clean('max_attempts'));
+                $settings['max_attempts'] = ($attempts >= 1 && $attempts <= 10) ? $attempts : 3;
+                $hold = (int) $this->input->post($this->security->xss_clean('hold_expiry_hours'));
+                $settings['hold_expiry_hours'] = ($hold >= 1 && $hold <= 720) ? $hold : 48;
+                $batch = (int) $this->input->post($this->security->xss_clean('batch_size'));
+                $settings['batch_size'] = ($batch >= 1 && $batch <= 500) ? $batch : 50;
+                $this->irSaveModuleSettings('notifications', $settings);
+                $this->session->set_flashdata('exception', lang('notify_saved'));
+                redirect('setting/notifications');
+            }
+
+            if($action == 'sms'){
+                $cfg = irNotifyChannelSettings('sms');
+                $provider = htmlspecialcharscustom($this->input->post($this->security->xss_clean('provider')));
+                $cfg['provider'] = in_array($provider, array('termii', 'legacy'), TRUE) ? $provider : '';
+                $cfg['sender_id'] = trim(htmlspecialcharscustom($this->input->post($this->security->xss_clean('sender_id'))));
+                $cfg['route'] = (htmlspecialcharscustom($this->input->post($this->security->xss_clean('route'))) == 'generic') ? 'generic' : 'dnd';
+                $code = preg_replace('/\D+/', '', (string) $this->input->post($this->security->xss_clean('country_code')));
+                $cfg['country_code'] = ($code != '') ? $code : '234';
+                //the key is NOT read straight from the form: see irNotifyKeepSecret,
+                //which is what stops a masked value overwriting a working key
+                $cfg['api_key'] = irNotifyKeepSecret(
+                    (string) $this->input->post('api_key'),
+                    isset($cfg['api_key']) ? $cfg['api_key'] : '',
+                    (bool) $this->input->post('clear_api_key')
+                );
+                $this->irSaveModuleSettings('notify_sms', $cfg);
+                $this->session->set_flashdata('exception', lang('notify_saved'));
+                redirect('setting/notifications');
+            }
+
+            if($action == 'rules'){
+                /* The whole grid saves at once, from ONE form. Per-row forms were
+                   the obvious design and are not possible: a <form> is not valid
+                   inside a <tr>, so the parser hoists it out of the table and the
+                   inputs end up submitting nothing. One form also means a venue
+                   setting up six channels for an event presses Save once.
+                   Unticked boxes do not post at all, so the matrix is walked from
+                   the event list rather than from what arrived. */
+                $events = irNotifyEvents();
+                $channels = $this->irNotifyChannels();
+                $recipients_in = $this->input->post('rec');
+                $enabled_in = $this->input->post('en');
+                $critical_in = $this->input->post('cr');
+                if(!is_array($recipients_in)){ $recipients_in = array(); }
+                if(!is_array($enabled_in)){ $enabled_in = array(); }
+                if(!is_array($critical_in)){ $critical_in = array(); }
+                $company_id = (int) $this->session->userdata('company_id');
+                $saved = 0;
+
+                foreach($events as $event_key => $event){
+                    foreach($channels as $channel){
+                        /* ':' and not '~': CodeIgniter sanitises every POST
+                           key through _clean_input_keys(), which allows only
+                           [a-z0-9:_/|-] and quietly turns anything else into an
+                           empty key. With '~' the whole grid collapsed into one
+                           blank entry and saving appeared to do nothing at all. */
+                        $field = $event_key . ':' . $channel;
+                        //one rule per cell, written by the helper that irNotifyRecipientsFor
+                        //reads back; it returns 0 for an untouched cell with no rule
+                        //behind it, so an empty grid writes nothing at all
+                        $rule_id = irNotifyRuleSave(
+                            $event_key, $channel,
+                            !empty($enabled_in[$field]),
+                            !empty($critical_in[$field]),
+                            isset($recipients_in[$field]) ? htmlspecialcharscustom($recipients_in[$field]) : '',
+                            $company_id, $me
+                        );
+                        if($rule_id){ $saved++; }
+                    }
+                }
+                $this->session->set_flashdata('exception', lang('notify_rules_saved') . ' (' . $saved . ')');
+                redirect('setting/notifications');
+            }
+        }
+
+        $data = array();
+        $data['can_update'] = $can_update;
+        $data['can_see_keys'] = $can_see_keys;
+        $data['channels'] = $this->irNotifyChannels();
+        $data['events'] = irNotifyEvents();
+        $data['general'] = irNotifySettings(TRUE);
+        $data['sms_cfg'] = irNotifyChannelSettings('sms');
+        $data['rows'] = irModuleRows(TRUE);
+        $data['registry'] = irModuleRegistry();
+        $data['roles'] = $this->db->where('del_status', 'Live')->order_by('id', 'ASC')->get('tbl_roles')->result();
+
+        //rules keyed event|channel so the grid can find its own cell in one pass
+        $rules = array();
+        foreach($this->db->where('del_status', 'Live')->get('tbl_notification_rules')->result() as $rule){
+            $parts = array();
+            $recipients = $this->db->where('rule_id', $rule->id)->where('del_status', 'Live')
+                                   ->order_by('escalation_order', 'ASC')
+                                   ->get('tbl_notification_recipients')->result();
+            foreach($recipients as $one){
+                $parts[] = ($one->recipient_type == 'fixed')
+                         ? $one->recipient_value
+                         : $one->recipient_type . ':' . $one->recipient_value;
+            }
+            $rules[$rule->event_key . '|' . $rule->channel] = array(
+                'row' => $rule,
+                'recipients' => implode(', ', $parts),
+            );
+        }
+        $data['rules'] = $rules;
+
+        $data['recent'] = $this->db->order_by('id', 'DESC')->limit(25)->get('tbl_notification_outbox')->result();
+        $data['counts'] = array();
+        foreach($this->db->select('status, COUNT(*) AS total')->group_by('status')
+                         ->get('tbl_notification_outbox')->result() as $count){
+            $data['counts'][$count->status] = (int) $count->total;
+        }
+
+        $data['main_content'] = $this->load->view('setting/notifications', $data, TRUE);
+        $this->load->view('userHome', $data);
+    }
+
+    /**
+     * "Send a test to me": queue one message to the test recipient and send it
+     * here and now, so pressing the button gives an answer instead of a shrug.
+     *
+     * This is the ONLY place the web sends anything. It is one message, to the
+     * address the tester typed, started by somebody holding 'update'. Everything
+     * else still goes through the cron worker, because a sale must never wait on
+     * a gateway.
+     * @access public
+     * @return void
+     */
+    public function notificationTest() {
+        $access_id = (string) irAccessModuleId('notifications');
+        if(!$access_id || !checkAccess($access_id, "update")){
+            $this->session->set_flashdata('exception_1', lang('menu_not_permit_access'));
+            redirect('setting/notifications');
+        }
+        $channel = htmlspecialcharscustom($this->input->post($this->security->xss_clean('channel')));
+        if(!in_array($channel, $this->irNotifyChannels(), TRUE)){
+            $this->session->set_flashdata('exception_1', lang('notify_bad_rule'));
+            redirect('setting/notifications');
+        }
+        if(!irNotifyOn() || !irNotifyChannelOn($channel)){
+            $this->session->set_flashdata('exception_1', lang('notify_switch_off_first'));
+            redirect('setting/notifications');
+        }
+        $settings = irNotifySettings(TRUE);
+        $to = trim((string) $settings['test_recipient']);
+        if($to == ''){
+            $this->session->set_flashdata('exception_1', lang('notify_no_test_recipient'));
+            redirect('setting/notifications');
+        }
+        $driver = irNotifyDriver($channel);
+        if($driver === NULL){
+            //a channel with no driver yet: say so rather than queue a row the
+            //worker would leave pending for ever
+            $this->session->set_flashdata('exception_1', lang('notify_no_driver'));
+            redirect('setting/notifications');
+        }
+
+        $id = irNotifyEnqueue(array(
+            'event_key' => 'manual_test',
+            'channel' => $channel,
+            'intended_recipient' => $to,
+            'subject' => 'Rexlio test notification',
+            'body' => 'Rexlio test notification sent by ' . $this->session->userdata('full_name')
+                      . ' at ' . date('Y-m-d H:i') . '. If you are reading this, the ' . $channel
+                      . ' channel works.',
+            'payload' => array('manual' => TRUE, 'by' => (int) $this->session->userdata('user_id')),
+        ));
+        if(!$id){
+            $this->session->set_flashdata('exception_1', lang('notify_test_not_queued'));
+            redirect('setting/notifications');
+        }
+
+        $row = $this->db->where('id', $id)->get('tbl_notification_outbox')->row();
+        $result = call_user_func($driver, $row);
+        if(!empty($result['ok'])){
+            $this->db->where('id', $id)->update('tbl_notification_outbox', array(
+                'status' => 'sent', 'attempts' => 1, 'sent_at' => date('Y-m-d H:i:s'),
+            ));
+            irNotifyLog('test #' . $id . ' ' . $channel . ' -> ' . $row->actual_recipient . ' sent');
+            $this->session->set_flashdata('exception', lang('notify_test_sent') . ' ' . $row->actual_recipient);
+        }else{
+            $error = isset($result['error']) ? (string) $result['error'] : 'unknown';
+            $this->db->where('id', $id)->update('tbl_notification_outbox', array(
+                'status' => 'failed', 'attempts' => 1, 'last_error' => substr($error, 0, 480),
+            ));
+            irNotifyLog('test #' . $id . ' ' . $channel . ' -> ' . $row->actual_recipient . ' FAILED: ' . $error);
+            $this->session->set_flashdata('exception_1', lang('notify_test_failed') . ' ' . $error);
+        }
+        redirect('setting/notifications');
+    }
+
+    /**
+     * The channels this build knows about, in the order the screen shows them.
+     * Kept here rather than derived from tbl_modules so an unknown channel name
+     * posted at the rules form is refused instead of stored.
+     * @access private
+     * @return array
+     */
+    private function irNotifyChannels() {
+        return array('inapp', 'email', 'sms', 'whatsapp', 'telegram', 'push');
+    }
+
+    /**
+     * Write one module's settings JSON, leaving its ON/OFF state alone, and drop
+     * the caches that were populated earlier in this same request.
+     * @access private
+     * @return void
+     */
+    private function irSaveModuleSettings($module_key, $settings) {
+        $this->db->where('module_key', $module_key)->update('tbl_modules', array(
+            'settings' => json_encode($settings),
+            'updated_by' => (int) $this->session->userdata('user_id'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ));
+        irModuleRows(TRUE);
+        irNotifySettings(TRUE);
+    }
 }

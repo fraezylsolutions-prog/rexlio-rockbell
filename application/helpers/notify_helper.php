@@ -596,3 +596,145 @@ if (!function_exists('irNotifySendTermii')) {
         return array('ok' => FALSE, 'error' => 'Termii refused: ' . $why);
     }
 }
+
+/* ------------------------------------------- saving from the settings screen */
+
+if (!function_exists('irNotifyKeepSecret')) {
+    /**
+     * Decide what a provider key should become after a form submit.
+     *
+     * This is the rule that protects a working installation from its own
+     * settings screen. Anyone without the view_credentials permission sees the
+     * key masked, so the masked string is what their browser posts back. If that
+     * were saved, the real key would be destroyed by somebody who only came to
+     * change the sender ID - and the next alert would fail with "Invalid API
+     * key" for no visible reason, hours later, with nobody connecting the two.
+     *
+     * So: a blank box, an unchanged box, or the mask itself all mean LEAVE IT
+     * ALONE. Removing a key is a deliberate separate act, never a side effect.
+     *
+     * Named and kept here rather than inline in the controller because the same
+     * rule has to hold for the WhatsApp and Telegram keys, and because this is
+     * exactly the kind of decision that deserves a test of its own.
+     *
+     * @param string $posted   what came back from the form
+     * @param string $existing what is stored now
+     * @param bool   $clear    the "delete the saved key" tick-box
+     * @return string what to store
+     */
+    function irNotifyKeepSecret($posted, $existing, $clear = FALSE) {
+        $existing = (string) $existing;
+        if ($clear) { return ''; }
+        $posted = (string) $posted;
+        if (trim($posted) === '') { return $existing; }
+        if ($posted === irNotifyMaskSecret($existing)) { return $existing; }
+        return trim($posted);
+    }
+}
+
+if (!function_exists('irNotifyParseRecipients')) {
+    /**
+     * Turn one line of a rule's recipient box into rows for the database.
+     *
+     * "role:2, user:11, boss@example.com, 08031234567" becomes four entries, in
+     * the order they were typed - that order IS the escalation order, which is
+     * why the box is a list rather than a set of pickers.
+     *
+     * A role or user is stored as a reference and resolved when the message is
+     * sent (irNotifyRecipientsFor), so a rule never ends up pointing at somebody
+     * who has left. Anything else is kept verbatim as a 'fixed' address: the
+     * driver, not this function, decides whether it is a usable email or number,
+     * because that depends on the channel it ends up on.
+     *
+     * @param string $raw
+     * @return array list of array(recipient_type, recipient_value)
+     */
+    function irNotifyParseRecipients($raw) {
+        $out = array();
+        foreach (preg_split('/[,;\r\n]+/', (string) $raw) as $one) {
+            $one = trim($one);
+            if ($one === '') { continue; }
+            if (preg_match('/^role\s*:\s*(\d+)$/i', $one, $m)) {
+                $out[] = array('recipient_type' => 'role', 'recipient_value' => $m[1]);
+            } elseif (preg_match('/^user\s*:\s*(\d+)$/i', $one, $m)) {
+                $out[] = array('recipient_type' => 'user', 'recipient_value' => $m[1]);
+            } else {
+                $out[] = array('recipient_type' => 'fixed', 'recipient_value' => substr($one, 0, 190));
+            }
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('irNotifyRuleSave')) {
+    /**
+     * Save one rule - "when THIS happens, tell THESE people THIS way" - and the
+     * people it reaches. Sits next to irNotifyRecipientsFor(), which reads back
+     * what this writes.
+     *
+     * Returns 0 without touching anything when the cell is untouched and has no
+     * rule behind it: the settings screen posts the whole grid, and writing a
+     * row for every empty cell would leave 48 pointless rules per company.
+     *
+     * Recipients are replaced wholesale rather than diffed - the list is short,
+     * and since its order is the escalation order a diff would have to preserve
+     * positions anyway. Retired rows are marked Delete, never removed, so an
+     * outbox row from last week can still be explained afterwards.
+     *
+     * outlet_id is always 0, meaning every outlet; per-outlet rules are a later
+     * stage, and the column is NOT NULL so the UNIQUE key actually bites.
+     *
+     * @return int the rule id, or 0 when there was nothing to save
+     */
+    function irNotifyRuleSave($event_key, $channel, $enabled, $critical, $raw, $company_id, $user_id) {
+        $CI = &get_instance();
+        $events = irNotifyEvents();
+        if (!isset($events[$event_key])) { return 0; }
+
+        $enabled = $enabled ? 1 : 0;
+        $critical = $critical ? 1 : 0;
+        $company_id = (int) $company_id ? (int) $company_id : 1;
+        $people = irNotifyParseRecipients($raw);
+
+        $row = $CI->db->where('event_key', $event_key)->where('channel', $channel)
+                      ->where('outlet_id', 0)->where('company_id', $company_id)
+                      ->get('tbl_notification_rules')->row();
+        if (!$row && !$enabled && !$critical && !$people) { return 0; }
+
+        $now = date('Y-m-d H:i:s');
+        if ($row) {
+            $CI->db->where('id', $row->id)->update('tbl_notification_rules', array(
+                'is_enabled' => $enabled,
+                'is_critical' => $critical,
+                'del_status' => 'Live',
+                'updated_by' => (int) $user_id,
+                'updated_at' => $now,
+            ));
+            $rule_id = (int) $row->id;
+        } else {
+            $CI->db->insert('tbl_notification_rules', array(
+                'event_key' => $event_key,
+                'channel' => $channel,
+                'is_enabled' => $enabled,
+                'is_critical' => $critical,
+                'outlet_id' => 0,
+                'company_id' => $company_id,
+                'created_at' => $now,
+                'updated_by' => (int) $user_id,
+                'updated_at' => $now,
+            ));
+            $rule_id = (int) $CI->db->insert_id();
+        }
+
+        $CI->db->where('rule_id', $rule_id)->where('del_status', 'Live')
+               ->update('tbl_notification_recipients', array('del_status' => 'Delete'));
+        $order = 0;
+        foreach ($people as $one) {
+            $one['rule_id'] = $rule_id;
+            $one['escalation_order'] = $order++;
+            $one['del_status'] = 'Live';
+            $CI->db->insert('tbl_notification_recipients', $one);
+        }
+        return $rule_id;
+    }
+}

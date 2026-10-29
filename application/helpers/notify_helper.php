@@ -63,6 +63,7 @@ if (!function_exists('irNotifySettings')) {
             'backoff_minutes'   => array(1, 5, 15),   /* one entry per retry */
             'hold_expiry_hours' => 48,                /* a held message is dropped, never sent late */
             'batch_size'        => 50,                /* per worker run */
+            'ack_expiry_hours'  => 72,                /* N5(a): an old SMS must not silence a new alert */
         );
         $rows = irModuleRows();
         $stored = array();
@@ -145,9 +146,12 @@ if (!function_exists('irNotifyEnqueue')) {
             'test_mode'          => $test ? 1 : 0,
             'outlet_id'          => isset($m['outlet_id']) ? (int) $m['outlet_id'] : NULL,
             'company_id'         => isset($m['company_id']) ? (int) $m['company_id'] : 1,
-            'created_at'         => date('Y-m-d H:i:s'),
+            'created_at'         => irNotifyNow(),
         );
         if ($dedupe !== '') { $data['dedupe_key'] = $dedupe; }
+        /* N5(a): only set when there is one, so the column stays absent from the
+           INSERT on a site whose migration has not run yet. */
+        if (!empty($m['ack_group'])) { $data['ack_group'] = substr((string) $m['ack_group'], 0, 40); }
 
         /* Suppressed on purpose: a missing table (code deployed before the
            migration) must not fatal the sale that triggered it. */
@@ -162,8 +166,18 @@ if (!function_exists('irNotifyEnqueue')) {
                     "SELECT id FROM tbl_notification_outbox WHERE dedupe_key = "
                     . $CI->db->escape($dedupe) . " LIMIT 1");
                 if ($seen && $seen->num_rows()) { return (int) $seen->row()->id; }
-                unset($data['dedupe_key']);
+            }
+            /* Last resort: drop the two optional columns and try again. They are
+               the only fields here that a half-applied migration can be missing,
+               and a message is worth more than its metadata - losing the dedupe
+               key risks a duplicate, losing ack_group costs an Acknowledge
+               button, and losing the row costs the alert itself. Retried even
+               when there was no dedupe key, which the first version skipped. */
+            if (isset($data['dedupe_key']) || isset($data['ack_group'])) {
+                unset($data['dedupe_key'], $data['ack_group']);
                 if (@$CI->db->insert('tbl_notification_outbox', $data)) {
+                    @irNotifyLog('queued ' . $data['event_key']
+                        . ' without dedupe_key/ack_group - are the N3/N5 migrations applied?');
                     return (int) $CI->db->insert_id();
                 }
             }
@@ -455,11 +469,45 @@ if (!function_exists('irNotifyFire')) {
             if (!isset($ctx['when'])) { $ctx['when'] = date('Y-m-d H:i'); }
             $queued = 0;
 
+            /* N5(a): ONE acknowledgeable alert per call to this function, which
+               is to say one per real-world incident - not one per rule and not
+               one per recipient.
+               A register being force-closed is a single thing that happened. If
+               it is SMSed to the manager and emailed to the owner, whichever of
+               them answers has dealt with it, and the other must not keep being
+               escalated. The first version keyed the group per rule, and the
+               test caught it: the SMS and the email came out with two different
+               groups, so acknowledging one left the other climbing its ladder.
+               Created lazily, on the first critical rule, so a purely
+               non-critical event costs nothing. */
+            $ack_group = '';
+            $ack_url   = '';
+
             foreach ($rules->result() as $rule) {
                 if (!irNotifyChannelOn($rule->channel)) { continue; }
                 $short = in_array($rule->channel, array('sms', 'whatsapp', 'voice'), TRUE);
                 $body = irNotifyFill($short ? $def['short'] : $def['long'], $ctx);
                 $subject = irNotifyFill($def['subject'], $ctx);
+
+                if ((int) $rule->is_critical === 1 && $ack_group === '') {
+                    $group = bin2hex(random_bytes(16));
+                    $token = irNotifyAckCreate(
+                        $group, $event_key, $subject,
+                        $outlet ?: NULL,
+                        isset($ctx['company_id']) ? (int) $ctx['company_id'] : 1
+                    );
+                    /* No token - the table is not migrated yet - means no LINK,
+                       never no alert. The message still goes out. */
+                    if ($token !== '') {
+                        $ack_group = $group;
+                        $ack_url   = irNotifyAckUrl($token);
+                    }
+                }
+                /* Non-critical rules for the same event stay unlinked even when
+                   a critical one has made a group: there is nothing to
+                   acknowledge on a message nobody is chasing. */
+                $is_crit   = ((int) $rule->is_critical === 1);
+                $rule_body = irNotifyAckAppend($body, $rule->channel, $is_crit ? $ack_url : '');
 
                 foreach (irNotifyRecipientsFor($rule->id, $rule->channel) as $to) {
                     $queued += irNotifyEnqueue(array(
@@ -468,10 +516,13 @@ if (!function_exists('irNotifyFire')) {
                         'rule_id' => $rule->id,
                         'intended_recipient' => $to,
                         'subject' => $subject,
-                        'body' => $body,
+                        'body' => $rule_body,
                         'payload' => $ctx,
                         'is_critical' => (int) $rule->is_critical,
                         'outlet_id' => $outlet ?: NULL,
+                        /* only the critical rows join the group, so settling it
+                           cannot mark a non-critical message as answered */
+                        'ack_group' => $is_crit ? $ack_group : '',
                     )) ? 1 : 0;
                 }
             }
@@ -737,7 +788,7 @@ if (!function_exists('irNotifyRuleSave')) {
                       ->get('tbl_notification_rules')->row();
         if (!$row && !$enabled && !$critical && !$people) { return 0; }
 
-        $now = date('Y-m-d H:i:s');
+        $now = irNotifyNow();
         if ($row) {
             $CI->db->where('id', $row->id)->update('tbl_notification_rules', array(
                 'is_enabled' => $enabled,
@@ -772,5 +823,253 @@ if (!function_exists('irNotifyRuleSave')) {
             $CI->db->insert('tbl_notification_recipients', $one);
         }
         return $rule_id;
+    }
+}
+
+/* ------------------------------------------- N5(a): acknowledging an alert -- */
+
+if (!function_exists('irNotifyAckAlphabet')) {
+    /**
+     * The token alphabet. No padding and no '+' or '/', and none of 0/O/1/l/I,
+     * because these tokens get read off a phone screen and sometimes down a
+     * telephone.
+     */
+    function irNotifyAckAlphabet() {
+        return '23456789abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+    }
+}
+
+if (!function_exists('irNotifyAckNewToken')) {
+    /**
+     * 10 characters from a 56-letter alphabet: about 58 bits, from
+     * random_bytes() and not mt_rand(), because a predictable token would let
+     * somebody silence an alert they never received.
+     *
+     * Short on purpose. The whole link has to fit in an SMS alongside the
+     * message, and every character here costs one there.
+     */
+    function irNotifyAckNewToken() {
+        $alphabet = irNotifyAckAlphabet();
+        $n = strlen($alphabet);
+        $out = '';
+        $bytes = random_bytes(10);
+        for ($i = 0; $i < 10; $i++) {
+            /* ord() % n is very slightly biased towards the first few letters.
+               With one alert per token that is of no consequence; it is noted so
+               nobody copies this into something where it would be. */
+            $out .= $alphabet[ord($bytes[$i]) % $n];
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('irNotifyAckCreate')) {
+    /**
+     * Make one acknowledgeable alert and return its token, or '' if the table is
+     * not there yet (code deployed before its migration must never stop an
+     * alert being SENT - only stop it being acknowledgeable).
+     *
+     * @param string $group  the alert identity. Every message for this alert
+     *                       carries it, so any one of them can settle it.
+     * @param string $label  shown on the page. Stored here so the page needs no
+     *                       join and reveals nothing beyond this one alert.
+     */
+    function irNotifyAckCreate($group, $event_key, $label = '', $outlet_id = NULL, $company_id = 1) {
+        $CI = &get_instance();
+        $hours = (int) irNotifySetting('ack_expiry_hours', 72);
+        if ($hours < 1) { $hours = 72; }
+
+        /* Retried rather than assumed unique: the UNIQUE index is the real
+           guarantee, and a collision must not lose the alert. */
+        for ($try = 0; $try < 5; $try++) {
+            $token = irNotifyAckNewToken();
+            $ok = @$CI->db->insert('tbl_notification_acks', array(
+                'token'      => $token,
+                'ack_group'  => $group,
+                'event_key'  => substr((string) $event_key, 0, 60),
+                'label'      => substr((string) $label, 0, 190),
+                'outlet_id'  => $outlet_id !== NULL ? (int) $outlet_id : NULL,
+                'company_id' => (int) $company_id,
+                'expires_at' => irNotifyNow($hours * 3600),
+                'created_at' => irNotifyNow(),
+            ));
+            if ($ok) { return $token; }
+        }
+        @irNotifyLog('could not create an ack token for ' . $event_key);
+        return '';
+    }
+}
+
+if (!function_exists('irNotifyAckUrl')) {
+    /**
+     * The shortest link this application can serve: /ack/<token>.
+     *
+     * One path segment and no query string. .htaccess already rewrites
+     * everything to index.php, so "ack" resolves to the Ack controller with no
+     * entry in routes.php - which is a vendor file an update would overwrite.
+     */
+    function irNotifyAckUrl($token) {
+        if ((string) $token === '') { return ''; }
+        return rtrim(base_url(), '/') . '/ack/' . $token;
+    }
+}
+
+if (!function_exists('irNotifyAckRow')) {
+    /** The alert behind a token, or NULL. */
+    function irNotifyAckRow($token) {
+        $token = trim((string) $token);
+        if ($token === '' || !preg_match('/^[0-9A-Za-z]{6,16}$/', $token)) { return NULL; }
+        $CI = &get_instance();
+        $q = @$CI->db->query(
+            "SELECT * FROM tbl_notification_acks WHERE token = " . $CI->db->escape($token) . " LIMIT 1");
+        if (!$q || !$q->num_rows()) { return NULL; }
+        return $q->row();
+    }
+}
+
+if (!function_exists('irNotifyAckState')) {
+    /**
+     * What a token is good for right now, WITHOUT changing anything. This is
+     * what the GET uses, and the reason the GET is safe to prefetch.
+     *
+     * One of: unknown, expired, already, open.
+     */
+    function irNotifyAckState($token) {
+        $row = irNotifyAckRow($token);
+        if (!$row) { return array('state' => 'unknown', 'row' => NULL); }
+        if ($row->acknowledged_at !== NULL && $row->acknowledged_at !== '') {
+            /* Checked BEFORE expiry on purpose: an alert that was acknowledged
+               and has since expired should say "already done", not "too late". */
+            return array('state' => 'already', 'row' => $row);
+        }
+        if (strtotime($row->expires_at) < time()) { return array('state' => 'expired', 'row' => $row); }
+        return array('state' => 'open', 'row' => $row);
+    }
+}
+
+if (!function_exists('irNotifyAckConfirm')) {
+    /**
+     * Acknowledge. Idempotent: a second POST reports 'already' and changes
+     * nothing, so a double-tap cannot overwrite who answered first.
+     *
+     * Settles every outbox row in the group, which is what stops the N5(b)
+     * ladder - one person answering silences the alert for all of its tiers.
+     */
+    function irNotifyAckConfirm($token, $user_id = NULL, $ip = '') {
+        $st = irNotifyAckState($token);
+        if ($st['state'] !== 'open') { return $st; }
+
+        $CI = &get_instance();
+        $row = $st['row'];
+        $now = irNotifyNow();
+        $by  = ($user_id !== NULL && $user_id !== '') ? (int) $user_id : NULL;
+
+        /* The WHERE carries acknowledged_at IS NULL, so two taps in the same
+           second cannot both win: the second updates nothing. */
+        @$CI->db->query(
+            "UPDATE tbl_notification_acks
+                SET acknowledged_at = " . $CI->db->escape($now) . ",
+                    acknowledged_by = " . ($by !== NULL ? $by : 'NULL') . ",
+                    acknowledged_ip = " . $CI->db->escape(substr((string) $ip, 0, 45)) . "
+              WHERE id = " . (int) $row->id . " AND acknowledged_at IS NULL");
+
+        @$CI->db->query(
+            "UPDATE tbl_notification_outbox
+                SET acknowledged_at = " . $CI->db->escape($now) . ",
+                    acknowledged_by = " . ($by !== NULL ? $by : 'NULL') . "
+              WHERE ack_group = " . $CI->db->escape($row->ack_group) . "
+                AND acknowledged_at IS NULL");
+
+        @irNotifyLog('acknowledged ' . $row->event_key . ' (' . $row->ack_group . ')'
+            . ($by !== NULL ? ' by user ' . $by : ' by token')
+            . ($ip !== '' ? ' from ' . $ip : ''));
+
+        return irNotifyAckState($token);
+    }
+}
+
+if (!function_exists('irNotifyAckGroupSettled')) {
+    /** Has this alert been acknowledged? The N5(b) ladder asks this. */
+    function irNotifyAckGroupSettled($group) {
+        if ((string) $group === '') { return FALSE; }
+        $CI = &get_instance();
+        $q = @$CI->db->query(
+            "SELECT acknowledged_at FROM tbl_notification_acks
+              WHERE ack_group = " . $CI->db->escape($group) . " LIMIT 1");
+        if (!$q || !$q->num_rows()) { return FALSE; }
+        $v = $q->row()->acknowledged_at;
+        return ($v !== NULL && $v !== '');
+    }
+}
+
+if (!function_exists('irNotifyAckAppend')) {
+    /**
+     * Put the link in the message.
+     *
+     * Short channels get " Ack: <url>" and nothing more, because every word here
+     * costs an SMS character and a second SMS costs real money. Email gets its
+     * own line and a sentence, because there is room and the link needs
+     * explaining.
+     */
+    function irNotifyAckAppend($body, $channel, $url) {
+        if ((string) $url === '') { return $body; }
+        $short = in_array($channel, array('sms', 'whatsapp', 'voice'), TRUE);
+        if (!$short) {
+            return rtrim($body) . "\n\n" . lang('notify_ack_email_line') . "\n" . $url . "\n";
+        }
+
+        /* The link must survive; the prose may not. Measured against the real
+           templates with this venue's longest real values, order_cancelled came
+           to 169 characters - a second SMS, charged separately, for the sake of
+           the tail of a free-text reason.
+           So the BODY is trimmed to fit and the link is never touched. The
+           templates put the order number, outlet and amount before the
+           free-text, so what gets cut is the least load-bearing end of the
+           sentence. An ellipsis marks it, rather than stopping mid-word and
+           looking like a truncated send. */
+        $tail = ' Ack: ' . $url;
+        $body = rtrim($body);
+        $room = 160 - strlen($tail);
+        if (strlen($body) > $room) {
+            $body = rtrim(substr($body, 0, $room - 1)) . "\xE2\x80\xA6";
+            /* the ellipsis is 3 bytes in UTF-8, so take the room back */
+            while (strlen($body) > $room) { $body = substr($body, 0, -4) . "\xE2\x80\xA6"; }
+        }
+        return $body . $tail;
+    }
+}
+
+/* --------------------------------------------------------------- one clock -- */
+
+if (!function_exists('irNotifyNow')) {
+    /**
+     * The module's clock. Every stored datetime and every comparison goes
+     * through here, and nothing in this module uses MySQL's NOW().
+     *
+     * WHY THIS EXISTS
+     * The module used to mix the two. PHP wrote created_at, sent_at and
+     * next_attempt_at with date(), and SQL compared them with NOW() - which is
+     * the database server's clock, not PHP's. On this machine PHP runs in UTC
+     * and MySQL reports W. Central Africa (UTC+1), so they were an hour apart,
+     * and the effect was not cosmetic:
+     *
+     *   a 5-minute backoff written as 16:02:15 was already <= NOW() (16:57:15)
+     *
+     * so every retry was due the instant it was scheduled. A failing message
+     * burned all three attempts in three minutes instead of over twenty-one,
+     * and held messages expired an hour early. Proven with
+     *   SELECT '<php now + 300s>' <= NOW()  ->  1
+     *
+     * It is not fixed by setting the session timezone, because this is a vendor
+     * product whose reports all over the application compare dates their own
+     * way; changing the connection's clock would move those too. So the module
+     * stops asking the database what time it is instead.
+     *
+     * date() and not gmdate(): the application sets PHP's timezone per request
+     * from the venue's own setting (my_helper.php, date_default_timezone_set),
+     * and a venue reading its own log wants its own wall clock.
+     */
+    function irNotifyNow($offset_seconds = 0) {
+        return date('Y-m-d H:i:s', time() + (int) $offset_seconds);
     }
 }

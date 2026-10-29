@@ -134,6 +134,16 @@ $has_key    = isset($sms_cfg['api_key']) && $sms_cfg['api_key'] !== '';
                     </div>
                     <div class="col-sm-12 mb-2 col-md-2">
                         <div class="form-group">
+                            <label><?php echo lang('notify_ack_expiry_hours'); ?></label>
+                            <?php /* N5(a): capped at 168 (a week) in the controller too - the
+                                     browser is not where this is enforced. */ ?>
+                            <input type="number" min="1" max="168" name="ack_expiry_hours" class="form-control" <?php echo $can_update ? '' : 'disabled'; ?>
+                                   value="<?php echo (int) (isset($general['ack_expiry_hours']) ? $general['ack_expiry_hours'] : 72); ?>">
+                            <small class="text-muted"><?php echo lang('notify_ack_expiry_hint'); ?></small>
+                        </div>
+                    </div>
+                    <div class="col-sm-12 mb-2 col-md-2">
+                        <div class="form-group">
                             <label><?php echo lang('notify_batch_size'); ?></label>
                             <input type="number" min="1" max="500" name="batch_size" class="form-control" <?php echo $can_update ? '' : 'disabled'; ?>
                                    value="<?php echo (int) $general['batch_size']; ?>">

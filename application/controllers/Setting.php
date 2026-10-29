@@ -992,6 +992,10 @@ class Setting extends Cl_Controller {
                 $settings['hold_expiry_hours'] = ($hold >= 1 && $hold <= 720) ? $hold : 48;
                 $batch = (int) $this->input->post($this->security->xss_clean('batch_size'));
                 $settings['batch_size'] = ($batch >= 1 && $batch <= 500) ? $batch : 50;
+                //N5(a): capped at a week. An Acknowledge link that works for a
+                //month lets a forgotten SMS silence a fresh alert.
+                $ack = (int) $this->input->post($this->security->xss_clean('ack_expiry_hours'));
+                $settings['ack_expiry_hours'] = ($ack >= 1 && $ack <= 168) ? $ack : 72;
                 $this->irSaveModuleSettings('notifications', $settings);
                 $this->session->set_flashdata('exception', lang('notify_saved'));
                 redirect('setting/notifications');

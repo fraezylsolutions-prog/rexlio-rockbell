@@ -60,7 +60,7 @@ class Notification_worker extends CI_Controller {
         $rows = $this->db->query(
             "SELECT * FROM tbl_notification_outbox
               WHERE status = 'pending'
-                AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
+                AND (next_attempt_at IS NULL OR next_attempt_at <= '" . irNotifyNow() . "')
               ORDER BY is_critical DESC, id ASC
               LIMIT " . $batch)->result();
 
@@ -97,7 +97,7 @@ class Notification_worker extends CI_Controller {
             if (!empty($result['ok'])) {
                 $this->mark($row->id, array(
                     'status' => 'sent', 'attempts' => $attempt,
-                    'sent_at' => date('Y-m-d H:i:s'), 'last_error' => NULL,
+                    'sent_at' => irNotifyNow(), 'last_error' => NULL,
                     'next_attempt_at' => NULL,
                 ));
                 $sent++;
@@ -123,7 +123,10 @@ class Notification_worker extends CI_Controller {
             $this->mark($row->id, array(
                 'status' => 'pending', 'attempts' => $attempt,
                 'last_error' => substr($error, 0, 480),
-                'next_attempt_at' => date('Y-m-d H:i:s', time() + ($wait * 60)),
+                /* irNotifyNow, not date(): this value is compared against the
+                   module's clock in the due query, and the two were an hour
+                   apart while one was PHP and the other MySQL NOW(). */
+                'next_attempt_at' => irNotifyNow($wait * 60),
             ));
             irNotifyLog(sprintf('retry  #%d %s/%s attempt %d, next in %dm: %s',
                 $row->id, $row->event_key, $row->channel, $attempt, $wait, $error));
@@ -189,7 +192,7 @@ class Notification_worker extends CI_Controller {
             $this->out('  (empty)');
         }
         $stuck = $this->db->query("SELECT COUNT(*) n FROM tbl_notification_outbox
-                                    WHERE status='pending' AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)")->row();
+                                    WHERE status='pending' AND created_at < '" . irNotifyNow(-3600) . "'")->row();
         if ($stuck && (int) $stuck->n > 0) {
             $this->out('WARNING: ' . $stuck->n . ' message(s) pending for over an hour - is cron running?');
         }
@@ -239,7 +242,7 @@ class Notification_worker extends CI_Controller {
                 SET status = 'expired',
                     last_error = CONCAT(COALESCE(last_error,''), ' | expired after " . $hours . "h held')
               WHERE status = 'held'
-                AND created_at < DATE_SUB(NOW(), INTERVAL " . $hours . " HOUR)");
+                AND created_at < '" . irNotifyNow(-$hours * 3600) . "'");
         $n = $this->db->affected_rows();
         if ($n > 0) { irNotifyLog($n . ' held message(s) expired after ' . $hours . 'h'); }
     }

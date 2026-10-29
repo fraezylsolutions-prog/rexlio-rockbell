@@ -2469,3 +2469,21 @@ $lang['notify_last_error'] = 'Last error';
 $lang['notify_intended_for'] = 'meant for';
 $lang['notify_test_badge'] = 'TEST';
 $lang['notify_worker_note'] = 'Messages are queued instantly and sent by a scheduled task, so placing an order never waits on a provider. If rows sit at "pending", the scheduled task is not running.';
+
+/* Notifications - N5(a): acknowledging a critical alert */
+$lang['notify_ack_title']            = 'Acknowledge alert';
+$lang['notify_ack_heading']          = 'Acknowledge this alert';
+$lang['notify_ack_explain']          = 'Tap the button to confirm you have seen this. Until somebody does, it will be sent on to the next person.';
+$lang['notify_ack_button']           = 'Acknowledge';
+$lang['notify_ack_expires']          = 'This link stops working after';
+$lang['notify_ack_done_heading']     = 'Acknowledged';
+$lang['notify_ack_done']             = 'This alert was acknowledged at';
+$lang['notify_ack_done_note']        = 'Nothing further will be sent about it. Tapping again changes nothing.';
+$lang['notify_ack_expired_heading']  = 'This link has expired';
+$lang['notify_ack_expired']          = 'Acknowledge links are short-lived on purpose, so an old message cannot silence a new alert. The alert itself is unchanged - sort it out on the system.';
+$lang['notify_ack_unknown_heading']  = 'Link not recognised';
+$lang['notify_ack_unknown']          = 'This link is not valid. Check it was copied in full, or use the most recent message.';
+$lang['notify_ack_post_only']        = 'Acknowledging has to be confirmed with the button on the page.';
+$lang['notify_ack_email_line']       = 'Acknowledge this alert so it is not escalated:';
+$lang['notify_ack_expiry_hours']     = 'Acknowledge link valid for (hours)';
+$lang['notify_ack_expiry_hint']      = 'How long an Acknowledge link keeps working. Short is safer: an old SMS should not be able to silence a new alert.';

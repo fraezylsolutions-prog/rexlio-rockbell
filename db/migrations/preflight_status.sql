@@ -3,7 +3,7 @@
 --
 -- Run against live before a deploy:
 --     mysql -u <user> -p <livedb> < db/migrations/preflight_status.sql
--- Prints one row per migration: APPLIED or MISSING (17 migrations as of 2026-09-25). Apply the MISSING ones in
+-- Prints one row per migration: APPLIED or MISSING (18 migrations as of 2026-10-29). Apply the MISSING ones in
 -- the listed order, each with its own script (each prints PASS at the end).
 -- Nothing here writes. Every check uses information_schema or tables that
 -- exist in every install (tbl_access, tbl_roles, tbl_role_access, tbl_food_menus).
@@ -91,4 +91,10 @@ SELECT '2026-09-24_01_kitchen-origin', CASE WHEN
 UNION ALL
 SELECT '2026-09-25_01_waiter-register-report', CASE WHEN
     (SELECT COUNT(*) FROM tbl_access WHERE module_name='waiter_register_report' AND parent_id=0) = 1
+  THEN 'APPLIED' ELSE 'MISSING' END
+UNION ALL
+SELECT '2026-10-29_01_notifications-n1', CASE WHEN
+    (SELECT COUNT(*) FROM tbl_modules WHERE module_key LIKE 'notif%') = 7
+    AND (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()
+          AND TABLE_NAME IN ('tbl_notification_rules','tbl_notification_recipients','tbl_notification_outbox')) = 3
   THEN 'APPLIED' ELSE 'MISSING' END;

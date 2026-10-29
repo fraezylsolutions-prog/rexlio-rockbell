@@ -5166,6 +5166,59 @@ if (!function_exists('irModuleRegistry')) {
                what the add-ons need - business-wide, Admin-gated, audited, read per request. 'default'
                is the answer while its tbl_modules row does not exist yet, so deploying the code before
                the migration changes nothing (add-ons have no default: they stay off until installed). */
+            /* Notifications (N1, 2026-10-29). A master switch plus one per channel,
+               every one OFF and with NO 'default': unlike waiter_auto_logout these
+               must stay silent until somebody deliberately turns them on, so code
+               deployed ahead of the migration sends nothing.
+
+               notify_sms owns its own provider setting on purpose. The legacy
+               tbl_companies columns are contradictory - sms_enable_status is a
+               dropdown where 5 means Nexmo and which nothing reads at send time,
+               while sms_service_provider is a different dropdown with different
+               numbering that is what actually decides. Reading either would
+               inherit that mess. */
+            'notifications' => array(
+                'label' => 'module_notifications', 'desc' => 'module_notifications_desc',
+                'kind' => 'switch',
+                'migration' => 'db/migrations/2026-10-29_01_notifications-n1.sql',
+                'tables' => array('tbl_notification_rules', 'tbl_notification_recipients', 'tbl_notification_outbox'),
+            ),
+            'notify_inapp' => array(
+                'label' => 'module_notify_inapp', 'desc' => 'module_notify_inapp_desc',
+                'kind' => 'switch',
+                'migration' => 'db/migrations/2026-10-29_01_notifications-n1.sql',
+                'tables' => array('tbl_notification_outbox'),
+            ),
+            'notify_email' => array(
+                'label' => 'module_notify_email', 'desc' => 'module_notify_email_desc',
+                'kind' => 'switch',
+                'migration' => 'db/migrations/2026-10-29_01_notifications-n1.sql',
+                'tables' => array('tbl_notification_outbox'),
+            ),
+            'notify_sms' => array(
+                'label' => 'module_notify_sms', 'desc' => 'module_notify_sms_desc',
+                'kind' => 'switch',
+                'migration' => 'db/migrations/2026-10-29_01_notifications-n1.sql',
+                'tables' => array('tbl_notification_outbox'),
+            ),
+            'notify_whatsapp' => array(
+                'label' => 'module_notify_whatsapp', 'desc' => 'module_notify_whatsapp_desc',
+                'kind' => 'switch',
+                'migration' => 'db/migrations/2026-10-29_01_notifications-n1.sql',
+                'tables' => array('tbl_notification_outbox'),
+            ),
+            'notify_telegram' => array(
+                'label' => 'module_notify_telegram', 'desc' => 'module_notify_telegram_desc',
+                'kind' => 'switch',
+                'migration' => 'db/migrations/2026-10-29_01_notifications-n1.sql',
+                'tables' => array('tbl_notification_outbox'),
+            ),
+            'notify_push' => array(
+                'label' => 'module_notify_push', 'desc' => 'module_notify_push_desc',
+                'kind' => 'switch',
+                'migration' => 'db/migrations/2026-10-29_01_notifications-n1.sql',
+                'tables' => array('tbl_notification_outbox'),
+            ),
             'waiter_auto_logout' => array(
                 'label' => 'module_waiter_auto_logout', 'desc' => 'module_waiter_auto_logout_desc',
                 'kind' => 'switch', 'default' => 1,

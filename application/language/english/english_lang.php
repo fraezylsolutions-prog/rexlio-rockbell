@@ -2378,3 +2378,21 @@ $lang['open'] = 'Open';
 $lang['search'] = 'Search';
 $lang['wrr_completed_orders_list'] = 'Completed orders';
 $lang['wrr_no_orders'] = 'No completed orders in this period.';
+
+/* Notifications module (N1, 2026-10-29) */
+$lang['module_notifications'] = 'Notifications';
+$lang['module_notifications_desc'] = 'Master switch. While this is off nothing is queued and nothing is sent, whatever the individual channels say. Existing settings and history are kept.';
+$lang['module_notify_inapp'] = 'Notifications: in-app';
+$lang['module_notify_inapp_desc'] = 'The bell inside Rexlio. Costs nothing and needs no provider account.';
+$lang['module_notify_email'] = 'Notifications: email';
+$lang['module_notify_email_desc'] = 'Sent by SMTP using the mail settings already configured. Best for summaries and anything long.';
+$lang['module_notify_sms'] = 'Notifications: SMS';
+$lang['module_notify_sms_desc'] = 'Costs money per message. Intended for critical alerts and the daily summary, not routine events.';
+$lang['module_notify_whatsapp'] = 'Notifications: WhatsApp';
+$lang['module_notify_whatsapp_desc'] = 'One channel with a choice of driver. Only one driver is active at a time.';
+$lang['module_notify_telegram'] = 'Notifications: Telegram';
+$lang['module_notify_telegram_desc'] = 'Free, and good for staff groups. Each person must start a chat with the bot first.';
+$lang['module_notify_push'] = 'Notifications: browser push';
+$lang['module_notify_push_desc'] = 'Alerts on a till or phone with Rexlio closed. Needs HTTPS and each person to allow notifications.';
+$lang['notifications'] = 'Notifications';
+$lang['view_credentials'] = 'View provider keys';

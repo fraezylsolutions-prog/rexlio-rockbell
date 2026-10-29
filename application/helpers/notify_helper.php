@@ -112,6 +112,23 @@ if (!function_exists('irNotifyEnqueue')) {
         if ($test && $actual === '') { return 0; }   /* test mode with nowhere to send */
 
         $CI = &get_instance();
+
+        /* Queue-at-most-once. A caller that can be retried passes a dedupe_key;
+           everybody else passes nothing and is unaffected, because MySQL allows
+           any number of NULLs in a unique index.
+
+           On a key that is already present this returns the EXISTING row id, not
+           0. That distinction matters: push_online() treats a 0 as "could not be
+           queued" and sends the SMS inline instead, so returning 0 here would
+           text the customer exactly the duplicate this is meant to prevent. */
+        $dedupe = isset($m['dedupe_key']) ? substr(trim((string) $m['dedupe_key']), 0, 190) : '';
+        if ($dedupe !== '') {
+            $seen = @$CI->db->query(
+                "SELECT id FROM tbl_notification_outbox WHERE dedupe_key = "
+                . $CI->db->escape($dedupe) . " LIMIT 1");
+            if ($seen && $seen->num_rows()) { return (int) $seen->row()->id; }
+        }
+
         $data = array(
             'event_key'          => substr((string) $m['event_key'], 0, 60),
             'channel'            => substr($channel, 0, 20),
@@ -130,9 +147,28 @@ if (!function_exists('irNotifyEnqueue')) {
             'company_id'         => isset($m['company_id']) ? (int) $m['company_id'] : 1,
             'created_at'         => date('Y-m-d H:i:s'),
         );
+        if ($dedupe !== '') { $data['dedupe_key'] = $dedupe; }
+
         /* Suppressed on purpose: a missing table (code deployed before the
            migration) must not fatal the sale that triggered it. */
-        if (!@$CI->db->insert('tbl_notification_outbox', $data)) { return 0; }
+        if (!@$CI->db->insert('tbl_notification_outbox', $data)) {
+            /* Two tills retrying the same completion at the same moment both get
+               past the SELECT above and one loses the unique index. That is the
+               constraint doing its job, not a failure: look the winner up and
+               report it as queued. Also covers the column not existing yet,
+               where the row is simply queued without the key. */
+            if ($dedupe !== '') {
+                $seen = @$CI->db->query(
+                    "SELECT id FROM tbl_notification_outbox WHERE dedupe_key = "
+                    . $CI->db->escape($dedupe) . " LIMIT 1");
+                if ($seen && $seen->num_rows()) { return (int) $seen->row()->id; }
+                unset($data['dedupe_key']);
+                if (@$CI->db->insert('tbl_notification_outbox', $data)) {
+                    return (int) $CI->db->insert_id();
+                }
+            }
+            return 0;
+        }
         return (int) $CI->db->insert_id();
     }
 }

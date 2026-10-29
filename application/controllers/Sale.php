@@ -426,16 +426,26 @@ class Sale extends Cl_Controller {
 
         $event_txt = getSaleText($id);
         putAuditLog($this->session->userdata('user_id'),$event_txt,"Deleted Sale",date('Y-m-d H:i:s'));
-        //N3: order deleted.
-        irNotifyFire('order_deleted', array(
-            'sale_no' => isset($sale_no) ? $sale_no : '',
-            'outlet' => $this->session->userdata('outlet_name'),
-            'outlet_id' => $this->session->userdata('outlet_id'),
-            'user' => $this->session->userdata('full_name'),
-        ));
+        /* N3: read the sale BEFORE it is deleted, because the number has to come
+           from somewhere and after the delete there is nothing left to read.
+           The hook itself is fired further down, only once the delete has
+           actually succeeded: it used to fire here, which announced a deletion
+           that the next line could still fail to perform. */
+        $ir_deleted_sale = $this->db->where('id', $id)->get('tbl_sales')->row();
 
         $isDeleted = $this->delete_specific_order_by_sale_id($id);
         if($isDeleted){
+            /* N3: order deleted - after the delete, not before.
+               sale_no is taken from the row above and not from a $sale_no
+               variable: this method never had one, so the message always went
+               out saying an order with no number had been deleted. */
+            irNotifyFire('order_deleted', array(
+                'sale_no' => isset($ir_deleted_sale->sale_no) ? $ir_deleted_sale->sale_no : '',
+                'total' => isset($ir_deleted_sale->total_payable) ? $ir_deleted_sale->total_payable : '',
+                'outlet' => $this->session->userdata('outlet_name'),
+                'outlet_id' => $this->session->userdata('outlet_id'),
+                'user' => $this->session->userdata('full_name'),
+            ));
             $this->session->set_flashdata('exception', 'Information has been deleted successfully!');
             redirect('Sale/sales');
         }else{
@@ -1565,6 +1575,9 @@ class Sale extends Cl_Controller {
             $this->db->trans_begin();
             $sale_id = isset($sale_d->id) && $sale_d->id?$sale_d->id:'';
             $ir_new_version = 1;
+            /* N3: set only on the NEW-order branch, and fired after the commit.
+               Staying NULL is what stops a modify re-announcing the order. */
+            $ir_order_placed_ctx = NULL;
             if($sale_id>0){
                 //Cross-till versioning. A till that opened this order ("Open here")
                 //or the till that placed it may each hold a copy. The copy carries the
@@ -1604,17 +1617,34 @@ class Sale extends Cl_Controller {
                 //hybrid venue can sync without either overwriting the other's rows
                 $data = irStampOrigin($data, 'tbl_kitchen_sales');
                 $this->db->insert('tbl_kitchen_sales', $data);
-                //N3: order placed. This is the hottest path in the product -
-                //with the module off this costs one cached array lookup.
-                irNotifyFire('order_placed', array(
+                $sale_id = $this->db->insert_id();
+                /* N3: order placed. The hook does NOT run here, even though this
+                   is where the order comes into being. It is fired after
+                   trans_complete() instead - see irNotifyFire below - for two
+                   reasons, the second of which is the serious one:
+
+                     1. A rollback further down would leave a queued message for
+                        an order that never existed.
+                     2. Far worse: irNotifyFire runs its own queries, and
+                        CodeIgniter sets _trans_status = FALSE on ANY failed
+                        query while a transaction is open
+                        (system/database/DB_driver.php:662-665). A notification
+                        problem - most likely a missing table, because code is
+                        deployed before migrations are run - would therefore roll
+                        back the customer's ORDER at trans_complete(). The
+                        try/catch and the @ inside the helper cannot prevent that:
+                        they suppress the PHP error, not the flag CodeIgniter has
+                        already set on the connection.
+
+                   So only the facts are collected here, while $data is in scope. */
+                $ir_order_placed_ctx = array(
                     'sale_no' => isset($sale_no) ? $sale_no : '',
                     'outlet' => $this->session->userdata('outlet_name'),
                     'outlet_id' => $this->session->userdata('outlet_id'),
                     'user' => $this->session->userdata('full_name'),
                     'total' => isset($data['total_payable']) ? $data['total_payable'] : '',
                     'table' => isset($data['orders_table_text']) ? $data['orders_table_text'] : '',
-                ));
-                $sale_id = $this->db->insert_id();
+                );
 
                 if($is_self_order=="Yes" && $is_online_order!="Yes"){
                     $notification = "a new self order has been placed, Order Number is: ".$sale_no;
@@ -1783,6 +1813,19 @@ class Sale extends Cl_Controller {
                 $this->db->trans_rollback();
             } else {
                 $this->db->trans_commit();
+                /* N3: the order is now committed and durable, so it is safe to
+                   announce it. trans_complete() above is the real commit -
+                   it calls trans_commit() internally
+                   (system/database/DB_driver.php:876) and leaves _trans_depth at
+                   0, which makes the trans_commit() on the line above a no-op
+                   that returns FALSE without issuing anything. Anything after
+                   trans_complete() therefore runs outside the transaction, which
+                   is exactly where a notification belongs: a failure in here can
+                   no longer flip _trans_status and take the sale down with it. */
+                if ($ir_order_placed_ctx !== NULL) {
+                    $ir_order_placed_ctx['sale_id'] = $sale_id;
+                    irNotifyFire('order_placed', $ir_order_placed_ctx);
+                }
                 $printers_popup_print = $this->Common_model->getOrderedPrinter($sale_id,1);
                 $printers_direct_print = $this->Common_model->getOrderedPrinter($sale_id,2);
                 $is_printing_return = 1;
@@ -2103,9 +2146,14 @@ class Sale extends Cl_Controller {
 
         //store audit log data
         putAuditLog($this->session->userdata('user_id'),$txt,"Cancelled Sale",date('Y-m-d H:i:s'));
-        //N3: see the note at the other cancel site.
+        /* N3: see the note at the other cancel site. Fired here, after the
+           kitchen rows have gone, not before.
+           sale_no comes off $order_details: this method has no $sale_no
+           variable, so the old isset($sale_no) test was always false and every
+           cancellation alert went out with a blank order number. */
         irNotifyFire('order_cancelled', array(
-            'sale_no' => isset($sale_no) ? $sale_no : '',
+            'sale_no' => isset($order_details->sale_no) ? $order_details->sale_no : '',
+            'total' => isset($order_details->total_payable) ? $order_details->total_payable : '',
             'outlet' => $this->session->userdata('outlet_name'),
             'outlet_id' => $this->session->userdata('outlet_id'),
             'user' => $this->session->userdata('full_name'),
@@ -2822,6 +2870,25 @@ We hope to see you again!";
                             'customer_id' => trim_checker($order_details->customer_id),
                         ),
                         'outlet_id' => $this->session->userdata('outlet_id'),
+                        /* One receipt per order, however many times the till
+                           retries. The POS re-posts this completion every 7
+                           seconds until it sees a success, and the enqueue is
+                           gated only on send_sms_status and the customer having
+                           a number - not on whether THIS attempt was the one
+                           that created the sale. So a dropped response used to
+                           cost the customer a second text. Reproduced over real
+                           HTTP: two attempts, one sale, two receipt rows.
+
+                           Keyed on random_code rather than the order number:
+                           random_code is per order and never changes, while the
+                           number can be reassigned by the clash guard. Orders
+                           placed before random_code existed fall back to the
+                           number, which is the best identity they have. */
+                        'dedupe_key' => 'receipt:' . (
+                            trim((string) $data['random_code']) !== ''
+                                ? 'rc:' . $data['random_code']
+                                : 'no:' . $sale_no
+                        ),
                     ));
                     if(!$ir_queued){
                         smsSendOnly($sms_content,$customer->phone);
@@ -3512,15 +3579,22 @@ We hope to see you again!";
         $sale_id = $this->input->post('sale_id');
         $event_txt = getSaleText($sale_id);
         putAuditLog($this->session->userdata('user_id'),$event_txt,"Cancelled Sale",date('Y-m-d H:i:s'));
-        //N3: tell whoever asked to be told. One queue write, no sending.
+        /* N3: read the sale before it goes, so the alert can name it. */
+        $ir_cancelled_sale = $this->db->where('id', $sale_id)->get('tbl_sales')->row();
+        $this->delete_specific_order_by_sale_id($sale_id);
+        /* N3: tell whoever asked to be told. One queue write, no sending.
+           Fired after the delete, not before it, and with the number read from
+           the row: this method never had $sale_no or $reason, so both of the
+           old isset() tests were always false and the alert said only that
+           "an order" had been cancelled. */
         irNotifyFire('order_cancelled', array(
-            'sale_no' => isset($sale_no) ? $sale_no : '',
+            'sale_no' => isset($ir_cancelled_sale->sale_no) ? $ir_cancelled_sale->sale_no : '',
+            'total' => isset($ir_cancelled_sale->total_payable) ? $ir_cancelled_sale->total_payable : '',
             'outlet' => $this->session->userdata('outlet_name'),
             'outlet_id' => $this->session->userdata('outlet_id'),
             'user' => $this->session->userdata('full_name'),
-            'reason' => isset($reason) ? $reason : '',
+            'reason' => '',
         ));
-        $this->delete_specific_order_by_sale_id($sale_id);
         echo "success";
     }
      /**
@@ -4189,7 +4263,11 @@ We hope to see you again!";
         irNotifyFire('register_closed', array(
             'outlet' => $this->session->userdata('outlet_name'),
             'outlet_id' => $outlet_id,
-            'counter' => $counter_id,
+            /* the NAME, as register_force_closed already sends: the template
+               renders this as "Counter: {counter}", and a bare id told the
+               reader nothing. Returns '' if the counter has gone, which the
+               template shows as "-". */
+            'counter' => getCounterName($counter_id),
             'user' => $this->session->userdata('full_name'),
             'total' => isset($total_sale_all) ? $total_sale_all : '',
         ));

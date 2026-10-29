@@ -174,7 +174,15 @@ class Notification_worker extends CI_Controller {
         $dir = APPPATH . 'logs/notifications';
         if (!is_dir($dir)) { @mkdir($dir, 0755, TRUE); }
         @file_put_contents($dir . '/last-run.txt',
-            date('Y-m-d H:i:s') . '  ' . $line . PHP_EOL);
+            irNotifyNow() . '  ' . $line . PHP_EOL);
+
+        /* N5(c): the same statement - "the worker ran" - said to somebody
+           outside this server, so that the alarm does not depend on the thing
+           it is watching. Here rather than in run(), because markRun is already
+           on every path out, INCLUDING "master switch off": a heartbeat that
+           stopped when somebody turned the module off would raise a false
+           alarm about a system working exactly as told. */
+        irNotifyHeartbeat();
     }
 
     /** A summary. Writes nothing - safe to run at any time. */

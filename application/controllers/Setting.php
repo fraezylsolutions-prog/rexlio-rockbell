@@ -996,6 +996,19 @@ class Setting extends Cl_Controller {
                 //month lets a forgotten SMS silence a fresh alert.
                 $ack = (int) $this->input->post($this->security->xss_clean('ack_expiry_hours'));
                 $settings['ack_expiry_hours'] = ($ack >= 1 && $ack <= 168) ? $ack : 72;
+                //N5(c): what a link in a message points at. Under cron there is no
+                //request for base_url() to read, so without this an escalation's
+                //Acknowledge link came out as http://localhost/ack/...
+                $pub = trim((string) $this->input->post($this->security->xss_clean('public_base_url')));
+                $settings['public_base_url'] = preg_match('#^https?://[^\s<>"]+$#i', $pub) ? $pub : '';
+                //N5(c): the heartbeat URL is a secret, so it follows the same
+                //keep-or-replace rule as the provider key - a blank box or the mask
+                //itself leaves the stored one alone, and deleting needs its own box.
+                $settings['heartbeat_url'] = irNotifyKeepSecret(
+                    (string) $this->input->post('heartbeat_url'),
+                    isset($settings['heartbeat_url']) ? $settings['heartbeat_url'] : '',
+                    (bool) $this->input->post('clear_heartbeat_url')
+                );
                 $this->irSaveModuleSettings('notifications', $settings);
                 $this->session->set_flashdata('exception', lang('notify_saved'));
                 redirect('setting/notifications');

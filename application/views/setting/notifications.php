@@ -9,6 +9,11 @@ $master_row = isset($rows['notifications']) ? $rows['notifications'] : NULL;
 $master_on  = $master_row ? ((int) $master_row->is_enabled === 1) : FALSE;
 $mask       = isset($sms_cfg['api_key']) ? irNotifyMaskSecret($sms_cfg['api_key']) : '';
 $has_key    = isset($sms_cfg['api_key']) && $sms_cfg['api_key'] !== '';
+/* N5(c): the heartbeat URL is a secret in the same sense the provider key is -
+   anybody holding it can silence the alarm by pinging it themselves - so it is
+   masked and gated on view_credentials exactly the same way. */
+$has_heartbeat   = isset($general['heartbeat_url']) && $general['heartbeat_url'] !== '';
+$heartbeat_mask  = $has_heartbeat ? irNotifyMaskSecret($general['heartbeat_url']) : '';
 ?>
 <section class="main-content-wrapper">
     <?php $this->view('hotel/_flash'); ?>
@@ -160,6 +165,51 @@ $has_key    = isset($sms_cfg['api_key']) && $sms_cfg['api_key'] !== '';
                             </div>
                         </div>
                     </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12 mb-2 col-md-6">
+                        <div class="form-group">
+                            <label><?php echo lang('notify_public_base_url'); ?></label>
+                            <?php /* N5(c): what a link in a message points at. base_url()
+                                     is built from the current request, and the worker runs
+                                     under cron where there is no request - so without this
+                                     an escalation's Acknowledge link came out as
+                                     http://localhost/ack/... */ ?>
+                            <input type="text" name="public_base_url" class="form-control" <?php echo $can_update ? '' : 'disabled'; ?>
+                                   placeholder="https://goloviana.fraezyl.com/"
+                                   value="<?php echo escape_output(isset($general['public_base_url']) ? $general['public_base_url'] : ''); ?>">
+                            <small class="text-muted"><?php echo lang('notify_public_base_url_hint'); ?></small>
+                        </div>
+                    </div>
+                    <div class="col-sm-12 mb-2 col-md-6">
+                        <div class="form-group">
+                            <label><?php echo lang('notify_heartbeat'); ?></label>
+                            <?php /* Masked like the provider key: it is a secret URL, and
+                                     anybody holding it can silence the alarm by pinging it
+                                     themselves. No vendor is named - any heartbeat service
+                                     that accepts a GET works, and blank means off. */ ?>
+                            <input type="text" name="heartbeat_url" class="form-control" autocomplete="off" <?php echo $can_update ? '' : 'disabled'; ?>
+                                   placeholder="<?php echo $has_heartbeat ? escape_output(lang('notify_api_key_set')) : escape_output(lang('notify_heartbeat_empty')); ?>"
+                                   value="<?php echo ($has_heartbeat && $can_see_keys) ? escape_output($general['heartbeat_url']) : ''; ?>">
+                            <small class="text-muted">
+                                <?php if (!$has_heartbeat): ?>
+                                    <?php echo lang('notify_heartbeat_hint'); ?>
+                                <?php elseif ($can_see_keys): ?>
+                                    <?php echo lang('notify_heartbeat_on'); ?>
+                                <?php else: ?>
+                                    <?php echo lang('notify_api_key_masked'); ?> <code><?php echo escape_output($heartbeat_mask); ?></code>
+                                <?php endif; ?>
+                            </small>
+                        </div>
+                    </div>
+                    <?php if ($has_heartbeat && $can_update): ?>
+                    <div class="col-sm-12 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="clear_heartbeat_url" value="1" id="ir_clear_hb">
+                            <label class="form-check-label" for="ir_clear_hb"><?php echo lang('notify_heartbeat_clear'); ?></label>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <?php if (!empty($general['test_mode'])): ?>
                     <div class="callout callout-warning my-2"><?php echo lang('notify_test_mode_banner'); ?></div>

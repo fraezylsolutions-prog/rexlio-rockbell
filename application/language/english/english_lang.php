@@ -2491,3 +2491,12 @@ $lang['notify_ack_expiry_hint']      = 'How long an Acknowledge link keeps worki
 /* Notifications - N5(b): the escalation ladder */
 $lang['notify_escalate']        = 'Escalate after (min)';
 $lang['notify_escalate_hint']   = 'Minutes to wait for an Acknowledge before telling the next person on the list. 0 tells everybody at once. Only applies to a Critical rule.';
+
+/* Notifications - N5(c): the heartbeat, and the address links point at */
+$lang['notify_public_base_url']      = 'Public address of this site';
+$lang['notify_public_base_url_hint'] = 'Used for the Acknowledge links in messages. The worker runs from cron, where there is no web request to work this out from, so without it those links point at localhost and do not work. Example: https://goloviana.fraezyl.com/';
+$lang['notify_heartbeat']            = 'Heartbeat ping URL';
+$lang['notify_heartbeat_empty']      = 'Blank - no heartbeat. Nothing outside this server will notice if the worker stops.';
+$lang['notify_heartbeat_hint']       = 'Optional. The worker fetches this URL on every run, so an outside monitor can raise the alarm when the pings stop. Any service that accepts a plain GET works. Only the fact that the worker ran leaves this server - no order, customer or money data.';
+$lang['notify_heartbeat_on']         = 'Set. The worker pings this on every run.';
+$lang['notify_heartbeat_clear']      = 'Delete the heartbeat URL (turns the heartbeat off)';

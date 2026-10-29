@@ -40,6 +40,28 @@ if (empty($_SERVER['HTTP_HOST'])) {
     $host = getenv('RTD_CLI_HOST');
     $_SERVER['HTTP_HOST'] = ($host !== FALSE && $host !== '') ? $host : 'localhost';
 }
+
+/* config.php builds base_url as http:// unless $_SERVER['HTTPS'] is set, and
+   nothing sets it under CLI.
+   That was invisible until N5 began generating LINKS from the worker: an
+   escalation raised by cron carried http://localhost/ack/... - a link that goes
+   nowhere from a manager's phone. The FIRST alert was always correct, because
+   it is raised inside a real web request that knows its own host and scheme;
+   only worker-generated messages were wrong, which is the kind of difference
+   nobody notices until the night it matters.
+   A named host means a real site, and real sites are https. RTD_CLI_HTTPS=0
+   forces plain http for the rare install that needs it. */
+if (empty($_SERVER['HTTPS'])) {
+    $https = getenv('RTD_CLI_HTTPS');
+    $named = ($_SERVER['HTTP_HOST'] !== 'localhost'
+              && strpos($_SERVER['HTTP_HOST'], '127.0.0.1') !== 0);
+    if ($https === '0' || $https === 'off') {
+        /* deliberately left unset: config.php tests isset(), not the value */
+    } elseif (($https !== FALSE && $https !== '') || $named) {
+        $_SERVER['HTTPS'] = 'on';
+    }
+}
+
 /* config.php also reads SCRIPT_NAME to work out the sub-folder. Under CLI it is
    this file's path, which would put "cli.php" in base_url, so it is pinned to
    the same value a web request would give. */

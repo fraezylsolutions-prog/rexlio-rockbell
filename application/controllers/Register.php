@@ -550,6 +550,15 @@ class Register extends Cl_Controller {
             .', Counted: '.getAmtP($counted_amount)
             .', Discrepancy: '.getAmtP($discrepancy);
         putAuditLog($this->session->userdata('user_id'), $details, 'Force Closed Register', date('Y-m-d H:i:s'));
+        //N3: a force-close is an override, not a normal close - it is in the
+        //default critical set for exactly that reason.
+        irNotifyFire('register_force_closed', array(
+            'outlet' => isset($register->outlet_name) ? $register->outlet_name : $this->session->userdata('outlet_name'),
+            'outlet_id' => isset($register->outlet_id) ? $register->outlet_id : $this->session->userdata('outlet_id'),
+            'counter' => isset($register->counter_name) ? $register->counter_name : '',
+            'user' => $this->session->userdata('full_name'),
+            'reason' => $reason,
+        ));
 
         echo json_encode(array(
             'status' => 'ok',

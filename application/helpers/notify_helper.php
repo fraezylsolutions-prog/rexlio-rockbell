@@ -217,3 +217,189 @@ if (!function_exists('irNotifyDriver')) {
         return function_exists($fn) ? $fn : NULL;
     }
 }
+
+/* ------------------------------------------------------- firing an event -- */
+
+if (!function_exists('irNotifyEvents')) {
+    /**
+     * Every event the system can raise, and how to describe it.
+     *
+     * 'short' is written for SMS and WhatsApp and must stay inside one 160
+     * character page: plain ASCII, "N" rather than the naira sign, no emoji.
+     * A pound of cleverness here costs real money per message.
+     *
+     * 'long' is for email and in-app, where there is room to be useful.
+     * Both take the event's context through irNotifyFill().
+     */
+    function irNotifyEvents() {
+        return array(
+            'order_placed' => array(
+                'label' => 'Order placed',
+                'subject' => 'Order {sale_no} placed',
+                'short' => 'Rexlio: order {sale_no} placed at {outlet}, N{total}, by {user}.',
+                'long' => "Order {sale_no} has been placed.\n\nOutlet: {outlet}\nTable: {table}\nTotal: N{total}\nTaken by: {user}\nTime: {when}\n",
+            ),
+            'order_cancelled' => array(
+                'label' => 'Order cancelled',
+                'subject' => 'Order {sale_no} CANCELLED',
+                'short' => 'Rexlio: order {sale_no} CANCELLED at {outlet}, N{total}, by {user}. Reason: {reason}',
+                'long' => "Order {sale_no} has been cancelled.\n\nOutlet: {outlet}\nTotal: N{total}\nCancelled by: {user}\nReason: {reason}\nTime: {when}\n",
+            ),
+            'order_deleted' => array(
+                'label' => 'Order deleted',
+                'subject' => 'Order {sale_no} deleted',
+                'short' => 'Rexlio: order {sale_no} DELETED at {outlet}, N{total}, by {user}.',
+                'long' => "Order {sale_no} has been deleted.\n\nOutlet: {outlet}\nTotal: N{total}\nDeleted by: {user}\nTime: {when}\n",
+            ),
+            'register_closed' => array(
+                'label' => 'Register closed',
+                'subject' => 'Register closed at {outlet}',
+                'short' => 'Rexlio: register closed at {outlet} by {user}. Takings N{total}.',
+                'long' => "A register has been closed.\n\nOutlet: {outlet}\nCounter: {counter}\nClosed by: {user}\nTakings: N{total}\nTime: {when}\n",
+            ),
+            'register_force_closed' => array(
+                'label' => 'Register FORCE-closed',
+                'subject' => 'Register FORCE-CLOSED at {outlet}',
+                'short' => 'Rexlio: register FORCE-CLOSED at {outlet} by {user}. Reason: {reason}',
+                'long' => "A register was force-closed on somebody else's behalf.\n\nOutlet: {outlet}\nCounter: {counter}\nForced by: {user}\nReason: {reason}\nTime: {when}\n\nThis is worth checking: a force-close is an override, not a normal close.\n",
+            ),
+            'hotel_check_in' => array(
+                'label' => 'Hotel check-in',
+                'subject' => 'Check-in: room {room}',
+                'short' => 'Rexlio: check-in room {room}, {guest}, {outlet}.',
+                'long' => "A guest has checked in.\n\nRoom: {room}\nGuest: {guest}\nOutlet: {outlet}\nBy: {user}\nTime: {when}\n",
+            ),
+            'hotel_check_out' => array(
+                'label' => 'Hotel check-out',
+                'subject' => 'Check-out: room {room}',
+                'short' => 'Rexlio: check-out room {room}, {guest}, {outlet}.',
+                'long' => "A guest has checked out.\n\nRoom: {room}\nGuest: {guest}\nOutlet: {outlet}\nBy: {user}\nTime: {when}\n",
+            ),
+            'hotel_room_dirty' => array(
+                'label' => 'Room needs cleaning',
+                'subject' => 'Room {room} needs cleaning',
+                'short' => 'Rexlio: room {room} needs cleaning at {outlet}.',
+                'long' => "A room has been marked as needing attention.\n\nRoom: {room}\nStatus: {status}\nOutlet: {outlet}\nBy: {user}\nTime: {when}\n",
+            ),
+        );
+    }
+}
+
+if (!function_exists('irNotifyFill')) {
+    /** Replace {placeholders} from the event context. Anything absent reads "-". */
+    function irNotifyFill($template, $ctx) {
+        $out = $template;
+        if (preg_match_all('/\{([a-z_]+)\}/', $template, $m)) {
+            foreach ($m[1] as $key) {
+                $v = isset($ctx[$key]) && $ctx[$key] !== '' && $ctx[$key] !== NULL ? $ctx[$key] : '-';
+                $out = str_replace('{' . $key . '}', (string) $v, $out);
+            }
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('irNotifyRecipientsFor')) {
+    /**
+     * Turn a rule's recipient rows into actual addresses for one channel.
+     *
+     * Resolved at send time rather than stored, so a rule never ends up pointing
+     * at somebody who has left. A role with nobody in it yields nothing, which
+     * is correct and silent - the alternative is a rule that looks configured
+     * and quietly reaches no one.
+     */
+    function irNotifyRecipientsFor($rule_id, $channel) {
+        $CI = &get_instance();
+        $field = in_array($channel, array('sms', 'whatsapp', 'voice'), TRUE) ? 'phone' : 'email_address';
+        $out = array();
+
+        $rows = @$CI->db->query("SELECT recipient_type, recipient_value FROM tbl_notification_recipients
+                                  WHERE rule_id = " . (int) $rule_id . " AND del_status = 'Live'
+                                  ORDER BY escalation_order ASC, id ASC");
+        if (!$rows) { return $out; }
+
+        foreach ($rows->result() as $r) {
+            if ($r->recipient_type === 'fixed') {
+                $v = trim((string) $r->recipient_value);
+                if ($v !== '') { $out[] = $v; }
+                continue;
+            }
+            $where = ($r->recipient_type === 'role')
+                   ? 'role_id = ' . (int) $r->recipient_value
+                   : 'id = ' . (int) $r->recipient_value;
+            $q = @$CI->db->query("SELECT `$field` AS v FROM tbl_users
+                                   WHERE $where AND del_status = 'Live' AND active_status = 'Active'");
+            if (!$q) { continue; }
+            foreach ($q->result() as $u) {
+                $v = trim((string) $u->v);
+                if ($v !== '') { $out[] = $v; }
+            }
+        }
+        return array_values(array_unique($out));
+    }
+}
+
+if (!function_exists('irNotifyFire')) {
+    /**
+     * Raise an event. THIS IS WHAT EVERY HOOK CALLS, and all it may do.
+     *
+     * It must be cheap and it must never throw: it is called from the middle of
+     * saving a sale. The first line is the master switch, which irModuleEnabled
+     * caches per request, so with the module off a hook costs one array lookup.
+     * Everything after that is wrapped, because a notification problem must not
+     * become a failed sale.
+     *
+     * @param string $event_key one of irNotifyEvents()
+     * @param array  $ctx       placeholders for the templates
+     * @return int how many messages were queued
+     */
+    function irNotifyFire($event_key, $ctx = array()) {
+        if (!irNotifyOn()) { return 0; }
+
+        try {
+            $CI = &get_instance();
+            $events = irNotifyEvents();
+            if (!isset($events[$event_key])) { return 0; }
+            $def = $events[$event_key];
+
+            $outlet = isset($ctx['outlet_id']) ? (int) $ctx['outlet_id'] : 0;
+            /* outlet_id 0 on a rule means every outlet */
+            $rules = @$CI->db->query(
+                "SELECT id, channel, is_critical FROM tbl_notification_rules
+                  WHERE event_key = " . $CI->db->escape($event_key) . "
+                    AND is_enabled = 1 AND del_status = 'Live'
+                    AND (outlet_id = 0 OR outlet_id = " . $outlet . ")");
+            if (!$rules || !$rules->num_rows()) { return 0; }
+
+            if (!isset($ctx['when'])) { $ctx['when'] = date('Y-m-d H:i'); }
+            $queued = 0;
+
+            foreach ($rules->result() as $rule) {
+                if (!irNotifyChannelOn($rule->channel)) { continue; }
+                $short = in_array($rule->channel, array('sms', 'whatsapp', 'voice'), TRUE);
+                $body = irNotifyFill($short ? $def['short'] : $def['long'], $ctx);
+                $subject = irNotifyFill($def['subject'], $ctx);
+
+                foreach (irNotifyRecipientsFor($rule->id, $rule->channel) as $to) {
+                    $queued += irNotifyEnqueue(array(
+                        'event_key' => $event_key,
+                        'channel' => $rule->channel,
+                        'rule_id' => $rule->id,
+                        'intended_recipient' => $to,
+                        'subject' => $subject,
+                        'body' => $body,
+                        'payload' => $ctx,
+                        'is_critical' => (int) $rule->is_critical,
+                        'outlet_id' => $outlet ?: NULL,
+                    )) ? 1 : 0;
+                }
+            }
+            return $queued;
+        } catch (Throwable $e) {
+            /* Swallowed on purpose. A sale must not fail because a notification
+               could not be queued. The worker's log is where this surfaces. */
+            @irNotifyLog('FIRE FAILED ' . $event_key . ': ' . $e->getMessage());
+            return 0;
+        }
+    }
+}

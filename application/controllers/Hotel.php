@@ -404,6 +404,14 @@ class Hotel extends Cl_Controller {
         $this->Hotel_model->setRoomStatus($room->id, 'occupancy', 'occupied', $user_id, lang('hotel_log_checkin') . ' ' . $guest);
         $this->Hotel_model->logStatus($room->id, 'value', NULL, number_format($amount, 2, '.', ''), $user_id, lang('hotel_log_checkin') . ' ' . $nights . ' x ' . number_format($rate, 2, '.', '') . ' (stay ' . $stay_id . ')');
         putAuditLog($user_id, 'Check-in: room ' . $room->number . ', ' . $guest . ' (stay ' . $stay_id . ', value ' . $amount . ')', 'Hotel Check-in', date('Y-m-d H:i:s'));
+        //N3: check-in.
+        irNotifyFire('hotel_check_in', array(
+            'room' => $room->number,
+            'guest' => $guest,
+            'outlet' => getOutletNameById((int) $room->outlet_id),
+            'outlet_id' => $room->outlet_id,
+            'user' => $this->session->userdata('full_name'),
+        ));
         $this->jsonOk(array('stay_id' => $stay_id, 'rate' => $rate, 'nights' => $nights, 'amount' => $amount));
     }
 
@@ -444,6 +452,14 @@ class Hotel extends Cl_Controller {
         $this->Hotel_model->setRoomStatus($room->id, 'housekeeping', 'dirty', $user_id, lang('hotel_log_checkout'));
         $task_id = $this->Hotel_model->createTask($room->company_id, $room->outlet_id, $room->id, 'cleaning', $user_id, lang('hotel_task_after_checkout'));
         putAuditLog($user_id, 'Check-out: room ' . $room->number . ', ' . $stay->guest_name . ' (stay ' . $stay->id . ')', 'Hotel Check-out', date('Y-m-d H:i:s'));
+        //N3: check-out.
+        irNotifyFire('hotel_check_out', array(
+            'room' => $room->number,
+            'guest' => $stay->guest_name,
+            'outlet' => getOutletNameById((int) $room->outlet_id),
+            'outlet_id' => $room->outlet_id,
+            'user' => $this->session->userdata('full_name'),
+        ));
         $this->jsonOk(array('stay_id' => (int) $stay->id, 'task_id' => $task_id, 'actual_nights' => $actual, 'variance' => ($expected_n !== NULL && $actual !== $expected_n) ? 1 : 0));
     }
 
@@ -1097,6 +1113,16 @@ class Hotel extends Cl_Controller {
         putAuditLog($me, 'Create: room ' . $room->number . ', ' . $type . ' (task ' . $task_id . ')' . ($assign ? ' to user ' . $assign : ''), 'Hotel Task Create', date('Y-m-d H:i:s'));
         if ($type === 'cleaning' && in_array($room->housekeeping_status, array('clean', 'inspected'), TRUE)) {
             $this->Hotel_model->setRoomStatus($room->id, 'housekeeping', 'dirty', $me, $note !== '' ? $note : lang('hotel_task_cleaning'));
+        //N3: a room marked dirty, via the cleaning task that marks it.
+        if ($type === 'cleaning') {
+            irNotifyFire('hotel_room_dirty', array(
+                'room' => $room->number,
+                'status' => 'dirty',
+                'outlet' => getOutletNameById((int) $room->outlet_id),
+                'outlet_id' => $room->outlet_id,
+                'user' => $this->session->userdata('full_name'),
+            ));
+        }
         }
         $this->jsonOk(array('task_id' => $task_id));
     }

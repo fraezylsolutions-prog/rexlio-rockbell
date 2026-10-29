@@ -426,6 +426,13 @@ class Sale extends Cl_Controller {
 
         $event_txt = getSaleText($id);
         putAuditLog($this->session->userdata('user_id'),$event_txt,"Deleted Sale",date('Y-m-d H:i:s'));
+        //N3: order deleted.
+        irNotifyFire('order_deleted', array(
+            'sale_no' => isset($sale_no) ? $sale_no : '',
+            'outlet' => $this->session->userdata('outlet_name'),
+            'outlet_id' => $this->session->userdata('outlet_id'),
+            'user' => $this->session->userdata('full_name'),
+        ));
 
         $isDeleted = $this->delete_specific_order_by_sale_id($id);
         if($isDeleted){
@@ -1597,6 +1604,16 @@ class Sale extends Cl_Controller {
                 //hybrid venue can sync without either overwriting the other's rows
                 $data = irStampOrigin($data, 'tbl_kitchen_sales');
                 $this->db->insert('tbl_kitchen_sales', $data);
+                //N3: order placed. This is the hottest path in the product -
+                //with the module off this costs one cached array lookup.
+                irNotifyFire('order_placed', array(
+                    'sale_no' => isset($sale_no) ? $sale_no : '',
+                    'outlet' => $this->session->userdata('outlet_name'),
+                    'outlet_id' => $this->session->userdata('outlet_id'),
+                    'user' => $this->session->userdata('full_name'),
+                    'total' => isset($data['total_payable']) ? $data['total_payable'] : '',
+                    'table' => isset($data['orders_table_text']) ? $data['orders_table_text'] : '',
+                ));
                 $sale_id = $this->db->insert_id();
 
                 if($is_self_order=="Yes" && $is_online_order!="Yes"){
@@ -2086,6 +2103,14 @@ class Sale extends Cl_Controller {
 
         //store audit log data
         putAuditLog($this->session->userdata('user_id'),$txt,"Cancelled Sale",date('Y-m-d H:i:s'));
+        //N3: see the note at the other cancel site.
+        irNotifyFire('order_cancelled', array(
+            'sale_no' => isset($sale_no) ? $sale_no : '',
+            'outlet' => $this->session->userdata('outlet_name'),
+            'outlet_id' => $this->session->userdata('outlet_id'),
+            'user' => $this->session->userdata('full_name'),
+            'reason' => isset($reason) ? $reason : '',
+        ));
 
     }
     public function add_sale_by_ajax_split(){
@@ -3458,6 +3483,14 @@ We hope to see you again!";
         $sale_id = $this->input->post('sale_id');
         $event_txt = getSaleText($sale_id);
         putAuditLog($this->session->userdata('user_id'),$event_txt,"Cancelled Sale",date('Y-m-d H:i:s'));
+        //N3: tell whoever asked to be told. One queue write, no sending.
+        irNotifyFire('order_cancelled', array(
+            'sale_no' => isset($sale_no) ? $sale_no : '',
+            'outlet' => $this->session->userdata('outlet_name'),
+            'outlet_id' => $this->session->userdata('outlet_id'),
+            'user' => $this->session->userdata('full_name'),
+            'reason' => isset($reason) ? $reason : '',
+        ));
         $this->delete_specific_order_by_sale_id($sale_id);
         echo "success";
     }
@@ -4123,6 +4156,14 @@ We hope to see you again!";
         $this->db->where('opening_balance_date_time', $opening_date_time);
         $this->db->where('register_status', 1);
         $this->db->update('tbl_register', $changes);
+        //N3: a register closing normally.
+        irNotifyFire('register_closed', array(
+            'outlet' => $this->session->userdata('outlet_name'),
+            'outlet_id' => $outlet_id,
+            'counter' => $counter_id,
+            'user' => $this->session->userdata('full_name'),
+            'total' => isset($total_sale_all) ? $total_sale_all : '',
+        ));
     }
      /**
      * get new notification

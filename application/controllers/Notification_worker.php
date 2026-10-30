@@ -76,6 +76,7 @@ class Notification_worker extends CI_Controller {
             $line = $escalated ? ('nothing due (escalated ' . $escalated . ')') : 'nothing due';
             $this->out($line);
             $this->markRun($line);
+            $this->digests();
             return;
         }
 
@@ -149,6 +150,52 @@ class Notification_worker extends CI_Controller {
            -minute "nothing due" would bury the lines that matter. */
         if ($sent || $failed || $held || $escalated) { irNotifyLog($line); }
         $this->markRun($line);
+
+        /* THE DIGESTS GO LAST, AFTER the sending is finished and after the run
+           marker and the heartbeat have been written. Order matters here and it
+           was learned the hard way.
+
+           The digests are the only part of this worker that loads a MODEL, and
+           iRestora's CI_Model constructor runs an activation check that die()s
+           on a mismatch - so one bad environment variable in a cron line took
+           down the entire run: messages that were ready to send did not go, the
+           marker was never written and the heartbeat never fired, so the
+           monitor would have reported the worker dead when the only broken
+           thing was a daily summary.
+
+           Now the worst a digest failure can do is cost that day's digest. */
+        $this->digests();
+    }
+
+    /**
+     * Raise the daily digests. Safe to run on its own cron line.
+     *
+     *     php cli.php notification_worker digests
+     *
+     * Separated because this is the one part of the worker that touches a model
+     * and can therefore be killed by the vendor's activation check. A venue
+     * that would rather keep the send loop completely untouched by it can run
+     * this hourly on its own line and leave `run` to do nothing but send; the
+     * dedupe key means running it from both places is harmless.
+     */
+    /**
+     * Load one model and say so. Used by status() from a sub-process, because
+     * if the activation check refuses, this process dies rather than returning.
+     */
+    public function modelcheck() {
+        $this->load->model('Common_model');
+        echo "MODELS-OK
+";
+    }
+
+    public function digests() {
+        if (!irNotifyOn()) { return; }
+        $n = irNotifyRunDigests();
+        if ($n) {
+            $line = 'digests: ' . $n . ' raised';
+            $this->out($line);
+            irNotifyLog($line);
+        }
     }
 
     /**
@@ -213,6 +260,25 @@ class Notification_worker extends CI_Controller {
         if ($stuck && (int) $stuck->n > 0) {
             $this->out('WARNING: ' . $stuck->n . ' message(s) pending for over an hour - is cron running?');
         }
+
+        /* Can this CLI environment load a model at all? The digests are the
+           only part that needs one, and iRestora's activation check die()s
+           rather than returning an error, so the failure is otherwise silent:
+           digests simply never arrive and nothing says why. Checked in a
+           SUB-PROCESS because a failure would kill this one too. */
+        $this->out('install path    : REQUEST_URI=' . $_SERVER['REQUEST_URI']
+            . '  SERVER_NAME=' . $_SERVER['SERVER_NAME']);
+        $probe = @shell_exec(escapeshellarg(PHP_BINARY) . ' '
+            . escapeshellarg(FCPATH . 'cli.php') . ' notification_worker modelcheck 2>&1');
+        if (strpos((string) $probe, 'MODELS-OK') !== FALSE) {
+            $this->out('daily digests   : can run (models load under CLI)');
+        } else {
+            $this->out('daily digests   : WILL NOT RUN - a model cannot be loaded from cron.');
+            $this->out('                  Set RTD_CLI_PATH in the cron line to this site\'s');
+            $this->out('                  install path ("/" for a docroot install). Sending is');
+            $this->out('                  unaffected; only the end-of-day and low-stock');
+            $this->out('                  digests need this.');
+        }
     }
 
     /**
@@ -234,7 +300,9 @@ class Notification_worker extends CI_Controller {
             'body' => "This is a test from the Rexlio notification worker.\n\n"
                     . "If you are reading this, the queue, the worker and the "
                     . strtoupper($channel) . " settings are all working.\n\n"
-                    . 'Sent ' . date('Y-m-d H:i:s') . ' from ' . php_uname('n') . ".\n",
+                    /* venue clock: this line is read by a person, next to the
+                       clock on their wall */
+                    . 'Sent ' . irNotifyNow() . ' from ' . php_uname('n') . ".\n",
             'payload' => array('manual' => TRUE),
         ));
         if (!$id) { $this->out('could not queue - check the switches and the test recipient'); return; }

@@ -66,6 +66,7 @@ if (!function_exists('irNotifySettings')) {
             'ack_expiry_hours'  => 72,                /* N5(a): an old SMS must not silence a new alert */
             'public_base_url'   => '',                /* N5(c): what a link in a message must point at */
             'heartbeat_url'     => '',                /* N5(c): blank = no heartbeat */
+            'digest_timezone'   => 'Africa/Lagos',    /* N5(d): the venue's wall clock, explicitly */
         );
         $rows = irModuleRows();
         $stored = array();
@@ -203,8 +204,10 @@ if (!function_exists('irNotifyLog')) {
     function irNotifyLog($line) {
         $dir = APPPATH . 'logs/notifications';
         if (!is_dir($dir)) { @mkdir($dir, 0755, TRUE); }
-        $file = $dir . '/worker-' . date('Y-m-d') . '.log';
-        @file_put_contents($file, date('Y-m-d H:i:s') . '  ' . $line . "\n", FILE_APPEND);
+        /* The venue's clock here too, so a line in the log and a datetime in
+           the outbox can be read against each other without arithmetic. */
+        $file = $dir . '/worker-' . irNotifyVenueNow('Y-m-d') . '.log';
+        @file_put_contents($file, irNotifyNow() . '  ' . $line . "\n", FILE_APPEND);
     }
 }
 
@@ -379,6 +382,21 @@ if (!function_exists('irNotifyEvents')) {
                 'short' => 'Rexlio: room {room} needs cleaning at {outlet}.',
                 'long' => "A room has been marked as needing attention.\n\nRoom: {room}\nStatus: {status}\nOutlet: {outlet}\nBy: {user}\nTime: {when}\n",
             ),
+            /* N5(d): the two daily digests. Raised by the worker at the
+               outlet's closing time, not by anything a person does, which is
+               why neither has a {user}. */
+            'day_end_summary' => array(
+                'label' => 'End of day summary',
+                'subject' => '{outlet}: {date} takings N{takings}',
+                'short' => 'Rexlio {outlet} {date}: {orders} orders, N{takings} taken, N{due} due, {cancelled} cancelled, {force_closed} force-closed.',
+                'long' => "End of day at {outlet}.\n\nDate: {date}\nOrders: {orders}\nTakings: N{takings}\nPaid: N{paid}\nStill due: N{due}\nDiscounts given: N{discount}\nCancelled orders: {cancelled}\nDeleted orders: {deleted}\nRegisters force-closed: {force_closed}\nSent: {when}\n",
+            ),
+            'low_stock' => array(
+                'label' => 'Low stock',
+                'subject' => '{outlet}: {count} item(s) cannot be sold',
+                'short' => 'Rexlio {outlet}: {count} item(s) out of stock - {items}',
+                'long' => "These items cannot currently be sold at {outlet}, because there is not enough stock for even one.\n\nCount: {count}\nItems: {items}\n\nDate: {date}\nSent: {when}\n",
+            ),
         );
     }
 }
@@ -488,7 +506,21 @@ if (!function_exists('irNotifyFire')) {
             }
             if (!$rules || !$rules->num_rows()) { return 0; }
 
-            if (!isset($ctx['when'])) { $ctx['when'] = date('Y-m-d H:i'); }
+            /* N5(d): a caller that must only ever raise this event ONCE passes
+               ir_dedupe. Lifted out of the context before anything else sees it,
+               so it does not end up in a template or stored in the payload - it
+               is plumbing, not a fact about the event. */
+            $dedupe_base = '';
+            if (isset($ctx['ir_dedupe'])) {
+                $dedupe_base = (string) $ctx['ir_dedupe'];
+                unset($ctx['ir_dedupe']);
+            }
+
+            /* The time PRINTED IN THE MESSAGE, so it is the venue's wall clock
+               and not whatever timezone PHP is set to for this request. A
+               message saying "Time: 15:00" when the clock behind the bar says
+               16:00 is worse than no timestamp at all. */
+            if (!isset($ctx['when'])) { $ctx['when'] = irNotifyVenueNow('Y-m-d H:i'); }
             $queued = 0;
 
             /* N5(a): ONE acknowledgeable alert per call to this function, which
@@ -557,6 +589,10 @@ if (!function_exists('irNotifyFire')) {
                            cannot mark a non-critical message as answered */
                         'ack_group' => $is_crit ? $ack_group : '',
                         'escalation_tier' => 0,
+                        /* unique per row, because the index is: the same digest
+                           on two channels, or to two people, is two messages */
+                        'dedupe_key' => $dedupe_base === ''
+                            ? '' : $dedupe_base . ':' . $rule->channel . ':' . $to,
                     )) ? 1 : 0;
                 }
             }
@@ -1005,7 +1041,7 @@ if (!function_exists('irNotifyAckState')) {
                and has since expired should say "already done", not "too late". */
             return array('state' => 'already', 'row' => $row);
         }
-        if (strtotime($row->expires_at) < time()) { return array('state' => 'expired', 'row' => $row); }
+        if (irNotifyStamp($row->expires_at) < time()) { return array('state' => 'expired', 'row' => $row); }
         return array('state' => 'open', 'row' => $row);
     }
 }
@@ -1132,12 +1168,40 @@ if (!function_exists('irNotifyNow')) {
      * way; changing the connection's clock would move those too. So the module
      * stops asking the database what time it is instead.
      *
-     * date() and not gmdate(): the application sets PHP's timezone per request
-     * from the venue's own setting (my_helper.php, date_default_timezone_set),
-     * and a venue reading its own log wants its own wall clock.
+     * THE VENUE'S WALL CLOCK, EXPLICITLY - not date(), which is PHP's default.
+     * That was the first version and it was still two clocks, just quieter
+     * ones: the application resets PHP's timezone per request from a settings
+     * row (my_helper.php, date_default_timezone_set), while cron runs on
+     * whatever php.ini says - UTC on this machine. So a token written by a web
+     * request and read by the worker were an hour apart again, and an
+     * Acknowledge link would have expired an hour early or late depending on
+     * which side wrote it.
+     *
+     * One clock for the whole module, and it is the clock on the venue's wall.
+     * Anything comparing a STORED value against this must parse it through
+     * irNotifyStamp(), not strtotime(), for the same reason.
      */
     function irNotifyNow($offset_seconds = 0) {
-        return date('Y-m-d H:i:s', time() + (int) $offset_seconds);
+        return irNotifyVenueNow('Y-m-d H:i:s', $offset_seconds);
+    }
+}
+
+if (!function_exists('irNotifyStamp')) {
+    /**
+     * A datetime this module stored, as an epoch.
+     *
+     * strtotime() would read it in PHP's default timezone, which is exactly the
+     * assumption irNotifyNow() stopped making. Every stored notification
+     * datetime is venue wall-clock, so it has to be parsed as one.
+     */
+    function irNotifyStamp($stored) {
+        $stored = trim((string) $stored);
+        if ($stored === '') { return 0; }
+        $d = DateTime::createFromFormat('Y-m-d H:i:s', $stored, irNotifyVenueZone());
+        if (!$d) {
+            $d = DateTime::createFromFormat('Y-m-d H:i', $stored, irNotifyVenueZone());
+        }
+        return $d ? $d->getTimestamp() : 0;
     }
 }
 
@@ -1214,7 +1278,7 @@ if (!function_exists('irNotifyEscalate')) {
                when the alert was raised. A failed rung still counts as gone
                out: nobody is coming, so the next person should hear sooner,
                not never. */
-            $due_at = strtotime($g->last_at) + ((int) $g->mins * 60);
+            $due_at = irNotifyStamp($g->last_at) + ((int) $g->mins * 60);
             if ($due_at > time()) { continue; }
 
             $next = (int) $g->tier + 1;
@@ -1353,5 +1417,272 @@ if (!function_exists('irNotifyHeartbeat')) {
             return FALSE;
         }
         return TRUE;
+    }
+}
+
+/* -------------------------------------- N5(d): the venue clock and digests -- */
+
+if (!function_exists('irNotifyVenueZone')) {
+    /**
+     * The zone the VENUE's day is measured in. Africa/Lagos unless somebody
+     * deliberately changes it.
+     *
+     * Deliberately NOT PHP's default timezone. The application resets that per
+     * request from a settings row (my_helper.php, date_default_timezone_set),
+     * cron runs with whatever php.ini says - UTC on this machine - and the
+     * database server has a third opinion again. "We close at 23:00" is a
+     * statement about the clock on the venue's wall, and it has to mean the
+     * same thing whichever of those three is asking.
+     */
+    function irNotifyVenueZone() {
+        $tz = trim((string) irNotifySetting('digest_timezone', 'Africa/Lagos'));
+        if ($tz === '') { $tz = 'Africa/Lagos'; }
+        try {
+            return new DateTimeZone($tz);
+        } catch (Exception $e) {
+            @irNotifyLog('unknown digest timezone "' . $tz . '", falling back to Africa/Lagos');
+            return new DateTimeZone('Africa/Lagos');
+        }
+    }
+}
+
+if (!function_exists('irNotifyVenueNow')) {
+    /**
+     * Now, on the venue's wall clock. $offset_seconds shifts it.
+     *
+     * Built from a UTC instant and then converted, so the answer does not
+     * depend on what PHP's default zone happens to be when it is called.
+     */
+    function irNotifyVenueNow($format = 'Y-m-d H:i:s', $offset_seconds = 0) {
+        $d = new DateTime('@' . (time() + (int) $offset_seconds));   /* always UTC */
+        $d->setTimezone(irNotifyVenueZone());
+        return $d->format($format);
+    }
+}
+
+if (!function_exists('irNotifyVenueStamp')) {
+    /**
+     * A venue wall-clock date and time, as a UTC epoch.
+     *
+     * This is the one that matters for "has closing time passed?": the answer
+     * has to be a comparison between two instants, not between two strings
+     * written in different zones.
+     */
+    function irNotifyVenueStamp($date, $time) {
+        $d = DateTime::createFromFormat('Y-m-d H:i:s', $date . ' ' . $time, irNotifyVenueZone());
+        return $d ? $d->getTimestamp() : 0;
+    }
+}
+
+if (!function_exists('irNotifyDigestOutlets')) {
+    /**
+     * The outlets a digest applies to.
+     *
+     * is_sales_enabled = 0 is the test, NOT the name "Central Store". A store
+     * that does not sell has no takings to report and nothing a waiter could
+     * fail to sell, so the digest is meaningless there. Matching on the name
+     * would also have missed Guest House, which is in exactly the same
+     * position, and would break the first time somebody renames an outlet.
+     */
+    function irNotifyDigestOutlets() {
+        $CI = &get_instance();
+        $q = @$CI->db->query(
+            "SELECT id, outlet_name, company_id, eod_closing_time
+               FROM tbl_outlets
+              WHERE del_status = 'Live'
+                AND is_sales_enabled = 1
+              ORDER BY id ASC");
+        return ($q && $q->num_rows()) ? $q->result() : array();
+    }
+}
+
+if (!function_exists('irNotifyDayEndFigures')) {
+    /** What an outlet took on one business day. */
+    function irNotifyDayEndFigures($outlet_id, $date) {
+        $CI = &get_instance();
+        $q = @$CI->db->query(
+            "SELECT COUNT(*) AS orders,
+                    COALESCE(SUM(total_payable), 0)         AS takings,
+                    COALESCE(SUM(paid_amount), 0)           AS paid,
+                    COALESCE(SUM(due_amount), 0)            AS due,
+                    COALESCE(SUM(total_discount_amount), 0) AS discount
+               FROM tbl_sales
+              WHERE outlet_id = " . (int) $outlet_id . "
+                AND del_status = 'Live'
+                AND sale_date = " . $CI->db->escape($date));
+        if (!$q || !$q->num_rows()) {
+            return array('orders' => 0, 'takings' => 0, 'paid' => 0, 'due' => 0, 'discount' => 0);
+        }
+        $r = $q->row();
+        $out = array(
+            'orders'   => (int) $r->orders,
+            'takings'  => (float) $r->takings,
+            'paid'     => (float) $r->paid,
+            'due'      => (float) $r->due,
+            'discount' => (float) $r->discount,
+        );
+
+        /* Cancellations, deletions and force-closes come from the audit log,
+           which is where the product already records them, rather than from
+           the outbox. The outbox would only know about them if somebody had
+           configured a rule for that event - so a venue that had not would get
+           a digest reporting zero cancellations on a day full of them, which is
+           worse than not reporting it at all. */
+        $counts = array(
+            'cancelled'    => 'Cancelled Sale',
+            'deleted'      => 'Deleted Sale',
+            'force_closed' => 'Force Closed Register',
+        );
+        foreach ($counts as $key => $title) {
+            $out[$key] = 0;
+            $c = @$CI->db->query(
+                "SELECT COUNT(*) AS n FROM tbl_audit_logs
+                  WHERE outlet_id = " . (int) $outlet_id . "
+                    AND `date` = " . $CI->db->escape($date) . "
+                    AND event_title = " . $CI->db->escape($title));
+            if ($c && $c->num_rows()) { $out[$key] = (int) $c->row()->n; }
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('irNotifyLowStockItems')) {
+    /**
+     * Which menu items this outlet cannot currently sell even one of.
+     *
+     * Reuses stockBlockedItems() rather than defining "low" a second time. That
+     * function already decides what the till refuses to sell, so a digest built
+     * on anything else would eventually disagree with the till - and the till
+     * is the one the customer is standing in front of. Asking it "what would be
+     * blocked if somebody ordered one of each" gives exactly the list worth
+     * acting on before tomorrow.
+     */
+    function irNotifyLowStockItems($outlet_id, $company_id) {
+        $CI = &get_instance();
+        $q = @$CI->db->query(
+            "SELECT id FROM tbl_food_menus
+              WHERE del_status = 'Live' AND parent_id = 0
+              ORDER BY id ASC");
+        if (!$q || !$q->num_rows()) { return array(); }
+
+        $items = array();
+        foreach ($q->result() as $row) {
+            $one = new stdClass();
+            $one->food_menu_id = (int) $row->id;
+            $one->qty = 1;
+            $items[] = $one;
+        }
+
+        /* stockBlockedItems() reaches oversaleBlocked(), which reads company_id
+           OFF THE SESSION. The worker runs from cron and has no session, so
+           company_id came out as 0: the company row was never found, the global
+           "block oversale" setting read as off, and NOTHING was ever reported
+           as low. It would have been a digest that quietly never fired on a
+           live site - the worst kind, because an empty report looks like good
+           news.
+           So the company is put into the session for the duration of the call
+           and put back afterwards. Borrowing the session is ugly; defining
+           "low" a second time would be worse, because the till already decides
+           what it will not sell and a digest that disagreed with the till would
+           be wrong in front of a customer. */
+        $had = $CI->session->userdata('company_id');
+        $CI->session->set_userdata('company_id', (int) $company_id);
+        $blocked = stockBlockedItems($items, $outlet_id, $company_id);
+        if ($had === NULL) { $CI->session->unset_userdata('company_id'); }
+        else { $CI->session->set_userdata('company_id', $had); }
+
+        return is_array($blocked) ? $blocked : array();
+    }
+}
+
+if (!function_exists('irNotifyRunDigests')) {
+    /**
+     * Fire the daily digests that are due. Returns how many were raised.
+     *
+     * ONE PER OUTLET PER DAY, enforced by the outbox dedupe key and not by a
+     * flag anywhere else: the worker runs every minute, so "have I already sent
+     * this?" has to be answered by something that cannot be raced. The key
+     * carries the VENUE's date, so a digest belongs to the business day the
+     * venue just finished rather than to whatever date the server is on.
+     *
+     * CATCH-UP, WITHIN REASON. If cron was down at closing time the digest is
+     * still sent when it comes back, up to six hours late - a day's figures
+     * arriving at 2am is useful, the same figures arriving two days later are
+     * just confusing, and the dedupe key stops it ever arriving twice.
+     */
+    function irNotifyRunDigests() {
+        if (!irNotifyOn()) { return 0; }
+        $raised = 0;
+        $now = time();
+        $grace = 6 * 3600;
+
+        foreach (irNotifyDigestOutlets() as $outlet) {
+          try {
+            $closing = trim((string) $outlet->eod_closing_time);
+            if ($closing === '' || $closing === '00:00:00') { continue; }   /* opted out */
+
+            /* Which business day has just closed? Today's closing time if it
+               has passed, otherwise yesterday's - which is what makes a worker
+               running at 00:05 still send the night before's figures. */
+            $today = irNotifyVenueNow('Y-m-d');
+            $stamp = irNotifyVenueStamp($today, $closing);
+            $date  = $today;
+            if ($stamp > $now) {
+                $date  = irNotifyVenueNow('Y-m-d', -86400);
+                $stamp = irNotifyVenueStamp($date, $closing);
+            }
+            if ($stamp <= 0 || $now < $stamp || ($now - $stamp) > $grace) { continue; }
+
+            $company_id = (int) $outlet->company_id ?: 1;
+
+            /* ---- end of day ---- */
+            $f = irNotifyDayEndFigures($outlet->id, $date);
+            $raised += irNotifyFire('day_end_summary', array(
+                'outlet'     => $outlet->outlet_name,
+                'outlet_id'  => $outlet->id,
+                'company_id' => $company_id,
+                'date'       => $date,
+                'orders'     => $f['orders'],
+                'takings'    => number_format($f['takings'], 2),
+                'paid'       => number_format($f['paid'], 2),
+                'due'        => number_format($f['due'], 2),
+                'discount'   => number_format($f['discount'], 2),
+                /* Cast for clarity only: irNotifyFill tests against '' and NULL,
+                   not falsiness, so 0 renders as "0" either way - checked,
+                   because "0 cancelled" is a fact worth stating and "-" would
+                   read as "we do not know". */
+                'cancelled'    => (string) $f['cancelled'],
+                'deleted'      => (string) $f['deleted'],
+                'force_closed' => (string) $f['force_closed'],
+                'when'       => irNotifyVenueNow('Y-m-d H:i'),
+                'ir_dedupe'  => 'eod:' . (int) $outlet->id . ':' . $date,
+            )) ? 1 : 0;
+
+            /* ---- low stock ---- */
+            $low = irNotifyLowStockItems($outlet->id, $company_id);
+            if ($low) {
+                $names = implode(', ', array_slice($low, 0, 20));
+                if (count($low) > 20) { $names .= ' (+' . (count($low) - 20) . ' more)'; }
+                $raised += irNotifyFire('low_stock', array(
+                    'outlet'     => $outlet->outlet_name,
+                    'outlet_id'  => $outlet->id,
+                    'company_id' => $company_id,
+                    'date'       => $date,
+                    'count'      => count($low),
+                    'items'      => $names,
+                    'when'       => irNotifyVenueNow('Y-m-d H:i'),
+                    'ir_dedupe'  => 'lowstock:' . (int) $outlet->id . ':' . $date,
+                )) ? 1 : 0;
+            }
+          } catch (Throwable $e) {
+            /* One outlet must not cost the others their digest. Caught per
+               outlet rather than around the whole loop for exactly that reason.
+               Note this cannot catch a die() - the vendor's activation check
+               ends the process outright - which is why the worker now runs the
+               digests only after the sending, the marker and the heartbeat. */
+            @irNotifyLog('digest failed for outlet ' . $outlet->id . ': ' . $e->getMessage());
+          }
+        }
+        return $raised;
     }
 }

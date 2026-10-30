@@ -66,7 +66,48 @@ if (empty($_SERVER['HTTPS'])) {
    this file's path, which would put "cli.php" in base_url, so it is pinned to
    the same value a web request would give. */
 $_SERVER['SCRIPT_NAME'] = '/index.php';
-if (empty($_SERVER['REQUEST_URI'])) { $_SERVER['REQUEST_URI'] = '/index.php'; }
+
+/* SERVER_NAME and REQUEST_URI: the vendor's activation check needs them.
+ *
+ * iRestora's CI_Model constructor (system/core/Model.php) checks the install
+ * against $_SERVER on EVERY model load and die()s on a mismatch, rendering an
+ * obfuscated view that does not exist - so the symptom is the baffling
+ *   "Unable to load the requested file: supplierPayment/supplierPayments/bak0719.php"
+ * and the process stops dead. Under cron there is no request, so those vars are
+ * absent and the check cannot evaluate at all: EVERY model load from CLI died,
+ * whatever the code was doing. Nothing to do with stock or notifications.
+ *
+ * This supplies the same two values Apache would, so the check can do its job.
+ * It is NOT a way round it: given a host this install is not licensed for, it
+ * still refuses - verified with SERVER_NAME=notourdomain.example.com.
+ *
+ * RTD_CLI_PATH is the path the application is installed under, because the
+ * check compares HTTP_HOST . explode('/', REQUEST_URI)[1] against the recorded
+ * installation URL:
+ *   installed at a docroot (Rockbell, Goloviana)  ->  '/'          (the default)
+ *   installed in a folder, e.g. localhost/rexlio  ->  '/rexlio/index.php'
+ * Default '/' is right for both live sites. Get it wrong and the only symptom
+ * is that cron silently does nothing, so notification_worker status reports it.
+ */
+if (empty($_SERVER['SERVER_NAME'])) {
+    $_SERVER['SERVER_NAME'] = $_SERVER['HTTP_HOST'];
+}
+if (empty($_SERVER['REQUEST_URI'])) {
+    $path = getenv('RTD_CLI_PATH');
+    if ($path === FALSE || $path === '') {
+        $path = '/';
+    } elseif ($path[0] !== '/') {
+        /* A leading slash is optional, so RTD_CLI_PATH=rexlio/index.php works
+           as well as /rexlio/index.php. Not cosmetic: Git Bash on Windows
+           rewrites a leading '/' in an argument or variable into a Windows path
+           (/rexlio/index.php became C:/Program Files/Git/rexlio/index.php),
+           and the workaround for that - MSYS_NO_PATHCONV - then breaks every
+           other POSIX path handed to a Windows PHP. Accepting both spellings
+           avoids the whole argument. */
+        $path = '/' . $path;
+    }
+    $_SERVER['REQUEST_URI'] = $path;
+}
 
 chdir(__DIR__);
 require __DIR__ . '/index.php';

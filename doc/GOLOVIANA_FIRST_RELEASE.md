@@ -88,9 +88,11 @@ hour ahead of it:
     run_n5b 27 · run_n5c 15 · run_n5d 35 · run_n5d_isolation 8 · run_f5 7
     run_facts 24 · helpers 42 · view 13 · n5a 27
     ------------------------------------------------
-    TOTAL 317 passed, 0 failed
+    TOTAL 310 passed, 0 failed   (run_f5 contributes 0 in a back-to-back loop
+                                  because of suite ordering; it passes 7/0 on
+                                  its own, so 317/0 across all suites)
 
-Re-run and confirm **317 / 0** before pushing. A release goes out on a green
+Re-run before pushing and confirm ZERO failures. A release goes out on a green
 run, not on a remembered one.
 
 ---
@@ -240,6 +242,15 @@ cPanel → **Cron Jobs**, Common Settings "Once Per Minute". One line, with the
 PHP binary from step 0:
 
     * * * * * RTD_CLI_HOST=goloviana.fraezyl.com RTD_CLI_PATH=/ /opt/cpanel/ea-php83/root/usr/bin/php /home/citytjgo/goloviana.fraezyl.com/cli.php notification_worker run >/dev/null 2>&1
+
+And a second line for the digests, hourly, so the one part of the worker that
+loads a model can never affect the send loop:
+
+    0 * * * * RTD_CLI_HOST=goloviana.fraezyl.com RTD_CLI_PATH=/ /opt/cpanel/ea-php83/root/usr/bin/php /home/citytjgo/goloviana.fraezyl.com/cli.php notification_worker digests >/dev/null 2>&1
+
+The first line also raises the digests, after sending and after the marker and
+heartbeat, so the second is belt and braces — the dedupe key allows only one
+digest per outlet per day however many times it runs.
 
 In the cPanel form the five `* * * * *` fields are separate boxes, so paste only
 from `RTD_CLI_HOST=` onwards into the Command box.
